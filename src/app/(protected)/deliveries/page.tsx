@@ -1,0 +1,73 @@
+import { createClient } from '@/lib/supabase/server'
+import DeliveriesClient from './DeliveriesClient'
+
+export const dynamic = 'force-dynamic'
+
+export default async function DeliveriesPage() {
+  let products: unknown[] = []
+  let contracts: unknown[] = []
+  let deliveries: unknown[] = []
+  let fetchError: string | null = null
+
+  try {
+    const supabase = await createClient()
+    const [pResult, cResult, dResult] = await Promise.all([
+      supabase
+        .from('products')
+        .select('id, name, display_name, buyer, price_unit, is_active')
+        .eq('is_active', true)
+        .order('display_name'),
+      supabase
+        .from('contracts')
+        .select('id, product_id, start_date, end_date, sell_price, cost_price, currency, reference_exchange_rate')
+        .order('start_date', { ascending: false }),
+      supabase
+        .from('deliveries')
+        .select(`
+          id, year_month, delivery_date, product_id, contract_id,
+          quantity_kg, addl_quantity_kg, addl_margin_per_ton,
+          hoejin_shortage_kg, hoejin_shortage_price,
+          memo, created_at,
+          product:products(id, display_name, buyer),
+          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, start_date, end_date)
+        `)
+        .order('year_month', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(200),
+    ])
+
+    if (pResult.error) fetchError = `품목: ${pResult.error.message}`
+    else if (cResult.error) fetchError = `계약: ${cResult.error.message}`
+    else if (dResult.error) fetchError = `입고: ${dResult.error.message}`
+    else {
+      products  = pResult.data  ?? []
+      contracts = cResult.data  ?? []
+      deliveries = dResult.data ?? []
+    }
+  } catch (e) {
+    fetchError = e instanceof Error ? e.message : String(e)
+  }
+
+  if (fetchError) {
+    return (
+      <div className="p-6">
+        <h2 className="text-xl font-bold text-red-600 mb-2">데이터 로드 오류</h2>
+        <div className="bg-red-50 border border-red-200 rounded p-3 font-mono text-xs text-red-800 mb-4">
+          {fetchError}
+        </div>
+        <p className="text-sm text-gray-500">Supabase 마이그레이션 실행 여부를 확인하세요.</p>
+      </div>
+    )
+  }
+
+  return (
+    <DeliveriesClient
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      products={products as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      contracts={contracts as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      initialDeliveries={deliveries as any[]}
+    />
+  )
+}
