@@ -26,16 +26,9 @@ export async function proxy(request: NextRequest) {
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // TODO: 로그인 기능 임시 비활성화 — 테스트용
     const pathname = request.nextUrl.pathname
-
-    if (!user && pathname !== '/login') {
-      const url = request.nextUrl.clone()
-      url.pathname = '/login'
-      return NextResponse.redirect(url)
-    }
-
-    if (user && pathname === '/login') {
+    if (pathname === '/login') {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'
       return NextResponse.redirect(url)

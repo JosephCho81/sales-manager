@@ -1,5 +1,3 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
 
 export default async function ProtectedLayout({
@@ -7,22 +5,8 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  let userEmail = ''
-
-  try {
-    const supabase = await createClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      redirect('/login')
-    }
-
-    userEmail = user.email ?? ''
-  } catch (e) {
-    // createClient 자체가 실패하면 (쿠키 컨텍스트 없음 등) 로그인으로
-    console.error('[layout] auth error:', e)
-    redirect('/login')
-  }
+  // TODO: 로그인 기능 임시 비활성화 — 테스트용
+  const userEmail = ''
 
   return (
     <div className="flex h-screen overflow-hidden">
