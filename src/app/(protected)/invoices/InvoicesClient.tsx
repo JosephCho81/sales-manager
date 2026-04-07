@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { replaceInvoices, deleteAllInvoices, toggleInvoicePaid } from './actions'
 import { generateInvoices, type DeliveryForInvoice } from '@/lib/invoice-generator'
 import { fmtKrw } from '@/lib/margin'
 
@@ -153,7 +153,6 @@ export default function InvoicesClient({
     setGenerating(true)
     setError(null)
     try {
-      const supabase = createClient()
       const mapped = mapDeliveries()
       if (mapped.length === 0) {
         setError('이 달에 입고 데이터가 없거나 계약 정보가 없습니다.')
@@ -166,14 +165,6 @@ export default function InvoicesClient({
         return
       }
 
-      // 기존 삭제
-      const { error: delErr } = await supabase
-        .from('invoice_instructions')
-        .delete()
-        .eq('year_month', yearMonth)
-      if (delErr) throw new Error(delErr.message)
-
-      // 신규 삽입
       const rows = generated.map(inv => ({
         year_month: inv.year_month,
         product_id: inv.product_id,
@@ -191,14 +182,10 @@ export default function InvoicesClient({
         memo: inv.memo,
       }))
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error: insErr } = await supabase
-        .from('invoice_instructions')
-        .insert(rows)
-        .select('*')
-      if (insErr) throw new Error(insErr.message)
+      const result = await replaceInvoices(yearMonth, rows)
+      if (result.error) throw new Error(result.error)
 
-      setInvoices((data ?? []) as InvoiceRow[])
+      setInvoices((result.data ?? []) as InvoiceRow[])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -212,12 +199,8 @@ export default function InvoicesClient({
     setDeleting(true)
     setError(null)
     try {
-      const supabase = createClient()
-      const { error: e } = await supabase
-        .from('invoice_instructions')
-        .delete()
-        .eq('year_month', yearMonth)
-      if (e) throw new Error(e.message)
+      const result = await deleteAllInvoices(yearMonth)
+      if (result.error) throw new Error(result.error)
       setInvoices([])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -235,16 +218,12 @@ export default function InvoicesClient({
       prev.map(inv => (inv.id === id ? { ...inv, is_paid: newPaid, paid_at: paidAt } : inv))
     )
     try {
-      const supabase = createClient()
-      const { error: e } = await supabase
-        .from('invoice_instructions')
-        .update({ is_paid: newPaid, paid_at: paidAt })
-        .eq('id', id)
-      if (e) {
+      const result = await toggleInvoicePaid(id, newPaid, paidAt)
+      if (result.error) {
         setInvoices(prev =>
           prev.map(inv => (inv.id === id ? { ...inv, is_paid: currentPaid } : inv))
         )
-        setError(e.message)
+        setError(result.error)
       }
     } catch (e) {
       setInvoices(prev =>

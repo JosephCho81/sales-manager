@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { upsertDelivery, upsertFxRate, deleteDelivery } from './actions'
 import { calcMarginFromContract, calcAddlMargin, fmtKrw, fmtNum } from '@/lib/margin'
 
 // ────────────────────────────────────────────────────────
@@ -321,36 +321,18 @@ export default function DeliveriesClient({
       memo: form.memo || null,
     }
 
-    const supabase = createClient()
-
     // FeSi BL 날짜 환율 입력 시 fx_rates 테이블에 upsert
     if (isFeSi && form.fesi_fx_rate) {
       const rate = parseFloat(form.fesi_fx_rate)
       if (rate > 0) {
-        await supabase.from('fx_rates').upsert({
-          product_id: form.product_id,
-          bl_date: form.delivery_date,
-          rate_krw_per_usd: rate,
-          memo: '입고 등록 시 입력',
-        }, { onConflict: 'product_id,bl_date' })
+        await upsertFxRate(form.product_id, form.delivery_date, rate)
       }
     }
 
-    const SELECT = `
-      id, year_month, delivery_date, product_id, contract_id,
-      quantity_kg, addl_quantity_kg, addl_margin_per_ton,
-      hoejin_shortage_kg, hoejin_shortage_price,
-      memo, created_at,
-      product:products(id, display_name, buyer),
-      contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, start_date, end_date)
-    `
-
-    const result = editId
-      ? await supabase.from('deliveries').update(payload).eq('id', editId).select(SELECT).single()
-      : await supabase.from('deliveries').insert(payload).select(SELECT).single()
+    const result = await upsertDelivery(payload, editId ?? undefined)
 
     if (result.error) {
-      setError(result.error.message)
+      setError(result.error)
       setSaving(false)
       return
     }
@@ -371,9 +353,8 @@ export default function DeliveriesClient({
   // ────────────────────────
   async function handleDelete(id: string) {
     if (!confirm('이 입고 데이터를 삭제하시겠습니까?')) return
-    const supabase = createClient()
-    const { error: err } = await supabase.from('deliveries').delete().eq('id', id)
-    if (err) { alert('삭제 실패: ' + err.message); return }
+    const result = await deleteDelivery(id)
+    if (result.error) { alert('삭제 실패: ' + result.error); return }
     setDeliveries(prev => prev.filter(d => d.id !== id))
   }
 

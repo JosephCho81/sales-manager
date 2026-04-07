@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { insertHyundaiTransaction, deleteHyundaiTransaction } from './actions'
 import { calcMarginFromContract, calcAddlMargin, splitMargin, fmtKrw, fmtNum } from '@/lib/margin'
 
 // ─────────────────────────────────────────────
@@ -198,24 +198,19 @@ export default function HyundaiClient({
     setSaving(true)
     setError(null)
     try {
-      const supabase = createClient()
-      const { data, error: e } = await supabase
-        .from('hyundai_transactions')
-        .insert({
-          year_month: form.ym,
-          invoice_date: monthEnd(form.ym),
-          quantity_kg: qty * 1000,
-          sell_price: price,    // 화림 통보 단가
-          cost_price: 0,
-          commission_amount: commAmt,
-          commission_type: 'shortage',
-          memo: form.memo || `AL30 ${form.ym} 부족분 커미션 — ${fmtNum(qty, 3)}톤 × ${fmtNum(price)}원/톤`,
-        })
-        .select('*')
-        .single()
-      if (e) throw new Error(e.message)
-      if (data) {
-        setShortageList(prev => [data as ShortageEntry, ...prev])
+      const result = await insertHyundaiTransaction({
+        year_month: form.ym,
+        invoice_date: monthEnd(form.ym),
+        quantity_kg: qty * 1000,
+        sell_price: price,
+        cost_price: 0,
+        commission_amount: commAmt,
+        commission_type: 'shortage',
+        memo: form.memo || `AL30 ${form.ym} 부족분 커미션 — ${fmtNum(qty, 3)}톤 × ${fmtNum(price)}원/톤`,
+      })
+      if (result.error) throw new Error(result.error)
+      if (result.data) {
+        setShortageList(prev => [result.data as ShortageEntry, ...prev])
         setForm(f => ({ ...f, qty_ton: '', price_per_ton: '', memo: '' }))
       }
     } catch (e) {
@@ -228,9 +223,8 @@ export default function HyundaiClient({
   async function handleDeleteShortage(id: string) {
     if (!confirm('이 부족분 항목을 삭제하시겠습니까?')) return
     try {
-      const supabase = createClient()
-      const { error: e } = await supabase.from('hyundai_transactions').delete().eq('id', id)
-      if (e) throw new Error(e.message)
+      const result = await deleteHyundaiTransaction(id)
+      if (result.error) throw new Error(result.error)
       setShortageList(prev => prev.filter(s => s.id !== id))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

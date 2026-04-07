@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { upsertProduct, toggleProductActive } from './actions'
 import type { Product, VatType, PriceUnit } from '@/types'
 
 const BUYERS = ['동국제강', '현대제철', '기타']
@@ -92,7 +92,6 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
     setSaving(true)
     setError('')
 
-    const supabase = createClient()
     const payload = {
       name: form.name.toUpperCase().replace(/\s/g, ''),
       display_name: form.display_name,
@@ -110,15 +109,10 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
       is_active: true,
     }
 
-    let result
-    if (editId) {
-      result = await supabase.from('products').update(payload).eq('id', editId).select().single()
-    } else {
-      result = await supabase.from('products').insert(payload).select().single()
-    }
+    const result = await upsertProduct(payload, editId ?? undefined)
 
     if (result.error) {
-      setError(result.error.message)
+      setError(result.error)
       setSaving(false)
       return
     }
@@ -136,8 +130,7 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
   }
 
   async function toggleActive(p: Product) {
-    const supabase = createClient()
-    await supabase.from('products').update({ is_active: !p.is_active }).eq('id', p.id)
+    await toggleProductActive(p.id, !p.is_active)
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, is_active: !p.is_active } : x))
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { upsertFxRate, deleteFxRate } from './actions'
 import { fmtKrw, fmtNum } from '@/lib/margin'
 
 // ─────────────────────────────────────────────
@@ -127,33 +127,24 @@ export default function FeSiClient({
     setSaving(true)
     setError(null)
     try {
-      const supabase = createClient()
-
-      // upsert: 같은 product_id + bl_date면 업데이트
-      const { data, error: e } = await supabase
-        .from('fx_rates')
-        .upsert(
-          {
-            product_id: form.product_id,
-            bl_date: form.bl_date,
-            rate_krw_per_usd: rate,
-            memo: form.memo || null,
-          },
-          { onConflict: 'product_id,bl_date' }
-        )
-        .select('*')
-        .single()
-      if (e) throw new Error(e.message)
-      if (data) {
+      const result = await upsertFxRate({
+        product_id: form.product_id,
+        bl_date: form.bl_date,
+        rate_krw_per_usd: rate,
+        memo: form.memo || null,
+      })
+      if (result.error) throw new Error(result.error)
+      if (result.data) {
+        const data = result.data as FxRateRow
         setFxRates(prev => {
           const key = `${data.product_id}:${data.bl_date}`
           const exists = prev.findIndex(r => `${r.product_id}:${r.bl_date}` === key)
           if (exists >= 0) {
             const next = [...prev]
-            next[exists] = data as FxRateRow
+            next[exists] = data
             return next
           }
-          return [data as FxRateRow, ...prev]
+          return [data, ...prev]
         })
         setForm(f => ({ ...f, bl_date: '', rate: '', memo: '' }))
       }
@@ -167,9 +158,8 @@ export default function FeSiClient({
   async function handleDeleteRate(id: string) {
     if (!confirm('이 환율 기록을 삭제하시겠습니까?')) return
     try {
-      const supabase = createClient()
-      const { error: e } = await supabase.from('fx_rates').delete().eq('id', id)
-      if (e) throw new Error(e.message)
+      const result = await deleteFxRate(id)
+      if (result.error) throw new Error(result.error)
       setFxRates(prev => prev.filter(r => r.id !== id))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { upsertContract, deleteContract } from './actions'
 import type { Product } from '@/types'
 
 // ────────────────────────────────────────────────────────
@@ -189,25 +189,10 @@ export default function ContractsClient({
       memo: form.memo || null,
     }
 
-    const supabase = createClient()
-    let result
-    if (editId) {
-      result = await supabase
-        .from('contracts')
-        .update(payload)
-        .eq('id', editId)
-        .select('*, product:products(id, name, display_name, price_unit)')
-        .single()
-    } else {
-      result = await supabase
-        .from('contracts')
-        .insert(payload)
-        .select('*, product:products(id, name, display_name, price_unit)')
-        .single()
-    }
+    const result = await upsertContract(payload, editId ?? undefined)
 
     if (result.error) {
-      setError(result.error.message)
+      setError(result.error)
       setSaving(false)
       return
     }
@@ -226,12 +211,8 @@ export default function ContractsClient({
   // ────────────────────────
   async function handleDelete(id: string) {
     if (!confirm('이 낙찰 단가를 삭제하시겠습니까?\n연결된 입고 데이터가 있으면 삭제되지 않습니다.')) return
-    const supabase = createClient()
-    const { error: err } = await supabase.from('contracts').delete().eq('id', id)
-    if (err) {
-      alert('삭제 실패: ' + err.message)
-      return
-    }
+    const result = await deleteContract(id)
+    if (result.error) { alert('삭제 실패: ' + result.error); return }
     setContracts(prev => prev.filter(c => c.id !== id))
   }
 
