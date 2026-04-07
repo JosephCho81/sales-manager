@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import HyundaiClient from './HyundaiClient'
 
 export const dynamic = 'force-dynamic'
@@ -23,7 +23,7 @@ export default async function HyundaiPage({ searchParams }: { searchParams: Sear
   let fetchError: string | null = null
 
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // AL30 product_id 조회
     const { data: al30 } = await supabase

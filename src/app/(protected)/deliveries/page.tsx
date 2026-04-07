@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import DeliveriesClient from './DeliveriesClient'
 
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,7 @@ export default async function DeliveriesPage() {
   let fetchError: string | null = null
 
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const [pResult, cResult, dResult] = await Promise.all([
       supabase
         .from('products')

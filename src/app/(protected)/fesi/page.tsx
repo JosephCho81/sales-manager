@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import FeSiClient from './FeSiClient'
 
 export const dynamic = 'force-dynamic'
@@ -21,7 +21,7 @@ export default async function FeSiPage({ searchParams }: { searchParams: SearchP
   let fetchError: string | null = null
 
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const [pRes, dRes, rRes] = await Promise.all([
       // FeSi 품목 목록

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { calcMarginFromContract, calcAddlMargin, fmtKrw, fmtNum } from '@/lib/margin'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let unpaidInvoices: any[] = []
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const [dResult, iResult] = await Promise.all([
       supabase
         .from('deliveries')
