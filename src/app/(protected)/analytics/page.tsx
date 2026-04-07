@@ -3,64 +3,56 @@ import AnalyticsClient from './AnalyticsClient'
 
 export const dynamic = 'force-dynamic'
 
-type SearchParams = Promise<{ month?: string }>
+type SP = Promise<{ month?: string; from?: string; to?: string; year?: string }>
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams
+function currentYM() {
   const now = new Date()
-  const yearMonth =
-    params.month ??
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default async function AnalyticsPage({ searchParams }: { searchParams: SP }) {
+  const params = await searchParams
+
+  let fromYM: string, toYM: string, mode: 'month' | 'range' | 'year'
+
+  if (params.year) {
+    fromYM = `${params.year}-01`
+    toYM   = `${params.year}-12`
+    mode   = 'year'
+  } else if (params.from || params.to) {
+    const ym = currentYM()
+    fromYM = params.from ?? ym
+    toYM   = params.to   ?? ym
+    mode   = 'range'
+  } else {
+    const ym = params.month ?? currentYM()
+    fromYM = ym
+    toYM   = ym
+    mode   = 'month'
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let deliveries: any[] = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let monthInvoices: any[] = []
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let allCostInvoices: any[] = []
   let fetchError: string | null = null
 
   try {
     const supabase = await createClient()
-    const [dRes, mRes, cRes] = await Promise.all([
-      // 해당 월 입고 (마진 계산용)
-      supabase
-        .from('deliveries')
-        .select(`
-          id, year_month, product_id,
-          quantity_kg, addl_quantity_kg, addl_margin_per_ton,
-          product:products(id, name, display_name, buyer, vat),
-          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-        `)
-        .eq('year_month', yearMonth),
+    const { data, error } = await supabase
+      .from('deliveries')
+      .select(`
+        id, year_month, product_id,
+        quantity_kg, addl_quantity_kg, addl_margin_per_ton,
+        product:products(id, name, display_name, buyer),
+        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+      `)
+      .gte('year_month', fromYM)
+      .lte('year_month', toYM)
+      .order('year_month')
 
-      // 해당 월 계산서 지시 전체 (회사별 현황용)
-      supabase
-        .from('invoice_instructions')
-        .select(
-          'id, year_month, product_id, from_company, to_company, supply_amount, vat_amount, total_amount, invoice_basis_date, payment_due_date, is_paid, paid_at, invoice_type, memo'
-        )
-        .eq('year_month', yearMonth),
-
-      // 원가 계산서 전체 (거래처 지급 이력용 — 월 필터 없음)
-      supabase
-        .from('invoice_instructions')
-        .select(
-          'id, year_month, product_id, from_company, to_company, supply_amount, vat_amount, total_amount, invoice_basis_date, payment_due_date, is_paid, paid_at, invoice_type, memo'
-        )
-        .eq('invoice_type', 'cost')
-        .order('payment_due_date', { ascending: false })
-        .limit(300),
-    ])
-
-    if (dRes.error) fetchError = `입고: ${dRes.error.message}`
-    else if (mRes.error) fetchError = `계산서: ${mRes.error.message}`
-    else if (cRes.error) fetchError = `원가이력: ${cRes.error.message}`
-    else {
-      deliveries = dRes.data ?? []
-      monthInvoices = mRes.data ?? []
-      allCostInvoices = cRes.data ?? []
-    }
+    if (error) fetchError = error.message
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    else deliveries = (data ?? []) as any[]
   } catch (e) {
     fetchError = e instanceof Error ? e.message : String(e)
   }
@@ -78,13 +70,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Se
 
   return (
     <AnalyticsClient
-      yearMonth={yearMonth}
+      fromYM={fromYM}
+      toYM={toYM}
+      mode={mode}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      initialDeliveries={deliveries as any[]}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      monthInvoices={monthInvoices as any[]}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      allCostInvoices={allCostInvoices as any[]}
+      deliveries={deliveries as any[]}
     />
   )
 }
