@@ -18,7 +18,7 @@ export default async function DashboardPage() {
       supabase
         .from('deliveries')
         .select(`
-          id, quantity_kg, addl_quantity_kg, addl_margin_per_ton, depreciation_kg,
+          id, quantity_kg, addl_quantity_kg, addl_margin_per_ton, depreciation_amount,
           product:products(id, display_name, buyer, price_unit),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
@@ -45,12 +45,14 @@ export default async function DashboardPage() {
     const isFesi = d.product?.price_unit === 'USD_TON'
     const sellRate = isFesi && d.contract.reference_exchange_rate
       ? d.contract.reference_exchange_rate : 1
-    const effKg = d.quantity_kg - (d.depreciation_kg ?? 0)
-    const sellKrw = d.contract.sell_price * (isFesi ? sellRate : 1) * effKg / 1000
+    // 감가는 금액 차감(원) — 소괴탄/분탄 전용, FeSi는 null
+    const sellKrw = d.contract.sell_price * (isFesi ? sellRate : 1) * d.quantity_kg / 1000
+      - (d.depreciation_amount ?? 0)
 
     totalSell += sellKrw
 
-    const m = calcMarginFromContract(d.contract, effKg)
+    // 마진: 감가가 sell/cost 양쪽 동일 차감되므로 quantity_kg 기준으로 계산
+    const m = calcMarginFromContract(d.contract, d.quantity_kg)
     totalMargin += m.total_margin
     totalGm += m.geumhwa
     totalRs += m.raseong

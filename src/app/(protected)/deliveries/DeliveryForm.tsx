@@ -16,7 +16,7 @@ function makeEmptyForm(defaultDate?: string): FormState {
     product_id: '', contract_id: '', quantity_kg: '', fesi_fx_rate: '',
     use_addl: false, addl_quantity_kg: '', addl_margin_per_ton: '',
     use_shortage: false, hoejin_shortage_kg: '', hoejin_shortage_price: '',
-    depreciation_ton: '',
+    depreciation_amount: '',
     memo: '',
   }
 }
@@ -34,7 +34,7 @@ function formFromDelivery(d: DeliveryRow): FormState {
     use_shortage: !!(d.hoejin_shortage_kg && d.hoejin_shortage_kg > 0),
     hoejin_shortage_kg: d.hoejin_shortage_kg ? String(d.hoejin_shortage_kg / 1000) : '',
     hoejin_shortage_price: d.hoejin_shortage_price ? String(d.hoejin_shortage_price) : '',
-    depreciation_ton: d.depreciation_kg ? String(d.depreciation_kg / 1000) : '',
+    depreciation_amount: d.depreciation_amount ? String(d.depreciation_amount) : '',
     memo: d.memo ?? '',
   }
 }
@@ -151,8 +151,8 @@ export default function DeliveryForm({
         ? parseFloat(form.hoejin_shortage_kg) * 1000 : null,
       hoejin_shortage_price: form.use_shortage && form.hoejin_shortage_price
         ? parseFloat(form.hoejin_shortage_price) : null,
-      depreciation_kg: isCoal && form.depreciation_ton
-        ? parseFloat(form.depreciation_ton) * 1000 : null,
+      depreciation_amount: isCoal && form.depreciation_amount
+        ? parseFloat(form.depreciation_amount) : null,
       memo: form.memo || null,
     }
 
@@ -368,23 +368,23 @@ export default function DeliveryForm({
       {isCoal && form.contract_id && (
         <div className="mb-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            감가 (선택) <span className="font-normal normal-case text-gray-400">— 자연 감량</span>
+            감가 (선택) <span className="font-normal normal-case text-gray-400">— 동국제강 지정 감가금액</span>
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="label">감가 물량 (톤)</label>
+              <label className="label">감가 금액 (원)</label>
               <div className="relative">
                 <input
-                  type="number" className="input pr-10" value={form.depreciation_ton}
-                  onChange={e => setForm(f => ({ ...f, depreciation_ton: e.target.value }))}
-                  placeholder="예: 2.000" step="0.001" min="0"
+                  type="number" className="input pr-10" value={form.depreciation_amount}
+                  onChange={e => setForm(f => ({ ...f, depreciation_amount: e.target.value }))}
+                  placeholder="예: 50000" step="1" min="0"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">톤</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">원</span>
               </div>
-              {form.depreciation_ton && form.quantity_kg && (
+              {form.depreciation_amount && (
                 <p className="mt-1 text-xs text-gray-400">
-                  실 청구 물량: <span className="font-medium text-gray-600">
-                    {fmtNum(parseFloat(form.quantity_kg) - parseFloat(form.depreciation_ton || '0'), 3)}톤
+                  렘코·동창 동일 적용: <span className="font-medium text-gray-600">
+                    -{fmtKrw(parseFloat(form.depreciation_amount || '0'))}
                   </span>
                 </p>
               )}

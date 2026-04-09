@@ -30,7 +30,7 @@ export interface DeliveryRow {
   addl_margin_per_ton: number | null
   hoejin_shortage_kg: number | null
   hoejin_shortage_price: number | null
-  depreciation_kg: number | null
+  depreciation_amount: number | null
   memo: string | null
   created_at: string
   product: { id: string; display_name: string; buyer: string }
@@ -57,6 +57,6 @@ export interface FormState {
   use_shortage: boolean
   hoejin_shortage_kg: string
   hoejin_shortage_price: string
-  depreciation_ton: string
+  depreciation_amount: string
   memo: string
 }

@@ -1,6 +1,7 @@
 /**
  * 소괴탄 / 분탄 (동국제강)
- * - 감가(depreciation_kg) 반영: 실 청구 물량 = quantity_kg - depreciation_kg
+ * - 감가(depreciation_amount) 반영: 청구 금액 = quantity_kg × 단가 / 1000 - depreciation_amount(원)
+ *   동국제강 지정 감가금액으로, 렘코·동창에 동일 금액 적용
  * 소괴탄: 동국→한국에이원 역발행 (VAT 없음), 익월1일 발행/익월10일 대금
  * 분탄:  동국→렘코→한국에이원→동창 (VAT 10%), 익월1일 동시 발행/익월10일 대금
  */
@@ -8,10 +9,6 @@ import { splitMargin } from '@/lib/margin'
 import { shiftMonths, monthEnd, nthDay } from '@/lib/date'
 import { makeInvoice } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
-
-function effectiveKg(d: DeliveryForInvoice): number {
-  return d.quantity_kg - (d.depreciation_kg ?? 0)
-}
 
 export function genSoggae(
   deliveries: DeliveryForInvoice[],
@@ -21,8 +18,8 @@ export function genSoggae(
   const ids   = deliveries.map(d => d.id)
   const nextM = shiftMonths(ym, 1)
 
-  const sellTotal  = deliveries.reduce((s, d) => s + d.contract.sell_price * effectiveKg(d) / 1000, 0)
-  const costTotal  = deliveries.reduce((s, d) => s + d.contract.cost_price * effectiveKg(d) / 1000, 0)
+  const sellTotal  = deliveries.reduce((s, d) => s + d.contract.sell_price * d.quantity_kg / 1000 - (d.depreciation_amount ?? 0), 0)
+  const costTotal  = deliveries.reduce((s, d) => s + d.contract.cost_price * d.quantity_kg / 1000 - (d.depreciation_amount ?? 0), 0)
   const marginTotal = Math.round(sellTotal - costTotal)
   const { geumhwa, raseong } = splitMargin(marginTotal)
 
@@ -62,8 +59,8 @@ export function genBuntan(
   const ids   = deliveries.map(d => d.id)
   const nextM = shiftMonths(ym, 1)
 
-  const sellTotal  = deliveries.reduce((s, d) => s + d.contract.sell_price * effectiveKg(d) / 1000, 0)
-  const costTotal  = deliveries.reduce((s, d) => s + d.contract.cost_price * effectiveKg(d) / 1000, 0)
+  const sellTotal  = deliveries.reduce((s, d) => s + d.contract.sell_price * d.quantity_kg / 1000 - (d.depreciation_amount ?? 0), 0)
+  const costTotal  = deliveries.reduce((s, d) => s + d.contract.cost_price * d.quantity_kg / 1000 - (d.depreciation_amount ?? 0), 0)
   const marginTotal = Math.round(sellTotal - costTotal)
   const { geumhwa, raseong } = splitMargin(marginTotal)
 
