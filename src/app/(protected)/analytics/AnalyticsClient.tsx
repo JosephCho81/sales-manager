@@ -6,7 +6,7 @@ import { fmtKrw, fmtNum } from '@/lib/margin'
 import { getCurrentYearMonth } from '@/lib/date'
 import {
   computeMargins, buildProductRows, buildMonthlyData, PRODUCT_ORDER,
-  type DeliveryRaw,
+  type DeliveryForAnalytics,
 } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 
@@ -22,7 +22,7 @@ export default function AnalyticsClient({
   fromYM: string
   toYM: string
   mode: 'month' | 'range' | 'year'
-  deliveries: DeliveryRaw[]
+  deliveries: DeliveryForAnalytics[]
 }) {
   const router = useRouter()
 

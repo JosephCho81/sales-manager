@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { replaceInvoices, deleteAllInvoices, toggleInvoicePaid } from './actions'
 import { generateInvoices } from '@/lib/invoice-generator'
-import { mapDeliveries, type DeliveryRaw, type FxRateRaw } from '@/lib/invoice-generator/mapper'
+import { mapDeliveries, type DeliveryRawForInvoice, type FxRateRaw } from '@/lib/invoice-generator/mapper'
 import { fmtKrw } from '@/lib/margin'
 import InvoiceTable from './InvoiceTable'
 import type { InvoiceRow } from './types'
@@ -20,7 +20,7 @@ export default function InvoicesClient({
   fxRates,
 }: {
   yearMonth: string
-  initialDeliveries: DeliveryRaw[]
+  initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
   fxRates: FxRateRaw[]
 }) {

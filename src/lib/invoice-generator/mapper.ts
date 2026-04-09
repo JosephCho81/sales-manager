@@ -4,7 +4,7 @@
  */
 import type { DeliveryForInvoice } from './types'
 
-export type DeliveryRaw = {
+export type DeliveryRawForInvoice = {
   id: string
   year_month: string
   delivery_date: string | null
@@ -33,7 +33,7 @@ export type FxRateRaw = {
 }
 
 export function mapDeliveries(
-  deliveries: DeliveryRaw[],
+  deliveries: DeliveryRawForInvoice[],
   fxRates: FxRateRaw[],
 ): DeliveryForInvoice[] {
   const fxRateMap = new Map<string, number>()
