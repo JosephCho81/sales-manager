@@ -1,3 +1,4 @@
+import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
 import ProductsClient from './ProductsClient'
 
@@ -22,7 +23,7 @@ export default async function ProductsPage() {
     }
   } catch (e) {
     console.error('[products] unexpected error:', e)
-    fetchError = e instanceof Error ? e.message : String(e)
+    fetchError = toMessage(e)
   }
 
   if (fetchError) {

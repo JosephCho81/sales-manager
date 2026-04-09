@@ -1,5 +1,7 @@
+import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
 import AnalyticsClient from './AnalyticsClient'
+import FetchErrorView from '@/components/FetchErrorView'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,19 +56,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     else deliveries = (data ?? []) as any[]
   } catch (e) {
-    fetchError = e instanceof Error ? e.message : String(e)
+    fetchError = toMessage(e)
   }
 
-  if (fetchError) {
-    return (
-      <div className="p-6">
-        <h2 className="text-xl font-bold text-red-600 mb-2">데이터 로드 오류</h2>
-        <div className="bg-red-50 border border-red-200 rounded p-3 font-mono text-xs text-red-800">
-          {fetchError}
-        </div>
-      </div>
-    )
-  }
+  if (fetchError) return <FetchErrorView message={fetchError} />
 
   return (
     <AnalyticsClient

@@ -8,7 +8,8 @@ export default async function DashboardPage() {
   const now = new Date()
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-  let rows: unknown[] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let deliveries: any[] = []
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let unpaidInvoices: any[] = []
   try {
@@ -17,11 +18,11 @@ export default async function DashboardPage() {
       supabase
         .from('deliveries')
         .select(`
-          id, year_month, quantity_kg, addl_quantity_kg, addl_margin_per_ton,
-          product:products(id, display_name, buyer),
+          id, quantity_kg, addl_quantity_kg, addl_margin_per_ton, depreciation_kg,
+          product:products(id, display_name, buyer, price_unit),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
-        .eq('year_month', yearMonth)
+        .eq('invoice_month', yearMonth)
         .order('created_at', { ascending: false }),
       supabase
         .from('invoice_instructions')
@@ -30,55 +31,116 @@ export default async function DashboardPage() {
         .order('payment_due_date', { ascending: true })
         .limit(50),
     ])
-    rows = dResult.data ?? []
+    deliveries = dResult.data ?? []
     unpaidInvoices = iResult.data ?? []
-  } catch { rows = []; unpaidInvoices = [] }
+  } catch { deliveries = []; unpaidInvoices = [] }
 
-  // 합산
-  let totalMargin = 0, totalA1 = 0, totalGm = 0, totalRs = 0
+  // ── 집계 ──────────────────────────────────────
+  let totalSell = 0, totalMargin = 0, totalGm = 0, totalRs = 0
+  const byBuyer = new Map<string, { sell: number; margin: number }>()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const d of rows as any[]) {
+  for (const d of deliveries as any[]) {
     if (!d.contract) continue
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
-    totalMargin += m.total_margin; totalA1 += m.korea_a1; totalGm += m.geumhwa; totalRs += m.raseong
+    const isFesi = d.product?.price_unit === 'USD_TON'
+    const sellRate = isFesi && d.contract.reference_exchange_rate
+      ? d.contract.reference_exchange_rate : 1
+    const effKg = d.quantity_kg - (d.depreciation_kg ?? 0)
+    const sellKrw = d.contract.sell_price * (isFesi ? sellRate : 1) * effKg / 1000
+
+    totalSell += sellKrw
+
+    const m = calcMarginFromContract(d.contract, effKg)
+    totalMargin += m.total_margin
+    totalGm += m.geumhwa
+    totalRs += m.raseong
+
     if (d.addl_quantity_kg && d.addl_margin_per_ton) {
       const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-      totalMargin += am.total_margin; totalA1 += am.korea_a1; totalGm += am.geumhwa; totalRs += am.raseong
+      totalMargin += am.total_margin
+      totalGm += am.geumhwa
+      totalRs += am.raseong
     }
+
+    const buyer = d.product?.buyer ?? '기타'
+    const prev = byBuyer.get(buyer) ?? { sell: 0, margin: 0 }
+    byBuyer.set(buyer, { sell: prev.sell + sellKrw, margin: prev.margin + m.total_margin })
   }
 
-  const summaryCards = [
-    { label: '이번 달 총 마진', value: fmtKrw(totalMargin), color: 'text-blue-600' },
-    { label: '한국에이원 배분', value: fmtKrw(totalA1),     color: 'text-green-600' },
-    { label: '금화 배분',       value: fmtKrw(totalGm),     color: 'text-purple-600' },
-    { label: '라성 배분',       value: fmtKrw(totalRs),     color: 'text-orange-600' },
-  ]
-
-  const totalUnpaid = unpaidInvoices.reduce((s: number, inv: { total_amount: number }) => s + Number(inv.total_amount), 0)
+  const totalUnpaid = unpaidInvoices.reduce(
+    (s: number, inv: { total_amount: number }) => s + Number(inv.total_amount), 0
+  )
   const unpaidByMonth = new Map<string, number>()
-  for (const inv of unpaidInvoices) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const inv of unpaidInvoices as any[]) {
     unpaidByMonth.set(inv.year_month, (unpaidByMonth.get(inv.year_month) ?? 0) + Number(inv.total_amount))
   }
 
   return (
     <div>
-      <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">대시보드</h2>
-        <p className="text-sm text-gray-500 mt-0.5">{yearMonth} 기준</p>
+      <div className="mb-6 flex items-baseline justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">대시보드</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{yearMonth} 계산서 발행 기준</p>
+        </div>
+        <Link href="/analytics" className="text-sm text-blue-600 hover:underline">
+          월별/연도별 분석 →
+        </Link>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {summaryCards.map(c => (
-          <div key={c.label} className="card p-4">
-            <p className="text-xs text-gray-500 font-medium">{c.label}</p>
-            <p className={`text-xl font-bold mt-1 ${c.color}`}>{c.value}</p>
-          </div>
-        ))}
+      {/* ── 이번달 요약 카드 ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="card p-4">
+          <p className="text-xs text-gray-500 font-medium">이번달 총 매출</p>
+          <p className="text-xl font-bold text-blue-600 mt-1">{fmtKrw(totalSell)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{deliveries.length}건 입고 기준</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs text-gray-500 font-medium">이번달 총 마진</p>
+          <p className="text-xl font-bold text-green-600 mt-1">{fmtKrw(totalMargin)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {totalSell > 0 ? `마진율 ${fmtNum((totalMargin / totalSell) * 100, 1)}%` : '—'}
+          </p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs text-gray-500 font-medium">금화 배분</p>
+          <p className="text-xl font-bold text-purple-600 mt-1">{fmtKrw(totalGm)}</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs text-gray-500 font-medium">라성 배분</p>
+          <p className="text-xl font-bold text-orange-600 mt-1">{fmtKrw(totalRs)}</p>
+        </div>
       </div>
 
-      {/* 미지급 잔액 요약 */}
-      {unpaidInvoices.length > 0 && (
+      {/* ── 거래처별 매출/마진 ── */}
+      {byBuyer.size > 0 && (
         <div className="card overflow-hidden mb-6">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-900">거래처별 현황</h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {Array.from(byBuyer.entries()).map(([buyer, { sell, margin }]) => (
+              <div key={buyer} className="px-4 py-3 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">{buyer}</span>
+                <div className="flex gap-6 text-sm">
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">매출</p>
+                    <p className="font-semibold text-blue-600">{fmtKrw(sell)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-400">마진</p>
+                    <p className="font-semibold text-green-600">{fmtKrw(margin)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 미지급 계산서 잔액 ── */}
+      {unpaidInvoices.length > 0 && (
+        <div className="card overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">미지급 계산서 잔액</h3>
@@ -106,56 +168,11 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">이번 달 입고 현황</h3>
-          <span className="text-xs text-gray-500">총 {(rows as unknown[]).length}건</span>
+      {deliveries.length === 0 && unpaidInvoices.length === 0 && (
+        <div className="card px-4 py-12 text-center text-sm text-gray-400">
+          {yearMonth} 계산서 발행 예정 입고 데이터가 없습니다.
         </div>
-        {(rows as unknown[]).length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">
-            이번 달 입고 데이터가 없습니다.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="table-th">품목</th>
-                  <th className="table-th">납품처</th>
-                  <th className="table-th text-right">물량 (톤)</th>
-                  <th className="table-th text-right">총 마진</th>
-                  <th className="table-th text-right">한국에이원</th>
-                  <th className="table-th text-right">금화</th>
-                  <th className="table-th text-right">라성</th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {(rows as any[]).map((d: any) => {
-                  if (!d.contract) return null
-                  const m = calcMarginFromContract(d.contract, d.quantity_kg)
-                  const addl = d.addl_quantity_kg && d.addl_margin_per_ton
-                    ? calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-                    : null
-                  const ct = m.total_margin + (addl?.total_margin ?? 0)
-                  const b = Math.floor(ct / 3)
-                  return (
-                    <tr key={d.id} className="hover:bg-gray-50">
-                      <td className="table-td font-medium">{d.product?.display_name}</td>
-                      <td className="table-td text-gray-500">{d.product?.buyer}</td>
-                      <td className="table-td text-right">{fmtNum(d.quantity_kg / 1000, 3)}</td>
-                      <td className="table-td text-right font-semibold text-blue-600">{fmtKrw(ct)}</td>
-                      <td className="table-td text-right text-green-600">{fmtKrw(b)}</td>
-                      <td className="table-td text-right text-purple-600">{fmtKrw(b)}</td>
-                      <td className="table-td text-right text-orange-600">{fmtKrw(ct - b * 2)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

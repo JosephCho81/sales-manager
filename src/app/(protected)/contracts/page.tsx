@@ -1,5 +1,7 @@
+import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
 import ContractsClient from './ContractsClient'
+import FetchErrorView from '@/components/FetchErrorView'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,22 +32,10 @@ export default async function ContractsPage() {
     }
   } catch (e) {
     console.error('[contracts] unexpected error:', e)
-    fetchError = e instanceof Error ? e.message : String(e)
+    fetchError = toMessage(e)
   }
 
-  if (fetchError) {
-    return (
-      <div className="p-6">
-        <h2 className="text-xl font-bold text-red-600 mb-2">데이터 로드 오류</h2>
-        <div className="bg-red-50 border border-red-200 rounded p-3 font-mono text-xs text-red-800 mb-4">
-          {fetchError}
-        </div>
-        <p className="text-sm text-gray-500">
-          Supabase 마이그레이션 실행 여부를 확인하세요.
-        </p>
-      </div>
-    )
-  }
+  if (fetchError) return <FetchErrorView message={fetchError} hint="Supabase 마이그레이션 실행 여부를 확인하세요." />
 
   return (
     <ContractsClient

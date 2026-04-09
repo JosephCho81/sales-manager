@@ -1,3 +1,5 @@
+import { toMessage } from '@/lib/error'
+import FetchErrorView from '@/components/FetchErrorView'
 import { createAdminClient } from '@/lib/supabase/server'
 import DeliveriesClient from './DeliveriesClient'
 
@@ -19,7 +21,7 @@ export default async function DeliveriesPage() {
         .order('display_name'),
       supabase
         .from('contracts')
-        .select('id, product_id, start_date, end_date, sell_price, cost_price, currency, reference_exchange_rate')
+        .select('id, product_id, start_date, end_date, sell_price, cost_price, currency, reference_exchange_rate, invoice_month_offset')
         .order('start_date', { ascending: false }),
       supabase
         .from('deliveries')
@@ -45,20 +47,10 @@ export default async function DeliveriesPage() {
       deliveries = dResult.data ?? []
     }
   } catch (e) {
-    fetchError = e instanceof Error ? e.message : String(e)
+    fetchError = toMessage(e)
   }
 
-  if (fetchError) {
-    return (
-      <div className="p-6">
-        <h2 className="text-xl font-bold text-red-600 mb-2">데이터 로드 오류</h2>
-        <div className="bg-red-50 border border-red-200 rounded p-3 font-mono text-xs text-red-800 mb-4">
-          {fetchError}
-        </div>
-        <p className="text-sm text-gray-500">Supabase 마이그레이션 실행 여부를 확인하세요.</p>
-      </div>
-    )
-  }
+  if (fetchError) return <FetchErrorView message={fetchError} hint="Supabase 마이그레이션 실행 여부를 확인하세요." />
 
   return (
     <DeliveriesClient

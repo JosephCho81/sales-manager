@@ -1,3 +1,5 @@
+import { toMessage } from '@/lib/error'
+import FetchErrorView from '@/components/FetchErrorView'
 import { createAdminClient } from '@/lib/supabase/server'
 import InvoicesClient from './InvoicesClient'
 
@@ -24,13 +26,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       supabase
         .from('deliveries')
         .select(`
-          id, year_month, delivery_date, product_id,
+          id, year_month, invoice_month, delivery_date, product_id,
           quantity_kg, addl_quantity_kg, addl_margin_per_ton,
           hoejin_shortage_kg, hoejin_shortage_price,
           product:products(id, name, display_name, vat),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
-        .eq('year_month', yearMonth)
+        .eq('invoice_month', yearMonth)
         .order('created_at', { ascending: true }),
       supabase
         .from('invoice_instructions')
@@ -53,20 +55,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       fxRates = fxRes.data ?? []
     }
   } catch (e) {
-    fetchError = e instanceof Error ? e.message : String(e)
+    fetchError = toMessage(e)
   }
 
-  if (fetchError) {
-    return (
-      <div className="p-6">
-        <h2 className="text-xl font-bold text-red-600 mb-2">데이터 로드 오류</h2>
-        <div className="bg-red-50 border border-red-200 rounded p-3 font-mono text-xs text-red-800 mb-4">
-          {fetchError}
-        </div>
-        <p className="text-sm text-gray-500">migration 004_invoice_type.sql 실행 여부를 확인하세요.</p>
-      </div>
-    )
-  }
+  if (fetchError) return <FetchErrorView message={fetchError} hint="migration 004_invoice_type.sql 실행 여부를 확인하세요." />
 
   return (
     <InvoicesClient
