@@ -237,8 +237,14 @@ export default function AnalyticsClient({
         <div className="card p-5">
           <div className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-4">금화</div>
           <div className="space-y-2">
+            {totals.geumhwaSellKrw > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">매출 (AL35 매매)</span>
+                <span className="text-sm tabular-nums font-medium">{fmtKrw(totals.geumhwaSellKrw)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">배분 마진 (1/3)</span>
+              <span className="text-xs text-gray-500">커미션 마진 (1/3)</span>
               <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.gm)}</span>
             </div>
           </div>
