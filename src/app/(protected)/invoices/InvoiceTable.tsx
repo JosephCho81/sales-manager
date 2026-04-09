@@ -17,11 +17,6 @@ const TYPE_BADGE: Record<string, string> = {
   other: 'bg-gray-100 text-gray-600',
 }
 
-function fmtYearMonth(ym: string): string {
-  const [y, m] = ym.split('-')
-  return `${y}년 ${parseInt(m)}월분`
-}
-
 // ────────────────────────────────────────────────────────
 // InvoiceTable — 제품별 그룹 (제품명 + 몇월분 헤더)
 //                각 제품 안에 매출→매입→커미션→기타 순서
@@ -76,22 +71,16 @@ export default function InvoiceTable({
             {sortedGroups.map(({ pid, rows }) => {
               const displayName = pid === '__none__' ? '기타' : (productMap.get(pid) ?? pid)
               // 이 제품의 대표 월 (모든 행의 year_month가 동일하므로 첫 번째 사용)
-              const ym = rows[0]?.year_month ?? ''
               const groupUnpaid = rows.filter(r => !r.is_paid).reduce((s, r) => s + Number(r.total_amount), 0)
               const groupTotal  = rows.reduce((s, r) => s + Number(r.total_amount), 0)
 
               return (
                 <React.Fragment key={pid}>
-                  {/* 제품 헤더 — 제품명 + 몇월분 */}
+                  {/* 제품 헤더 */}
                   <tr className="border-t-2 border-gray-200 bg-gray-50">
                     <td colSpan={6} className="px-4 py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-800">{displayName}</span>
-                        {ym && (
-                          <span className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
-                            {fmtYearMonth(ym)}
-                          </span>
-                        )}
                         <span className="text-xs text-gray-400 ml-1">합계 {fmtKrw(groupTotal)}</span>
                       </div>
                     </td>

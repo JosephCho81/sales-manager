@@ -348,6 +348,7 @@ export default function AnalyticsClient({
                   <th className="table-th text-right">매출</th>
                   <th className="table-th text-right">원가</th>
                   <th className="table-th text-right">총마진</th>
+                  <th className="table-th text-right text-gray-500">커미션</th>
                   <th className="table-th text-right text-green-700">한국에이원</th>
                   <th className="table-th text-right text-purple-700">금화</th>
                   <th className="table-th text-right text-orange-700">라성</th>
@@ -362,6 +363,9 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums">{fmtKrw(row.sellKrw)}</td>
                     <td className="table-td text-right tabular-nums text-gray-600">{fmtKrw(row.costKrw)}</td>
                     <td className="table-td text-right tabular-nums font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                    <td className="table-td text-right tabular-nums text-gray-500">
+                      {row.addlMarginTotal > 0 ? fmtKrw(row.addlMarginTotal) : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="table-td text-right tabular-nums text-green-600">{fmtKrw(row.a1)}</td>
                     <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(row.gm)}</td>
                     <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(row.rs)}</td>
@@ -376,6 +380,11 @@ export default function AnalyticsClient({
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums">{fmtKrw(totals.sellKrw)}</td>
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-600">{fmtKrw(totals.costKrw)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-blue-700 tabular-nums">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-500">
+                      {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
+                        ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
+                        : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-green-700 tabular-nums">{fmtKrw(totals.a1)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-purple-700 tabular-nums">{fmtKrw(totals.gm)}</td>
                     <td className="px-4 py-2.5 text-right text-sm font-bold text-orange-700 tabular-nums">{fmtKrw(totals.rs)}</td>

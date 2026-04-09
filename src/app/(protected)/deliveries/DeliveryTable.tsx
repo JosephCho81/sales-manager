@@ -24,17 +24,17 @@ export default function DeliveryTable({
   )
 
   const monthTotal = useMemo(() => {
-    let total = 0, korea_a1 = 0, geumhwa = 0, raseong = 0
+    let total = 0
     for (const d of filtered) {
       if (!d.contract) continue
       const m = calcMarginFromContract(d.contract, d.quantity_kg)
-      total += m.total_margin; korea_a1 += m.korea_a1; geumhwa += m.geumhwa; raseong += m.raseong
+      total += m.total_margin
       if (d.addl_quantity_kg && d.addl_margin_per_ton) {
         const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-        total += am.total_margin; korea_a1 += am.korea_a1; geumhwa += am.geumhwa; raseong += am.raseong
+        total += am.total_margin
       }
     }
-    return { total, korea_a1, geumhwa, raseong }
+    return { total }
   }, [filtered])
 
   async function handleDelete(id: string) {
@@ -58,18 +58,11 @@ export default function DeliveryTable({
 
       {/* 월 마진 합계 카드 */}
       {filtered.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          {[
-            { label: '총 마진',    value: monthTotal.total,    color: 'text-blue-600' },
-            { label: '한국에이원', value: monthTotal.korea_a1, color: 'text-green-600' },
-            { label: '금화',       value: monthTotal.geumhwa,  color: 'text-purple-600' },
-            { label: '라성',       value: monthTotal.raseong,  color: 'text-orange-600' },
-          ].map(c => (
-            <div key={c.label} className="card p-3">
-              <p className="text-xs text-gray-500">{filterMonth} {c.label}</p>
-              <p className={`text-lg font-bold ${c.color}`}>{fmtKrw(c.value)}</p>
-            </div>
-          ))}
+        <div className="mb-5">
+          <div className="card p-3 inline-block">
+            <p className="text-xs text-gray-500">{filterMonth} 총 마진</p>
+            <p className="text-lg font-bold text-blue-600">{fmtKrw(monthTotal.total)}</p>
+          </div>
         </div>
       )}
 
@@ -87,9 +80,6 @@ export default function DeliveryTable({
               <th className="table-th text-right">기본 마진</th>
               <th className="table-th text-right">추가 배분</th>
               <th className="table-th text-right">합계 마진</th>
-              <th className="table-th text-right">한국에이원</th>
-              <th className="table-th text-right">금화</th>
-              <th className="table-th text-right">라성</th>
               <th className="table-th">메모</th>
               <th className="table-th">관리</th>
             </tr>
@@ -97,7 +87,7 @@ export default function DeliveryTable({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={14} className="table-td text-center text-gray-400 py-10">
+                <td colSpan={11} className="table-td text-center text-gray-400 py-10">
                   {filterMonth} 입고 데이터가 없습니다.
                 </td>
               </tr>
@@ -109,8 +99,6 @@ export default function DeliveryTable({
                 ? calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
                 : null
               const combinedTotal = main.total_margin + (addl?.total_margin ?? 0)
-              const base = Math.floor(combinedTotal / 3)
-              const combined = { total: combinedTotal, a1: base, gm: base, rs: combinedTotal - base * 2 }
               const isUsd = d.contract.currency === 'USD'
 
               return (
@@ -146,10 +134,7 @@ export default function DeliveryTable({
                   <td className="table-td text-right text-orange-500 whitespace-nowrap">
                     {addl ? fmtKrw(addl.total_margin) : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="table-td text-right font-bold text-blue-700 whitespace-nowrap">{fmtKrw(combined.total)}</td>
-                  <td className="table-td text-right text-green-600 whitespace-nowrap">{fmtKrw(combined.a1)}</td>
-                  <td className="table-td text-right text-purple-600 whitespace-nowrap">{fmtKrw(combined.gm)}</td>
-                  <td className="table-td text-right text-orange-600 whitespace-nowrap">{fmtKrw(combined.rs)}</td>
+                  <td className="table-td text-right font-bold text-blue-700 whitespace-nowrap">{fmtKrw(combinedTotal)}</td>
                   <td className="table-td text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
                   <td className="table-td whitespace-nowrap">
                     <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>

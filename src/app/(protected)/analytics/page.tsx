@@ -43,14 +43,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
     const { data, error } = await supabase
       .from('deliveries')
       .select(`
-        id, year_month, invoice_month, product_id,
+        id, year_month, product_id,
         quantity_kg, addl_quantity_kg, addl_margin_per_ton,
         product:products(id, name, display_name, buyer),
         contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
       `)
-      .gte('invoice_month', fromYM)
-      .lte('invoice_month', toYM)
-      .order('invoice_month')
+      .gte('year_month', fromYM)
+      .lte('year_month', toYM)
+      .order('year_month')
 
     if (error) fetchError = error.message
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

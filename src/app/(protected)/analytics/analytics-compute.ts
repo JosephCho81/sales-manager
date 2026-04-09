@@ -8,7 +8,6 @@ import { calcMarginFromContract, calcAddlMargin } from '@/lib/margin'
 export type DeliveryForAnalytics = {
   id: string
   year_month: string
-  invoice_month: string   // 계산서 발행 기준월 (analytics 집계 기준)
   product_id: string
   quantity_kg: number
   addl_quantity_kg: number | null
@@ -29,6 +28,7 @@ export type MarginTotals = {
 
 export type ProductRow = MarginTotals & {
   productId: string; name: string; displayName: string; buyer: string
+  addlMarginTotal: number
 }
 
 export type MonthlyData = { ym: string } & MarginTotals
@@ -77,10 +77,11 @@ export function buildProductRows(deliveries: DeliveryForAnalytics[]): ProductRow
 
     const ex = map.get(d.product_id)
     if (ex) {
-      ex.qtyTon      += m.quantity_ton
-      ex.sellKrw     += m.sell_price_krw * m.quantity_ton
-      ex.costKrw     += m.cost_price_krw * m.quantity_ton
-      ex.totalMargin += m.total_margin + amTotal
+      ex.qtyTon          += m.quantity_ton
+      ex.sellKrw         += m.sell_price_krw * m.quantity_ton
+      ex.costKrw         += m.cost_price_krw * m.quantity_ton
+      ex.totalMargin     += m.total_margin + amTotal
+      ex.addlMarginTotal += amTotal
       ex.a1 += m.korea_a1 + amA1; ex.gm += m.geumhwa + amGm; ex.rs += m.raseong + amRs
       ex.geumhwaSellKrw += gmSell
     } else {
@@ -91,6 +92,7 @@ export function buildProductRows(deliveries: DeliveryForAnalytics[]): ProductRow
         sellKrw: m.sell_price_krw * m.quantity_ton,
         costKrw: m.cost_price_krw * m.quantity_ton,
         totalMargin: m.total_margin + amTotal,
+        addlMarginTotal: amTotal,
         a1: m.korea_a1 + amA1, gm: m.geumhwa + amGm, rs: m.raseong + amRs,
         geumhwaSellKrw: gmSell,
       })
@@ -112,6 +114,6 @@ export function buildMonthlyData(deliveries: DeliveryForAnalytics[], fromYM: str
     cur.setMonth(cur.getMonth() + 1)
   }
   const byMonth = new Map<string, DeliveryForAnalytics[]>(months.map(ym => [ym, []]))
-  for (const d of deliveries) byMonth.get(d.invoice_month)?.push(d)
+  for (const d of deliveries) byMonth.get(d.year_month)?.push(d)
   return months.map(ym => ({ ym, ...computeMargins(byMonth.get(ym) ?? []) }))
 }
