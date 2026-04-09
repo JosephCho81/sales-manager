@@ -8,6 +8,7 @@ import { calcMarginFromContract, calcAddlMargin } from '@/lib/margin'
 export type DeliveryForAnalytics = {
   id: string
   year_month: string
+  invoice_month: string   // 계산서 발행 기준월 (analytics 집계 기준)
   product_id: string
   quantity_kg: number
   addl_quantity_kg: number | null
@@ -111,6 +112,6 @@ export function buildMonthlyData(deliveries: DeliveryForAnalytics[], fromYM: str
     cur.setMonth(cur.getMonth() + 1)
   }
   const byMonth = new Map<string, DeliveryForAnalytics[]>(months.map(ym => [ym, []]))
-  for (const d of deliveries) byMonth.get(d.year_month)?.push(d)
+  for (const d of deliveries) byMonth.get(d.invoice_month)?.push(d)
   return months.map(ym => ({ ym, ...computeMargins(byMonth.get(ym) ?? []) }))
 }

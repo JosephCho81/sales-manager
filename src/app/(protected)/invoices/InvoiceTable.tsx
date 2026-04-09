@@ -8,19 +8,13 @@ import type { InvoiceRow } from './types'
 const TYPE_ORDER = ['sales', 'cost', 'commission', 'other'] as const
 
 const TYPE_LABELS: Record<string, string> = {
-  sales: '매출', cost: '원가', commission: '커미션', other: '기타',
+  sales: '매출', cost: '매입', commission: '커미션', other: '기타',
 }
-const TYPE_ROW_BADGE: Record<string, string> = {
+const TYPE_BADGE: Record<string, string> = {
   sales: 'bg-blue-100 text-blue-700',
   cost: 'bg-orange-100 text-orange-700',
   commission: 'bg-purple-100 text-purple-700',
   other: 'bg-gray-100 text-gray-600',
-}
-const TYPE_SECTION_HEADER: Record<string, string> = {
-  sales: 'bg-blue-50 text-blue-800 border-blue-200',
-  cost: 'bg-orange-50 text-orange-800 border-orange-200',
-  commission: 'bg-purple-50 text-purple-800 border-purple-200',
-  other: 'bg-gray-50 text-gray-700 border-gray-200',
 }
 
 function fmtYearMonth(ym: string): string {
@@ -29,7 +23,8 @@ function fmtYearMonth(ym: string): string {
 }
 
 // ────────────────────────────────────────────────────────
-// InvoiceTable — 타입별 섹션 그룹 테이블
+// InvoiceTable — 제품별 그룹 (제품명 + 몇월분 헤더)
+//                각 제품 안에 매출→매입→커미션→기타 순서
 // ────────────────────────────────────────────────────────
 export default function InvoiceTable({
   invoices,
@@ -42,14 +37,24 @@ export default function InvoiceTable({
 }) {
   const totalAmount = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
 
-  // 타입별 그룹화
-  const byType = new Map<string, InvoiceRow[]>()
-  for (const t of TYPE_ORDER) byType.set(t, [])
+  // 제품별 그룹화 (순서 유지)
+  const grouped = new Map<string, InvoiceRow[]>()
   for (const inv of invoices) {
-    const key = inv.invoice_type ?? 'other'
-    const bucket = byType.get(key) ?? byType.get('other')!
-    bucket.push(inv)
+    const key = inv.product_id ?? '__none__'
+    const list = grouped.get(key) ?? []
+    list.push(inv)
+    grouped.set(key, list)
   }
+
+  // 각 그룹 내 타입 순서 정렬
+  const sortedGroups = Array.from(grouped.entries()).map(([pid, rows]) => ({
+    pid,
+    rows: [...rows].sort((a, b) => {
+      const ai = TYPE_ORDER.indexOf((a.invoice_type ?? 'other') as typeof TYPE_ORDER[number])
+      const bi = TYPE_ORDER.indexOf((b.invoice_type ?? 'other') as typeof TYPE_ORDER[number])
+      return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
+    }),
+  }))
 
   return (
     <div className="card overflow-hidden">
@@ -57,8 +62,8 @@ export default function InvoiceTable({
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="table-th w-20">타입</th>
-              <th className="table-th">품목 · 발행회사 → 수취회사</th>
+              <th className="table-th w-20">구분</th>
+              <th className="table-th">발행회사 → 수취회사</th>
               <th className="table-th text-right">공급가액</th>
               <th className="table-th text-right">VAT</th>
               <th className="table-th text-right">합계</th>
@@ -68,60 +73,55 @@ export default function InvoiceTable({
             </tr>
           </thead>
           <tbody>
-            {TYPE_ORDER.map(typeKey => {
-              const rows = byType.get(typeKey) ?? []
-              if (rows.length === 0) return null
-
-              const sectionTotal = rows.reduce((s, r) => s + Number(r.total_amount), 0)
-              const sectionUnpaid = rows.filter(r => !r.is_paid).reduce((s, r) => s + Number(r.total_amount), 0)
+            {sortedGroups.map(({ pid, rows }) => {
+              const displayName = pid === '__none__' ? '기타' : (productMap.get(pid) ?? pid)
+              // 이 제품의 대표 월 (모든 행의 year_month가 동일하므로 첫 번째 사용)
+              const ym = rows[0]?.year_month ?? ''
+              const groupUnpaid = rows.filter(r => !r.is_paid).reduce((s, r) => s + Number(r.total_amount), 0)
+              const groupTotal  = rows.reduce((s, r) => s + Number(r.total_amount), 0)
 
               return (
-                <React.Fragment key={typeKey}>
-                  {/* 섹션 헤더 */}
-                  <tr className={`border-t-2 border-gray-200`}>
-                    <td
-                      colSpan={6}
-                      className={`px-4 py-2 text-xs font-bold uppercase tracking-wide border-b ${TYPE_SECTION_HEADER[typeKey]}`}
-                    >
-                      {TYPE_LABELS[typeKey]} ({rows.length}건) — 합계 {fmtKrw(sectionTotal)}
+                <React.Fragment key={pid}>
+                  {/* 제품 헤더 — 제품명 + 몇월분 */}
+                  <tr className="border-t-2 border-gray-200 bg-gray-50">
+                    <td colSpan={6} className="px-4 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-gray-800">{displayName}</span>
+                        {ym && (
+                          <span className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                            {fmtYearMonth(ym)}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400 ml-1">합계 {fmtKrw(groupTotal)}</span>
+                      </div>
                     </td>
-                    <td colSpan={2} className={`px-4 py-2 text-xs text-right border-b ${TYPE_SECTION_HEADER[typeKey]}`}>
-                      {sectionUnpaid > 0 && (
-                        <span className="text-red-500 font-medium">미지급 {fmtKrw(sectionUnpaid)}</span>
+                    <td colSpan={2} className="px-4 py-2 text-right">
+                      {groupUnpaid > 0 && (
+                        <span className="text-xs text-red-500 font-medium">미지급 {fmtKrw(groupUnpaid)}</span>
                       )}
                     </td>
                   </tr>
 
-                  {/* 행 */}
+                  {/* 계산서 행 */}
                   {rows.map(inv => {
-                    const productName = inv.product_id ? (productMap.get(inv.product_id) ?? '') : ''
-                    const isCommission = typeKey === 'commission'
-
+                    const typeKey = inv.invoice_type ?? 'other'
                     return (
                       <tr
                         key={inv.id}
                         className={`border-t border-gray-100 hover:bg-gray-50 transition-colors ${inv.is_paid ? 'opacity-40' : ''}`}
                       >
                         <td className="table-td">
-                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${TYPE_ROW_BADGE[typeKey]}`}>
-                            {TYPE_LABELS[typeKey]}
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${TYPE_BADGE[typeKey] ?? TYPE_BADGE.other}`}>
+                            {TYPE_LABELS[typeKey] ?? typeKey}
                           </span>
                         </td>
                         <td className="table-td">
-                          {productName && (
-                            <p className="text-xs text-gray-400 mb-0.5">{productName}</p>
-                          )}
                           <div>
                             <span className="font-medium">{inv.from_company}</span>
                             <span className="text-gray-400 mx-1.5">→</span>
                             <span className="font-medium">{inv.to_company}</span>
-                            {isCommission && (
-                              <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-purple-50 text-purple-600 text-xs font-semibold border border-purple-100">
-                                {fmtYearMonth(inv.year_month)}
-                              </span>
-                            )}
                           </div>
-                          {inv.memo && !isCommission && (
+                          {inv.memo && (
                             <p className="text-xs text-gray-400 mt-0.5 leading-snug">{inv.memo}</p>
                           )}
                         </td>
