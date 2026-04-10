@@ -40,13 +40,13 @@ export function genSoggae(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '한국에이원', to: '금화', supply: geumhwa, vat: false,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 10), paymentDue: nthDay(nextM, 10),
+      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '한국에이원', to: '라성', supply: raseong, vat: false,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 10), paymentDue: nthDay(nextM, 10),
+      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
       type: 'commission', memo: '라성 커미션 (나머지)',
     }),
   ]
@@ -88,13 +88,13 @@ export function genBuntan(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '한국에이원', to: '금화', supply: geumhwa, vat: true,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 10), paymentDue: nthDay(nextM, 10),
+      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '한국에이원', to: '라성', supply: raseong, vat: true,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 10), paymentDue: nthDay(nextM, 10),
+      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
       type: 'commission', memo: '라성 커미션 (나머지)',
     }),
   ]
