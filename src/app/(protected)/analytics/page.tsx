@@ -47,14 +47,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
       supabase
         .from('deliveries')
         .select(`
-          id, year_month, product_id,
+          id, year_month, invoice_month, product_id,
           quantity_kg, addl_quantity_kg, addl_margin_per_ton,
           product:products(id, name, display_name, buyer),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
-        .gte('year_month', shiftMonths(fromYM, -1))  // AL30 addl(납품월+1) 포함을 위해 1달 앞당김
-        .lte('year_month', toYM)
-        .order('year_month'),
+        .gte('invoice_month', fromYM)
+        .lte('invoice_month', toYM)
+        .order('invoice_month'),
 
       // AL30 부족분 커미션: 지급월 = year_month + 1, 조회 범위 내 지급월 기준 필터
       supabase

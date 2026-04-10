@@ -372,6 +372,7 @@ export default function AnalyticsClient({
               <thead>
                 <tr>
                   <th className="table-th">품목</th>
+                  <th className="table-th">배송월</th>
                   <th className="table-th">납품처</th>
                   <th className="table-th text-right">물량(톤)</th>
                   <th className="table-th text-right">매출</th>
@@ -385,8 +386,11 @@ export default function AnalyticsClient({
               </thead>
               <tbody>
                 {productRows.map(row => (
-                  <tr key={row.productId} className="border-t border-gray-100 hover:bg-gray-50">
+                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="table-td font-medium">{row.displayName}</td>
+                    <td className="table-td text-xs text-blue-600 tabular-nums whitespace-nowrap">
+                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                    </td>
                     <td className="table-td text-gray-500 text-xs">{row.buyer}</td>
                     <td className="table-td text-right tabular-nums">{fmtNum(row.qtyTon, 3)}</td>
                     <td className="table-td text-right tabular-nums">{fmtKrw(row.sellKrw)}</td>
@@ -403,6 +407,7 @@ export default function AnalyticsClient({
                 {shortageInPeriod.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                     <td className="table-td font-medium text-amber-800">└ 부족분 커미션</td>
+                    <td className="table-td text-gray-300">—</td>
                     <td className="table-td text-amber-600 text-xs">현대제철 (AL30)</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
@@ -418,7 +423,7 @@ export default function AnalyticsClient({
               {productRows.length > 1 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                    <td colSpan={2} className="px-4 py-2.5 text-sm">합계</td>
+                    <td colSpan={3} className="px-4 py-2.5 text-sm">합계</td>
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums">{fmtNum(totals.qtyTon, 3)}</td>
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums">{fmtKrw(totals.sellKrw)}</td>
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-600">{fmtKrw(totals.costKrw)}</td>
