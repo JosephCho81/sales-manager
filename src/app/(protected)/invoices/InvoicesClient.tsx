@@ -69,6 +69,7 @@ export default function InvoicesClient({
 
       const rows = generated.map(inv => ({
         year_month: inv.year_month,
+        delivery_year_month: inv.delivery_year_month,
         product_id: inv.product_id,
         delivery_ids: inv.delivery_ids,
         from_company: inv.from_company,
