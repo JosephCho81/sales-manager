@@ -12,16 +12,16 @@ export function genAL30(
   deliveries: DeliveryForInvoice[],
   ym: string
 ): InvoiceToCreate[] {
-  const pid    = deliveries[0].product_id
+  const pid        = deliveries[0].product_id
   const deliveryYM = deliveries[0].year_month
-  const nextM  = shiftMonths(ym, 1)
-  const next2M = shiftMonths(ym, 2)
+  const dNextM     = shiftMonths(deliveryYM, 1)
+  const dNext2M    = shiftMonths(deliveryYM, 2)
 
-  // 10일 단위 3구간으로 그룹
+  // 10일 단위 3구간으로 그룹 (납품월 기준)
   const periods: Array<{ label: string; days: DeliveryForInvoice[]; basisDate: string }> = [
-    { label: '1~10일',   days: [], basisDate: nthDay(ym, 10) },
-    { label: '11~20일',  days: [], basisDate: nthDay(ym, 20) },
-    { label: '21일~말일', days: [], basisDate: monthEnd(ym)  },
+    { label: '1~10일',   days: [], basisDate: nthDay(deliveryYM, 10) },
+    { label: '11~20일',  days: [], basisDate: nthDay(deliveryYM, 20) },
+    { label: '21일~말일', days: [], basisDate: monthEnd(deliveryYM)  },
   ]
   for (const d of deliveries) {
     const day = d.delivery_date ? parseInt(d.delivery_date.slice(8, 10)) : 15
@@ -63,7 +63,7 @@ export function genAL30(
     result.push(makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
       from: '한국에이원', to: '화림', supply: totalCost, vat: true,
-      basisDate: monthEnd(ym), deadline: nthDay(nextM, 1), paymentDue: monthEnd(next2M),
+      basisDate: monthEnd(deliveryYM), deadline: nthDay(dNextM, 1), paymentDue: monthEnd(dNext2M),
       type: 'cost',
       memo: '한국에이원→화림 당월 합산 1장 — 익월1일 발행, 익익월말 지급',
     }))
@@ -75,13 +75,13 @@ export function genAL30(
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
-        basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
+        basisDate: nthDay(dNext2M, 1), deadline: nthDay(dNext2M, 10), paymentDue: nthDay(dNext2M, 10),
         type: 'commission', memo: '금화 커미션 1/3 — 익익월10일',
       }),
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '라성', supply: totalRaseong, vat: true,
-        basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
+        basisDate: nthDay(dNext2M, 1), deadline: nthDay(dNext2M, 10), paymentDue: nthDay(dNext2M, 10),
         type: 'commission', memo: '라성 커미션 (나머지) — 익익월10일',
       }),
     )

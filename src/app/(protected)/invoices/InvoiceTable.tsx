@@ -60,18 +60,6 @@ export default function InvoiceTable({
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr>
-              <th className="table-th w-20">구분</th>
-              <th className="table-th">발행회사 → 수취회사</th>
-              <th className="table-th text-right">공급가액</th>
-              <th className="table-th text-right">VAT</th>
-              <th className="table-th text-right">합계</th>
-              <th className="table-th whitespace-nowrap">발행기준일</th>
-              <th className="table-th whitespace-nowrap">지급예정일</th>
-              <th className="table-th text-center w-20">지급완료</th>
-            </tr>
-          </thead>
           <tbody>
             {sortedGroups.map(({ pid, rows }) => {
               const displayName = pid === '__none__' ? '기타' : (productMap.get(pid) ?? pid)
@@ -82,7 +70,7 @@ export default function InvoiceTable({
               return (
                 <React.Fragment key={pid}>
                   {/* 제품 헤더 */}
-                  <tr className="border-t-2 border-gray-200 bg-gray-50">
+                  <tr className="border-t-2 border-gray-300 bg-gray-100">
                     <td colSpan={6} className="px-4 py-2">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-gray-800">{displayName}</span>
@@ -99,6 +87,18 @@ export default function InvoiceTable({
                         <span className="text-xs text-red-500 font-medium">미지급 {fmtKrw(groupUnpaid)}</span>
                       )}
                     </td>
+                  </tr>
+
+                  {/* 컬럼 헤더 */}
+                  <tr className="bg-gray-50 text-xs text-gray-500 border-t border-gray-200">
+                    <th className="px-4 py-1.5 text-left font-medium w-20">구분</th>
+                    <th className="px-4 py-1.5 text-left font-medium">발행회사 → 수취회사</th>
+                    <th className="px-4 py-1.5 text-right font-medium">공급가액</th>
+                    <th className="px-4 py-1.5 text-right font-medium">VAT</th>
+                    <th className="px-4 py-1.5 text-right font-medium">합계</th>
+                    <th className="px-4 py-1.5 text-left font-medium whitespace-nowrap">발행기준일</th>
+                    <th className="px-4 py-1.5 text-left font-medium whitespace-nowrap">지급예정일</th>
+                    <th className="px-4 py-1.5 text-center font-medium w-20">지급완료</th>
                   </tr>
 
                   {/* 계산서 행 */}
