@@ -239,7 +239,7 @@ export default function AnalyticsClient({
             </div>
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
-            <span className="text-xs text-gray-500">배분 마진 (1/3)</span>
+            <span className="text-xs text-gray-500">한국에이원 마진</span>
             <span className="text-base font-bold text-green-600 whitespace-nowrap">{fmtKrw(totals.a1)}</span>
           </div>
           {totals.totalMargin > 0 && (
@@ -255,12 +255,12 @@ export default function AnalyticsClient({
           <div className="space-y-2">
             {totals.geumhwaSellKrw > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-500">매출 (AL35 매매)</span>
+                <span className="text-xs text-gray-500">매출</span>
                 <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.geumhwaSellKrw)}</span>
               </div>
             )}
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">커미션 마진 (1/3)</span>
+              <span className="text-xs text-gray-500">동국제강 부족분</span>
               <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - shortageInPeriod.gm)}</span>
             </div>
             {shortageInPeriod.gm > 0 && (
@@ -271,7 +271,7 @@ export default function AnalyticsClient({
             )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
-            <span className="text-xs text-gray-500">커미션 수취</span>
+            <span className="text-xs text-gray-500">총 마진</span>
             <span className="text-base font-bold text-purple-600 whitespace-nowrap">{fmtKrw(totals.gm)}</span>
           </div>
           {totals.totalMargin > 0 && (
@@ -286,7 +286,7 @@ export default function AnalyticsClient({
           <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-2">라성</div>
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">배분 마진 (1/3+α)</span>
+              <span className="text-xs text-gray-500">동국제강</span>
               <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
             </div>
             {shortageInPeriod.rs > 0 && (
@@ -297,7 +297,7 @@ export default function AnalyticsClient({
             )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
-            <span className="text-xs text-gray-500">커미션 수취</span>
+            <span className="text-xs text-gray-500">총 마진</span>
             <span className="text-base font-bold text-orange-600 whitespace-nowrap">{fmtKrw(totals.rs)}</span>
           </div>
           {totals.totalMargin > 0 && (
