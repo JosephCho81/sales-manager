@@ -62,6 +62,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
 
   return (
     <InvoicesClient
+      key={yearMonth}
       yearMonth={yearMonth}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       initialDeliveries={deliveries as any[]}
