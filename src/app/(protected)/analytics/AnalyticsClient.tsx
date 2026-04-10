@@ -372,7 +372,7 @@ export default function AnalyticsClient({
               <thead>
                 <tr>
                   <th className="table-th">품목</th>
-                  <th className="table-th">배송월</th>
+                  <th className="table-th">입고일</th>
                   <th className="table-th">납품처</th>
                   <th className="table-th text-right">물량(톤)</th>
                   <th className="table-th text-right">매출</th>
@@ -392,16 +392,16 @@ export default function AnalyticsClient({
                       {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
                     </td>
                     <td className="table-td text-gray-500 text-xs">{row.buyer}</td>
-                    <td className="table-td text-right tabular-nums">{fmtNum(row.qtyTon, 3)}</td>
-                    <td className="table-td text-right tabular-nums">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums text-gray-500">
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-500">
                       {row.addlMarginTotal > 0 ? fmtKrw(row.addlMarginTotal) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="table-td text-right tabular-nums text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(row.rs)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
                   </tr>
                 ))}
                 {shortageInPeriod.total > 0 && (
@@ -412,11 +412,11 @@ export default function AnalyticsClient({
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums font-semibold text-amber-700">{fmtKrw(shortageInPeriod.total)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(shortageInPeriod.total)}</td>
                     <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums text-green-600">{fmtKrw(shortageInPeriod.a1)}</td>
-                    <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(shortageInPeriod.gm)}</td>
-                    <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(shortageInPeriod.rs)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(shortageInPeriod.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(shortageInPeriod.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(shortageInPeriod.rs)}</td>
                   </tr>
                 )}
               </tbody>
@@ -424,18 +424,18 @@ export default function AnalyticsClient({
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                     <td colSpan={3} className="px-4 py-2.5 text-sm">합계</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums">{fmtNum(totals.qtyTon, 3)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums">{fmtKrw(totals.sellKrw)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-blue-700 tabular-nums">{fmtKrw(totals.totalMargin)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-500">
+                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-500">
                       {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
                         ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-green-700 tabular-nums">{fmtKrw(totals.a1)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-purple-700 tabular-nums">{fmtKrw(totals.gm)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold text-orange-700 tabular-nums">{fmtKrw(totals.rs)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
+                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
                   </tr>
                 </tfoot>
               )}
