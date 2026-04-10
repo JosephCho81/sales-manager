@@ -91,13 +91,13 @@ export default function InvoiceTable({
 
                   {/* 컬럼 헤더 */}
                   <tr className="bg-gray-50 text-xs text-gray-500 border-t border-gray-200">
-                    <th className="px-4 py-1.5 text-left font-medium w-20">구분</th>
-                    <th className="px-4 py-1.5 text-left font-medium">발행회사 → 수취회사</th>
-                    <th className="px-4 py-1.5 text-right font-medium">공급가액</th>
-                    <th className="px-4 py-1.5 text-right font-medium">VAT</th>
-                    <th className="px-4 py-1.5 text-right font-medium">합계</th>
-                    <th className="px-4 py-1.5 text-left font-medium whitespace-nowrap">발행기준일</th>
-                    <th className="px-4 py-1.5 text-left font-medium whitespace-nowrap">지급예정일</th>
+                    <th className="px-4 py-1.5 text-center font-medium w-20">구분</th>
+                    <th className="px-4 py-1.5 text-center font-medium">발행회사 → 수취회사</th>
+                    <th className="px-4 py-1.5 text-center font-medium">공급가액</th>
+                    <th className="px-4 py-1.5 text-center font-medium">VAT</th>
+                    <th className="px-4 py-1.5 text-center font-medium">합계</th>
+                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">발행기준일</th>
+                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">지급예정일</th>
                     <th className="px-4 py-1.5 text-center font-medium w-20">지급완료</th>
                   </tr>
 
