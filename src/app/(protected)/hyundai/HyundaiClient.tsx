@@ -88,6 +88,18 @@ export default function HyundaiClient({
     return { sell, margin, ...splitMargin(margin) }
   }, [initialDeliveries])
 
+  // ── 이번달 지급 예정 부족분 커미션 (전월 발생분) ──
+  const shortageThisMonth = useMemo(() => {
+    const prevYM = shiftMonths(yearMonth, -1)
+    let total = 0, korea_a1 = 0, geumhwa = 0, raseong = 0
+    for (const s of initialShortage.filter(s => s.year_month === prevYM)) {
+      const sp = splitMargin(s.commission_amount)
+      total += s.commission_amount
+      korea_a1 += sp.korea_a1; geumhwa += sp.geumhwa; raseong += sp.raseong
+    }
+    return { total, korea_a1, geumhwa, raseong, prevYM }
+  }, [initialShortage, yearMonth])
+
   // ── 계산서 분류 ──
   const salesInvoices = initialInvoices.filter(i => i.invoice_type === 'sales')
   const costInvoice   = initialInvoices.find(i => i.invoice_type === 'cost' && i.to_company === '화림')
@@ -198,13 +210,20 @@ export default function HyundaiClient({
                     <p className="font-semibold">{fmtNum(initialDeliveries.reduce((s, d) => s + d.quantity_kg / 1000, 0), 3)} 톤</p>
                   </div>
                   <div><p className="text-xs text-blue-500">총 매출</p><p className="font-semibold">{fmtKrw(monthTotal.sell)}</p></div>
-                  <div><p className="text-xs text-blue-500">총 마진</p><p className="font-bold text-blue-700">{fmtKrw(monthTotal.margin)}</p></div>
+                  <div><p className="text-xs text-blue-500">납품 마진</p><p className="font-bold text-blue-700">{fmtKrw(monthTotal.margin)}</p></div>
+                  {shortageThisMonth.total > 0 && (
+                    <div>
+                      <p className="text-xs text-amber-600">{shortageThisMonth.prevYM} 부족분 커미션</p>
+                      <p className="font-bold text-amber-700">{fmtKrw(shortageThisMonth.total)}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right text-xs">
-                <div className="text-green-600">한국에이원 {fmtKrw(monthTotal.korea_a1)}</div>
-                <div className="text-purple-600">금화 {fmtKrw(monthTotal.geumhwa)}</div>
-                <div className="text-orange-600">라성 {fmtKrw(monthTotal.raseong)}</div>
+                <p className="text-gray-400 mb-1">이번달 수령 예정</p>
+                <div className="text-green-600">한국에이원 {fmtKrw(monthTotal.korea_a1 + shortageThisMonth.korea_a1)}</div>
+                <div className="text-purple-600">금화 {fmtKrw(monthTotal.geumhwa + shortageThisMonth.geumhwa)}</div>
+                <div className="text-orange-600">라성 {fmtKrw(monthTotal.raseong + shortageThisMonth.raseong)}</div>
               </div>
             </div>
           </div>

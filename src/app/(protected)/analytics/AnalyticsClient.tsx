@@ -2,11 +2,11 @@
 
 import React, { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { fmtKrw, fmtNum } from '@/lib/margin'
-import { getCurrentYearMonth } from '@/lib/date'
+import { fmtKrw, fmtNum, splitMargin } from '@/lib/margin'
+import { getCurrentYearMonth, shiftMonths } from '@/lib/date'
 import {
   computeMargins, buildProductRows, buildMonthlyData, PRODUCT_ORDER,
-  type DeliveryForAnalytics,
+  type DeliveryForAnalytics, type ShortageTransaction,
 } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 
@@ -18,11 +18,13 @@ export default function AnalyticsClient({
   toYM,
   mode,
   deliveries,
+  shortageTransactions,
 }: {
   fromYM: string
   toYM: string
   mode: 'month' | 'range' | 'year'
   deliveries: DeliveryForAnalytics[]
+  shortageTransactions: ShortageTransaction[]
 }) {
   const router = useRouter()
 
@@ -77,9 +79,24 @@ export default function AnalyticsClient({
   )
 
   // ── 집계 ──
-  const totals      = useMemo(() => computeMargins(filtered, fromYM, toYM),         [filtered, fromYM, toYM])
-  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),        [filtered, fromYM, toYM])
-  const monthlyData = useMemo(() => buildMonthlyData(filtered, fromYM, toYM),       [filtered, fromYM, toYM])
+  const totals      = useMemo(() => computeMargins(filtered, shortageTransactions, fromYM, toYM),        [filtered, shortageTransactions, fromYM, toYM])
+  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),                            [filtered, fromYM, toYM])
+  const monthlyData = useMemo(() => buildMonthlyData(filtered, shortageTransactions, fromYM, toYM),      [filtered, shortageTransactions, fromYM, toYM])
+
+  // ── 조회 기간 내 부족분 커미션 집계 (품목별/3사 카드 세부 표시용) ──
+  const shortageInPeriod = useMemo(() => {
+    const inRange = shortageTransactions.filter(s => {
+      const pm = shiftMonths(s.year_month, 1)
+      return pm >= fromYM && pm <= toYM
+    })
+    let total = 0, a1 = 0, gm = 0, rs = 0
+    for (const s of inRange) {
+      const sp = splitMargin(s.commission_amount)
+      total += s.commission_amount
+      a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+    }
+    return { total, a1, gm, rs }
+  }, [shortageTransactions, fromYM, toYM])
   const showChart   = fromYM !== toYM && monthlyData.length > 1
 
   // ── 기간 라벨 ──
@@ -245,8 +262,14 @@ export default function AnalyticsClient({
             )}
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">커미션 마진 (1/3)</span>
-              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.gm)}</span>
+              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.gm - shortageInPeriod.gm)}</span>
             </div>
+            {shortageInPeriod.gm > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-amber-600">현대제철 부족분 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700">{fmtKrw(shortageInPeriod.gm)}</span>
+              </div>
+            )}
           </div>
           <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
             <span className="text-xs text-gray-500">커미션 수취</span>
@@ -265,8 +288,14 @@ export default function AnalyticsClient({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">배분 마진 (1/3+α)</span>
-              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.rs)}</span>
+              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
             </div>
+            {shortageInPeriod.rs > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-amber-600">현대제철 부족분 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700">{fmtKrw(shortageInPeriod.rs)}</span>
+              </div>
+            )}
           </div>
           <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
             <span className="text-xs text-gray-500">커미션 수취</span>
@@ -371,6 +400,20 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(row.rs)}</td>
                   </tr>
                 ))}
+                {shortageInPeriod.total > 0 && (
+                  <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
+                    <td className="table-td font-medium text-amber-800">└ 부족분 커미션</td>
+                    <td className="table-td text-amber-600 text-xs">현대제철 (AL30)</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right tabular-nums font-semibold text-amber-700">{fmtKrw(shortageInPeriod.total)}</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right tabular-nums text-green-600">{fmtKrw(shortageInPeriod.a1)}</td>
+                    <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(shortageInPeriod.gm)}</td>
+                    <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(shortageInPeriod.rs)}</td>
+                  </tr>
+                )}
               </tbody>
               {productRows.length > 1 && (
                 <tfoot>

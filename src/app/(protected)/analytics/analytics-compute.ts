@@ -2,7 +2,8 @@
  * Analytics 계산 순수 함수
  * JSX 없음 — 마진 집계, 품목별/월별 breakdown 로직만 포함
  */
-import { calcMarginFromContract, calcAddlMargin } from '@/lib/margin'
+import { calcMarginFromContract, calcAddlMargin, splitMargin } from '@/lib/margin'
+import { shiftMonths } from '@/lib/date'
 
 // ── 타입 ──
 export type DeliveryForAnalytics = {
@@ -19,11 +20,19 @@ export type DeliveryForAnalytics = {
   } | null
 }
 
+/** hyundai_transactions에서 가져오는 부족분 커미션 데이터 */
+export type ShortageTransaction = {
+  year_month: string        // 발생 기준월 (납품월); 지급월 = year_month + 1
+  commission_amount: number
+}
+
 export type MarginTotals = {
   qtyTon: number; sellKrw: number; costKrw: number
   totalMargin: number; a1: number; gm: number; rs: number
   /** AL35B 전용: 금화 매출 (화림 원가 + 금화 마진1/3) */
   geumhwaSellKrw: number
+  /** AL30 부족분 커미션 합계 (지급월 기준) */
+  shortageCommission: number
 }
 
 export type ProductRow = MarginTotals & {
@@ -40,16 +49,20 @@ export const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'FESI75', 'F
 /** AL30: addl_margin 집계 기준월 = 납품월 + 1. 그 외: 납품월 그대로 */
 function getAddlMonth(d: DeliveryForAnalytics): string {
   if (d.product?.name.toUpperCase() === 'AL30') {
-    const [y, m] = d.year_month.split('-').map(Number)
-    const next = new Date(y, m, 1)
-    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
+    return shiftMonths(d.year_month, 1)
   }
   return d.year_month
+}
+
+/** 부족분 커미션 지급월 = 발생 기준월 + 1 */
+function shortagePaymentMonth(ym: string): string {
+  return shiftMonths(ym, 1)
 }
 
 // ── 집계 함수 ──
 export function computeMargins(
   deliveries: DeliveryForAnalytics[],
+  shortages: ShortageTransaction[],
   fromYM?: string,
   toYM?: string,
 ): MarginTotals {
@@ -79,7 +92,20 @@ export function computeMargins(
       totalMargin += am.total_margin; a1 += am.korea_a1; gm += am.geumhwa; rs += am.raseong
     }
   }
-  return { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw }
+
+  // 부족분 커미션 (지급월 기준으로 집계)
+  let shortageCommission = 0
+  for (const s of shortages) {
+    const payMonth = shortagePaymentMonth(s.year_month)
+    if (!fromYM || (payMonth >= fromYM && payMonth <= toYM!)) {
+      const sp = splitMargin(s.commission_amount)
+      shortageCommission += s.commission_amount
+      totalMargin += s.commission_amount
+      a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+    }
+  }
+
+  return { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, shortageCommission }
 }
 
 export function buildProductRows(
@@ -131,6 +157,7 @@ export function buildProductRows(
         gm: (m ? m.geumhwa  : 0) + amGm,
         rs: (m ? m.raseong  : 0) + amRs,
         geumhwaSellKrw: gmSell,
+        shortageCommission: 0,
       })
     }
   }
@@ -140,7 +167,12 @@ export function buildProductRows(
   })
 }
 
-export function buildMonthlyData(deliveries: DeliveryForAnalytics[], fromYM: string, toYM: string): MonthlyData[] {
+export function buildMonthlyData(
+  deliveries: DeliveryForAnalytics[],
+  shortages: ShortageTransaction[],
+  fromYM: string,
+  toYM: string,
+): MonthlyData[] {
   // 범위 내 모든 월 생성 (데이터 없는 월도 포함)
   const months: string[] = []
   const cur = new Date(fromYM + '-02')
@@ -170,6 +202,18 @@ export function buildMonthlyData(deliveries: DeliveryForAnalytics[], fromYM: str
         totalMargin += am.total_margin; a1 += am.korea_a1; gm += am.geumhwa; rs += am.raseong
       }
     }
-    return { ym, qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw }
+
+    // 부족분 커미션 (지급월 기준)
+    let shortageCommission = 0
+    for (const s of shortages) {
+      if (shortagePaymentMonth(s.year_month) === ym) {
+        const sp = splitMargin(s.commission_amount)
+        shortageCommission += s.commission_amount
+        totalMargin += s.commission_amount
+        a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+      }
+    }
+
+    return { ym, qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, shortageCommission }
   })
 }

@@ -4,7 +4,7 @@ import { toMessage } from '@/lib/error'
 import { useState, useMemo } from 'react'
 import { insertHyundaiTransaction, deleteHyundaiTransaction } from './actions'
 import { splitMargin, fmtKrw, fmtNum } from '@/lib/margin'
-import { monthEnd } from '@/lib/date'
+import { monthEnd, shiftMonths } from '@/lib/date'
 import type { ShortageEntry, HyundaiInvoiceRow as CommInvoice } from './types'
 
 // ────────────────────────────────────────────────────────
@@ -27,6 +27,18 @@ export default function HyundaiShortageSection({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState({ ym: yearMonth, qty_ton: '', price_per_ton: '', memo: '' })
+
+  // 이번달 지급 예정 = 전월 발생 부족분
+  const prevYM = shiftMonths(yearMonth, -1)
+  const shortageThisMonth = useMemo(() => {
+    const entries = shortageList.filter(s => s.year_month === prevYM)
+    let total = 0, geumhwa = 0, raseong = 0
+    for (const s of entries) {
+      const sp = splitMargin(s.commission_amount)
+      total += s.commission_amount; geumhwa += sp.geumhwa; raseong += sp.raseong
+    }
+    return { total, geumhwa, raseong }
+  }, [shortageList, prevYM])
 
   // ── 커미션 현황 (마진 + 부족분 통합) ──
   const commissionHistory = useMemo(() => {
@@ -171,6 +183,30 @@ export default function HyundaiShortageSection({
       <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">
         커미션 현황 (마진 + 부족분)
       </h3>
+
+      {/* 이번달 수령 예정 요약 */}
+      {shortageThisMonth.total > 0 && (
+        <div className="card p-4 bg-amber-50 border-2 border-amber-300 mb-4">
+          <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">
+            {yearMonth} 수령 예정 — {prevYM} 부족분 커미션
+          </p>
+          <div className="flex gap-6 text-sm">
+            <div>
+              <p className="text-xs text-amber-600">총액</p>
+              <p className="font-bold text-amber-800">{fmtKrw(shortageThisMonth.total)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-purple-600">금화</p>
+              <p className="font-semibold text-purple-700">{fmtKrw(shortageThisMonth.geumhwa)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-orange-600">라성</p>
+              <p className="font-semibold text-orange-700">{fmtKrw(shortageThisMonth.raseong)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {commissionHistory.length === 0 ? (
         <div className="card px-4 py-8 text-center text-sm text-gray-400">커미션 이력 없음</div>
       ) : (
@@ -190,9 +226,16 @@ export default function HyundaiShortageSection({
                 </tr>
               </thead>
               <tbody>
-                {commissionHistory.map(row => (
-                  <tr key={row.key} className={`border-t border-gray-100 hover:bg-gray-50 ${row.type === 'shortage' ? 'bg-yellow-50' : ''}`}>
-                    <td className="table-td font-medium">{row.ym}</td>
+                {commissionHistory.map(row => {
+                  const isDueSoon = row.type === 'shortage' && row.ym === prevYM
+                  return (
+                  <tr key={row.key} className={`border-t border-gray-100 hover:bg-gray-50 ${isDueSoon ? 'bg-amber-50' : row.type === 'shortage' ? 'bg-yellow-50' : ''}`}>
+                    <td className="table-td font-medium">
+                      {row.ym}
+                      {isDueSoon && (
+                        <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded-full bg-amber-200 text-amber-800 font-semibold">이번달 지급</span>
+                      )}
+                    </td>
                     <td className="table-td">
                       <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                         row.type === 'margin' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'
@@ -218,7 +261,8 @@ export default function HyundaiShortageSection({
                       </td>
                     )}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
