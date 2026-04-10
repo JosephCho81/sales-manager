@@ -1,10 +1,10 @@
 /**
  * AL-30 (현대제철 ← 화림)
- * - 10일 단위 3구간 역발행, 60일 어음
+ * - 10일 단위 3구간 역발행, 익익월말 지급
  * - 화림→한국에이원: 당월 합산 1장, 익월1일 발행(계산서 날짜=당월말), 익익월말 지급
- * - 커미션: 익익월10일
+ * - 커미션: 익익월말
  */
-import { shiftMonths, monthEnd, nthDay, addDays } from '@/lib/date'
+import { shiftMonths, monthEnd, nthDay } from '@/lib/date'
 import { makeInvoice, calcCombinedMargin } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -40,21 +40,20 @@ export function genAL30(
     const ids      = period.days.map(d => d.id)
     const sellTotal = period.days.reduce((s, d) => s + d.contract.sell_price * d.quantity_kg / 1000, 0)
     const costTotal = period.days.reduce((s, d) => s + d.contract.cost_price * d.quantity_kg / 1000, 0)
-    const billDue  = addDays(period.basisDate, 60)
     const { geumhwa, raseong } = calcCombinedMargin(period.days)
 
     totalCost    += costTotal
     totalGeumhwa += geumhwa
     totalRaseong += raseong
 
-    // 현대→한국에이원 역발행 (10일 단위, 60일 어음)
+    // 현대→한국에이원 역발행 (10일 단위, 익익월말 지급)
     result.push(makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '현대제철', to: '한국에이원', supply: sellTotal, vat: true,
       basisDate: period.basisDate, deadline: period.basisDate,
-      paymentDue: billDue,
+      paymentDue: monthEnd(dNext2M),
       type: 'sales',
-      memo: `현대제철 역발행 ${period.label} — 60일 어음 만기 ${billDue}`,
+      memo: `현대제철 역발행 ${period.label} — 익익월말 지급 ${monthEnd(dNext2M)}`,
     }))
   }
 
@@ -69,20 +68,20 @@ export function genAL30(
     }))
   }
 
-  // 커미션 — 익익월10일
+  // 커미션 — 익익월말
   if (totalGeumhwa > 0) {
     result.push(
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
-        basisDate: nthDay(dNext2M, 1), deadline: nthDay(dNext2M, 10), paymentDue: nthDay(dNext2M, 10),
-        type: 'commission', memo: '금화 커미션 1/3 — 익익월10일',
+        basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
+        type: 'commission', memo: '금화 커미션 1/3 — 익익월말',
       }),
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '라성', supply: totalRaseong, vat: true,
-        basisDate: nthDay(dNext2M, 1), deadline: nthDay(dNext2M, 10), paymentDue: nthDay(dNext2M, 10),
-        type: 'commission', memo: '라성 커미션 (나머지) — 익익월10일',
+        basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
+        type: 'commission', memo: '라성 커미션 (나머지) — 익익월말',
       }),
     )
   }
