@@ -1,7 +1,7 @@
 /**
  * AL-30 (현대제철 ← 화림)
  * - 10일 단위 3구간 역발행, 60일 어음
- * - 화림→한국에이원: 당월 합산 1장, 익익월1일 지급
+ * - 화림→한국에이원: 당월 합산 1장, 익월1일 발행(계산서 날짜=당월말), 익익월말 지급
  * - 커미션: 익익월10일
  */
 import { shiftMonths, monthEnd, nthDay, addDays } from '@/lib/date'
@@ -14,6 +14,7 @@ export function genAL30(
 ): InvoiceToCreate[] {
   const pid    = deliveries[0].product_id
   const deliveryYM = deliveries[0].year_month
+  const nextM  = shiftMonths(ym, 1)
   const next2M = shiftMonths(ym, 2)
 
   // 10일 단위 3구간으로 그룹
@@ -62,9 +63,9 @@ export function genAL30(
     result.push(makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
       from: '한국에이원', to: '화림', supply: totalCost, vat: true,
-      basisDate: monthEnd(ym), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
+      basisDate: monthEnd(ym), deadline: nthDay(nextM, 1), paymentDue: monthEnd(next2M),
       type: 'cost',
-      memo: '한국에이원→화림 당월 합산 1장 — 익익월1일 지급',
+      memo: '한국에이원→화림 당월 합산 1장 — 익월1일 발행, 익익월말 지급',
     }))
   }
 
