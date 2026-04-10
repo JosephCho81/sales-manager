@@ -110,15 +110,14 @@ export default function AnalyticsClient({
   return (
     <div>
       {/* ── 헤더 ── */}
-      <div className="mb-5">
-        <h2 className="text-xl font-bold text-gray-900">매출·마진 현황</h2>
-        <p className="text-sm text-gray-500 mt-0.5">기간별 3사 매출 및 마진 분석</p>
+      <div className="mb-2">
+        <h2 className="text-lg font-bold text-gray-900">매출·마진 현황</h2>
       </div>
 
       {/* ── 조회 컨트롤 ── */}
-      <div className="card p-4 mb-6">
+      <div className="card p-3 mb-3">
         {/* 모드 탭 */}
-        <div className="flex gap-1 mb-4">
+        <div className="flex gap-1 mb-2">
           {([
             { key: 'month', label: '단일월' },
             { key: 'range', label: '기간' },
@@ -209,7 +208,7 @@ export default function AnalyticsClient({
       </div>
 
       {/* ── 기간 라벨 ── */}
-      <p className="text-xs text-gray-500 mb-5">
+      <p className="text-xs text-gray-500 mb-2">
         📅 조회 기간: <span className="font-medium text-gray-700">{periodLabel}</span>
         {(filterProduct !== 'all' || filterBuyer !== 'all') && (
           <span className="ml-2 text-blue-600">
@@ -220,89 +219,89 @@ export default function AnalyticsClient({
       </p>
 
       {/* ── 3사 요약 카드 ── */}
-      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">3사 배분 현황</h3>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
+      <div className="grid grid-cols-3 gap-3 mb-3">
         {/* 한국에이원 */}
-        <div className="card p-5">
-          <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-4">한국에이원</div>
-          <div className="space-y-2">
+        <div className="card p-3">
+          <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">한국에이원</div>
+          <div className="space-y-1">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">매출 (동국/현대)</span>
-              <span className="text-sm tabular-nums font-medium">{fmtKrw(totals.sellKrw)}</span>
+              <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.sellKrw)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">원가 (화림 등)</span>
-              <span className="text-sm tabular-nums text-gray-600">{fmtKrw(totals.costKrw)}</span>
+              <span className="text-xs tabular-nums text-gray-600 whitespace-nowrap">{fmtKrw(totals.costKrw)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">총 마진</span>
-              <span className="text-sm tabular-nums font-semibold text-blue-600">{fmtKrw(totals.totalMargin)}</span>
+              <span className="text-xs tabular-nums font-semibold text-blue-600 whitespace-nowrap">{fmtKrw(totals.totalMargin)}</span>
             </div>
           </div>
-          <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
+          <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
             <span className="text-xs text-gray-500">배분 마진 (1/3)</span>
-            <span className="text-xl font-bold text-green-600">{fmtKrw(totals.a1)}</span>
+            <span className="text-base font-bold text-green-600 whitespace-nowrap">{fmtKrw(totals.a1)}</span>
           </div>
           {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right mt-0.5">
+            <div className="text-xs text-gray-400 text-right">
               마진율 {fmtNum(totals.totalMargin / totals.sellKrw * 100, 1)}%
             </div>
           )}
         </div>
 
         {/* 금화 */}
-        <div className="card p-5">
-          <div className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-4">금화</div>
-          <div className="space-y-2">
+        <div className="card p-3">
+          <div className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2">금화</div>
+          <div className="space-y-1">
             {totals.geumhwaSellKrw > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-500">매출 (AL35 매매)</span>
-                <span className="text-sm tabular-nums font-medium">{fmtKrw(totals.geumhwaSellKrw)}</span>
+                <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.geumhwaSellKrw)}</span>
               </div>
             )}
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">커미션 마진 (1/3)</span>
-              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.gm - shortageInPeriod.gm)}</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - shortageInPeriod.gm)}</span>
             </div>
             {shortageInPeriod.gm > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-amber-600">현대제철 부족분 커미션</span>
-                <span className="text-sm tabular-nums font-medium text-amber-700">{fmtKrw(shortageInPeriod.gm)}</span>
+                <span className="text-xs text-amber-600">현대제철 부족분</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(shortageInPeriod.gm)}</span>
               </div>
             )}
           </div>
-          <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
+          <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
             <span className="text-xs text-gray-500">커미션 수취</span>
-            <span className="text-xl font-bold text-purple-600">{fmtKrw(totals.gm)}</span>
+            <span className="text-base font-bold text-purple-600 whitespace-nowrap">{fmtKrw(totals.gm)}</span>
           </div>
           {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right mt-0.5">
+            <div className="text-xs text-gray-400 text-right">
               총마진의 {fmtNum(totals.gm / totals.totalMargin * 100, 1)}%
             </div>
           )}
         </div>
 
         {/* 라성 */}
-        <div className="card p-5">
-          <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-4">라성</div>
-          <div className="space-y-2">
+        <div className="card p-3">
+          <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-2">라성</div>
+          <div className="space-y-1">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">배분 마진 (1/3+α)</span>
-              <span className="text-sm tabular-nums font-medium text-gray-800">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
             </div>
             {shortageInPeriod.rs > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-amber-600">현대제철 부족분 커미션</span>
-                <span className="text-sm tabular-nums font-medium text-amber-700">{fmtKrw(shortageInPeriod.rs)}</span>
+                <span className="text-xs text-amber-600">현대제철 부족분</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(shortageInPeriod.rs)}</span>
               </div>
             )}
           </div>
-          <div className="border-t border-gray-100 mt-3 pt-3 flex justify-between items-center">
+          <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
             <span className="text-xs text-gray-500">커미션 수취</span>
-            <span className="text-xl font-bold text-orange-600">{fmtKrw(totals.rs)}</span>
+            <span className="text-base font-bold text-orange-600 whitespace-nowrap">{fmtKrw(totals.rs)}</span>
           </div>
           {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right mt-0.5">
+            <div className="text-xs text-gray-400 text-right">
               총마진의 {fmtNum(totals.rs / totals.totalMargin * 100, 1)}%
             </div>
           )}
@@ -369,9 +368,9 @@ export default function AnalyticsClient({
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden [&_.table-th]:py-1.5 [&_.table-th]:px-2 [&_.table-td]:py-1 [&_.table-td]:px-2">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
                 <tr>
                   <th className="table-th">품목</th>
@@ -413,9 +412,9 @@ export default function AnalyticsClient({
                       </tr>
                       {hasAddl && (
                         <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ {row.displayName} 커미션</td>
+                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
                           <td className="table-td text-gray-300">—</td>
-                          <td className="table-td text-amber-600 text-xs whitespace-nowrap">{row.buyer} (호진 추가)</td>
+                          <td className="table-td text-amber-600 whitespace-nowrap">{row.buyer}</td>
                           <td className="table-td text-right text-gray-300">—</td>
                           <td className="table-td text-right text-gray-300">—</td>
                           <td className="table-td text-right text-gray-300">—</td>
@@ -433,7 +432,7 @@ export default function AnalyticsClient({
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                     <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 부족분 커미션</td>
                     <td className="table-td text-gray-300">—</td>
-                    <td className="table-td text-amber-600 text-xs">현대제철 (AL30)</td>
+                    <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
@@ -448,19 +447,19 @@ export default function AnalyticsClient({
               {productRows.length > 1 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-4 py-2.5 text-sm">합계</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-500">
+                    <td colSpan={3} className="px-2 py-1.5 text-xs">합계</td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
                       {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
                         ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
-                    <td className="px-4 py-2.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
                   </tr>
                 </tfoot>
               )}
