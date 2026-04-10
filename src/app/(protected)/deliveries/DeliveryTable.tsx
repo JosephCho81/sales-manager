@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { deleteDelivery } from './actions'
-import { calcMarginFromContract, calcAddlMargin, fmtKrw, fmtNum } from '@/lib/margin'
+import { calcMarginFromContract, fmtKrw, fmtNum } from '@/lib/margin'
 import type { DeliveryRow } from './types'
 
 export default function DeliveryTable({
@@ -23,20 +23,6 @@ export default function DeliveryTable({
     [deliveries, filterMonth]
   )
 
-  const monthTotal = useMemo(() => {
-    let total = 0
-    for (const d of filtered) {
-      if (!d.contract) continue
-      const m = calcMarginFromContract(d.contract, d.quantity_kg)
-      total += m.total_margin
-      if (d.addl_quantity_kg && d.addl_margin_per_ton) {
-        const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-        total += am.total_margin
-      }
-    }
-    return { total }
-  }, [filtered])
-
   async function handleDelete(id: string) {
     if (!confirm('이 입고 데이터를 삭제하시겠습니까?')) return
     const result = await deleteDelivery(id)
@@ -55,16 +41,6 @@ export default function DeliveryTable({
         />
         <span className="text-xs text-gray-400">{filtered.length}건</span>
       </div>
-
-      {/* 월 마진 합계 카드 */}
-      {filtered.length > 0 && (
-        <div className="mb-5">
-          <div className="card p-3 inline-block">
-            <p className="text-xs text-gray-500">{filterMonth} 총 마진</p>
-            <p className="text-lg font-bold text-blue-600">{fmtKrw(monthTotal.total)}</p>
-          </div>
-        </div>
-      )}
 
       {/* 목록 테이블 */}
       <div className="card overflow-x-auto">
