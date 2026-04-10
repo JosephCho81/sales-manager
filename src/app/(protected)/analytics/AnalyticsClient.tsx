@@ -368,7 +368,7 @@ export default function AnalyticsClient({
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
         </div>
       ) : (
-        <div className="card overflow-hidden [&_.table-th]:py-3.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-th]:whitespace-nowrap [&_.table-td]:py-3.5 [&_.table-td]:px-2">
+        <div className="card overflow-hidden [&_.table-th]:py-3.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-th]:whitespace-nowrap [&_.table-th]:text-center [&_.table-td]:py-3.5 [&_.table-td]:px-2 [&_.table-td]:text-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -376,14 +376,14 @@ export default function AnalyticsClient({
                   <th className="table-th">품목</th>
                   <th className="table-th">입고일</th>
                   <th className="table-th">납품처</th>
-                  <th className="table-th text-right">물량(톤)</th>
-                  <th className="table-th text-right">매출</th>
-                  <th className="table-th text-right">원가</th>
-                  <th className="table-th text-right">총마진</th>
-                  <th className="table-th text-right text-gray-500">커미션</th>
-                  <th className="table-th text-right text-green-700">한국에이원</th>
-                  <th className="table-th text-right text-purple-700">금화</th>
-                  <th className="table-th text-right text-orange-700">라성</th>
+                  <th className="table-th">물량(톤)</th>
+                  <th className="table-th">매출</th>
+                  <th className="table-th">원가</th>
+                  <th className="table-th">총마진</th>
+                  <th className="table-th text-gray-500">커미션</th>
+                  <th className="table-th text-green-700">한국에이원</th>
+                  <th className="table-th text-purple-700">금화</th>
+                  <th className="table-th text-orange-700">라성</th>
                 </tr>
               </thead>
               <tbody>
@@ -448,7 +448,7 @@ export default function AnalyticsClient({
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                     <td colSpan={3} className="px-2 py-3.5 text-sm">합계</td>
-                    <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
                     <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
                     <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
                     <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
