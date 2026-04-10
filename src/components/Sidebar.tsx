@@ -6,8 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/analytics',   label: '매출·마진 현황',    icon: '📈' },
-  { href: '/deliveries',  label: '입고 입력',         icon: '📦' },
   { href: '/contracts',   label: '낙찰 단가 관리',    icon: '📋' },
+  { href: '/deliveries',  label: '입고 입력',         icon: '📦' },
   { href: '/invoices',    label: '지급 일정 관리',    icon: '🧾' },
   { href: '/hyundai',     label: '현대제철',          icon: '🏭' },
   { href: '/products',    label: '품목 설정',         icon: '⚙️' },
