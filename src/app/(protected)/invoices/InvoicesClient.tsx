@@ -145,16 +145,14 @@ export default function InvoicesClient({
   return (
     <div>
       {/* 헤더 */}
-      <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">계산서 발행 지시</h2>
-          <p className="text-sm text-gray-500 mt-0.5">월별 계산서 발행 지시 목록 관리</p>
-        </div>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold text-gray-900">지급 일정 관리</h2>
+        <p className="text-sm text-gray-500 mt-0.5">선택 월의 계산서 발행일 및 지급 예정일</p>
         <input
           type="month"
           value={yearMonth}
           onChange={handleMonthChange}
-          className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="mt-3 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 

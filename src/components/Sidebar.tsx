@@ -8,7 +8,7 @@ const navItems = [
   { href: '/dashboard',   label: '대시보드',         icon: '📊' },
   { href: '/deliveries',  label: '입고 입력',         icon: '📦' },
   { href: '/contracts',   label: '낙찰 단가 관리',    icon: '📋' },
-  { href: '/invoices',    label: '계산서 발행 지시',  icon: '🧾' },
+  { href: '/invoices',    label: '지급 일정 관리',    icon: '🧾' },
   { href: '/analytics',   label: '매출·마진 현황',    icon: '📈' },
   { href: '/hyundai',     label: '현대제철 AL30',     icon: '🏭' },
   { href: '/fesi',        label: '페로실리콘 (FeSi)', icon: '💱' },
