@@ -28,6 +28,7 @@ export interface DeliveryForInvoice {
 
 export interface InvoiceToCreate {
   year_month: string
+  delivery_year_month: string | null
   product_id: string
   delivery_ids: string[]
   from_company: string

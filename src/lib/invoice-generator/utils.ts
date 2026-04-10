@@ -9,6 +9,7 @@ export { monthEnd, nthDay, shiftMonths, addDays }
 // ────────────────────────────────────────────────────────
 export function makeInvoice(p: {
   yearMonth: string
+  deliveryYearMonth: string
   productId: string
   deliveryIds: string[]
   from: string
@@ -25,6 +26,7 @@ export function makeInvoice(p: {
   const vatAmt = p.vat ? Math.round(supply * 0.1) : 0
   return {
     year_month: p.yearMonth,
+    delivery_year_month: p.deliveryYearMonth,
     product_id: p.productId,
     delivery_ids: p.deliveryIds,
     from_company: p.from,

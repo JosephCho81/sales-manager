@@ -1,6 +1,7 @@
 export type InvoiceRow = {
   id: string
   year_month: string
+  delivery_year_month: string | null
   product_id: string | null
   delivery_ids: string[] | null
   from_company: string

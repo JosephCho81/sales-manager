@@ -1,5 +1,6 @@
 import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
+import { shiftMonths } from '@/lib/date'
 import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
 
@@ -48,7 +49,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
         product:products(id, name, display_name, buyer),
         contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
       `)
-      .gte('year_month', fromYM)
+      .gte('year_month', shiftMonths(fromYM, -1))  // AL30 addl(납품월+1) 포함을 위해 1달 앞당김
       .lte('year_month', toYM)
       .order('year_month')
 

@@ -76,10 +76,7 @@ export default function DeliveryTable({
               <th className="table-th">납품처</th>
               <th className="table-th text-right">물량 (톤)</th>
               <th className="table-th text-right">판매단가</th>
-              <th className="table-th text-right">원가단가</th>
-              <th className="table-th text-right">기본 마진</th>
-              <th className="table-th text-right">추가 배분</th>
-              <th className="table-th text-right">합계 마진</th>
+              <th className="table-th text-right">합계</th>
               <th className="table-th">메모</th>
               <th className="table-th">관리</th>
             </tr>
@@ -87,7 +84,7 @@ export default function DeliveryTable({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={11} className="table-td text-center text-gray-400 py-10">
+                <td colSpan={8} className="table-td text-center text-gray-400 py-10">
                   {filterMonth} 입고 데이터가 없습니다.
                 </td>
               </tr>
@@ -95,10 +92,7 @@ export default function DeliveryTable({
             {filtered.map(d => {
               if (!d.contract) return null
               const main = calcMarginFromContract(d.contract, d.quantity_kg)
-              const addl = d.addl_quantity_kg && d.addl_margin_per_ton
-                ? calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-                : null
-              const combinedTotal = main.total_margin + (addl?.total_margin ?? 0)
+              const sellTotal = main.sell_price_krw * main.quantity_ton
               const isUsd = d.contract.currency === 'USD'
 
               return (
@@ -116,7 +110,6 @@ export default function DeliveryTable({
                   <td className="table-td text-gray-500 text-xs whitespace-nowrap">{d.product?.buyer}</td>
                   <td className="table-td text-right whitespace-nowrap">
                     {fmtNum(d.quantity_kg / 1000, 3)}
-                    {addl && <div className="text-xs text-orange-500">+{fmtNum(d.addl_quantity_kg! / 1000, 3)}</div>}
                   </td>
                   <td className="table-td text-right whitespace-nowrap">
                     {isUsd
@@ -124,17 +117,7 @@ export default function DeliveryTable({
                       : <>{fmtNum(d.contract.sell_price)}<span className="text-gray-400 text-xs">원</span></>
                     }
                   </td>
-                  <td className="table-td text-right whitespace-nowrap">
-                    {isUsd
-                      ? <>{fmtNum(d.contract.cost_price, 2)}<span className="text-gray-400 text-xs">USD</span></>
-                      : <>{fmtNum(d.contract.cost_price)}<span className="text-gray-400 text-xs">원</span></>
-                    }
-                  </td>
-                  <td className="table-td text-right text-blue-600 whitespace-nowrap">{fmtKrw(main.total_margin)}</td>
-                  <td className="table-td text-right text-orange-500 whitespace-nowrap">
-                    {addl ? fmtKrw(addl.total_margin) : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="table-td text-right font-bold text-blue-700 whitespace-nowrap">{fmtKrw(combinedTotal)}</td>
+                  <td className="table-td text-right font-semibold text-blue-700 whitespace-nowrap">{fmtKrw(sellTotal)}</td>
                   <td className="table-td text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
                   <td className="table-td whitespace-nowrap">
                     <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>

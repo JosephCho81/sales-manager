@@ -36,25 +36,45 @@ export type MonthlyData = { ym: string } & MarginTotals
 // ── 상수 ──
 export const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'FESI75', 'FESI60', 'AL30']
 
+// ── 헬퍼 ──
+/** AL30: addl_margin 집계 기준월 = 납품월 + 1. 그 외: 납품월 그대로 */
+function getAddlMonth(d: DeliveryForAnalytics): string {
+  if (d.product?.name.toUpperCase() === 'AL30') {
+    const [y, m] = d.year_month.split('-').map(Number)
+    const next = new Date(y, m, 1)
+    return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
+  }
+  return d.year_month
+}
+
 // ── 집계 함수 ──
-export function computeMargins(deliveries: DeliveryForAnalytics[]): MarginTotals {
+export function computeMargins(
+  deliveries: DeliveryForAnalytics[],
+  fromYM?: string,
+  toYM?: string,
+): MarginTotals {
   let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
   let geumhwaSellKrw = 0
   for (const d of deliveries) {
     if (!d.contract) continue
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
-    qtyTon      += m.quantity_ton
-    sellKrw     += m.sell_price_krw  * m.quantity_ton
-    costKrw     += m.cost_price_krw  * m.quantity_ton
-    totalMargin += m.total_margin
-    a1          += m.korea_a1
-    gm          += m.geumhwa
-    rs          += m.raseong
-    // AL35B: 금화가 화림에서 매입 후 한국에이원에 판매 → 원가 + 마진1/3
-    if (d.product?.name.toUpperCase() === 'AL35B') {
-      geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
+    const inMain = !fromYM || (d.year_month >= fromYM && d.year_month <= toYM!)
+    const addlMonth = getAddlMonth(d)
+    const inAddl = !fromYM || (addlMonth >= fromYM && addlMonth <= toYM!)
+
+    if (inMain) {
+      const m = calcMarginFromContract(d.contract, d.quantity_kg)
+      qtyTon      += m.quantity_ton
+      sellKrw     += m.sell_price_krw  * m.quantity_ton
+      costKrw     += m.cost_price_krw  * m.quantity_ton
+      totalMargin += m.total_margin
+      a1          += m.korea_a1
+      gm          += m.geumhwa
+      rs          += m.raseong
+      if (d.product?.name.toUpperCase() === 'AL35B') {
+        geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
+      }
     }
-    if (d.addl_quantity_kg && d.addl_margin_per_ton) {
+    if (inAddl && d.addl_quantity_kg && d.addl_margin_per_ton) {
       const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
       totalMargin += am.total_margin; a1 += am.korea_a1; gm += am.geumhwa; rs += am.raseong
     }
@@ -62,38 +82,54 @@ export function computeMargins(deliveries: DeliveryForAnalytics[]): MarginTotals
   return { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw }
 }
 
-export function buildProductRows(deliveries: DeliveryForAnalytics[]): ProductRow[] {
+export function buildProductRows(
+  deliveries: DeliveryForAnalytics[],
+  fromYM?: string,
+  toYM?: string,
+): ProductRow[] {
   const map = new Map<string, ProductRow>()
   for (const d of deliveries) {
     if (!d.contract || !d.product) continue
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
+    const inMain = !fromYM || (d.year_month >= fromYM && d.year_month <= toYM!)
+    const addlMonth = getAddlMonth(d)
+    const inAddl = !fromYM || (addlMonth >= fromYM && addlMonth <= toYM!)
+
+    if (!inMain && !inAddl) continue
+
+    const m = inMain ? calcMarginFromContract(d.contract, d.quantity_kg) : null
     let amTotal = 0, amA1 = 0, amGm = 0, amRs = 0
-    if (d.addl_quantity_kg && d.addl_margin_per_ton) {
+    if (inAddl && d.addl_quantity_kg && d.addl_margin_per_ton) {
       const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
       amTotal = am.total_margin; amA1 = am.korea_a1; amGm = am.geumhwa; amRs = am.raseong
     }
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const gmSell = (inMain && m && isAL35) ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
 
     const ex = map.get(d.product_id)
     if (ex) {
-      ex.qtyTon          += m.quantity_ton
-      ex.sellKrw         += m.sell_price_krw * m.quantity_ton
-      ex.costKrw         += m.cost_price_krw * m.quantity_ton
-      ex.totalMargin     += m.total_margin + amTotal
+      if (m) {
+        ex.qtyTon  += m.quantity_ton
+        ex.sellKrw += m.sell_price_krw * m.quantity_ton
+        ex.costKrw += m.cost_price_krw * m.quantity_ton
+        ex.totalMargin += m.total_margin
+        ex.a1 += m.korea_a1; ex.gm += m.geumhwa; ex.rs += m.raseong
+        ex.geumhwaSellKrw += gmSell
+      }
+      ex.totalMargin     += amTotal
       ex.addlMarginTotal += amTotal
-      ex.a1 += m.korea_a1 + amA1; ex.gm += m.geumhwa + amGm; ex.rs += m.raseong + amRs
-      ex.geumhwaSellKrw += gmSell
+      ex.a1 += amA1; ex.gm += amGm; ex.rs += amRs
     } else {
       map.set(d.product_id, {
         productId: d.product_id, name: d.product.name,
         displayName: d.product.display_name, buyer: d.product.buyer,
-        qtyTon: m.quantity_ton,
-        sellKrw: m.sell_price_krw * m.quantity_ton,
-        costKrw: m.cost_price_krw * m.quantity_ton,
-        totalMargin: m.total_margin + amTotal,
+        qtyTon:    m ? m.quantity_ton : 0,
+        sellKrw:   m ? m.sell_price_krw * m.quantity_ton : 0,
+        costKrw:   m ? m.cost_price_krw * m.quantity_ton : 0,
+        totalMargin: (m ? m.total_margin : 0) + amTotal,
         addlMarginTotal: amTotal,
-        a1: m.korea_a1 + amA1, gm: m.geumhwa + amGm, rs: m.raseong + amRs,
+        a1: (m ? m.korea_a1 : 0) + amA1,
+        gm: (m ? m.geumhwa  : 0) + amGm,
+        rs: (m ? m.raseong  : 0) + amRs,
         geumhwaSellKrw: gmSell,
       })
     }
@@ -113,7 +149,27 @@ export function buildMonthlyData(deliveries: DeliveryForAnalytics[], fromYM: str
     months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`)
     cur.setMonth(cur.getMonth() + 1)
   }
-  const byMonth = new Map<string, DeliveryForAnalytics[]>(months.map(ym => [ym, []]))
-  for (const d of deliveries) byMonth.get(d.year_month)?.push(d)
-  return months.map(ym => ({ ym, ...computeMargins(byMonth.get(ym) ?? []) }))
+  return months.map(ym => {
+    let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
+    let geumhwaSellKrw = 0
+    for (const d of deliveries) {
+      if (!d.contract) continue
+      if (d.year_month === ym) {
+        const m = calcMarginFromContract(d.contract, d.quantity_kg)
+        qtyTon      += m.quantity_ton
+        sellKrw     += m.sell_price_krw * m.quantity_ton
+        costKrw     += m.cost_price_krw * m.quantity_ton
+        totalMargin += m.total_margin
+        a1 += m.korea_a1; gm += m.geumhwa; rs += m.raseong
+        if (d.product?.name.toUpperCase() === 'AL35B') {
+          geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
+        }
+      }
+      if (getAddlMonth(d) === ym && d.addl_quantity_kg && d.addl_margin_per_ton) {
+        const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
+        totalMargin += am.total_margin; a1 += am.korea_a1; gm += am.geumhwa; rs += am.raseong
+      }
+    }
+    return { ym, qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw }
+  })
 }

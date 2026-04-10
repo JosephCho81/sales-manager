@@ -13,6 +13,7 @@ export function genAL30(
   ym: string
 ): InvoiceToCreate[] {
   const pid    = deliveries[0].product_id
+  const deliveryYM = deliveries[0].year_month
   const next2M = shiftMonths(ym, 2)
 
   // 10일 단위 3구간으로 그룹
@@ -47,7 +48,7 @@ export function genAL30(
 
     // 현대→한국에이원 역발행 (10일 단위, 60일 어음)
     result.push(makeInvoice({
-      yearMonth: ym, productId: pid, deliveryIds: ids,
+      yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '현대제철', to: '한국에이원', supply: sellTotal, vat: true,
       basisDate: period.basisDate, deadline: period.basisDate,
       paymentDue: billDue,
@@ -59,7 +60,7 @@ export function genAL30(
   // 화림→한국에이원: 당월 합산 1장, 익익월1일 지급
   if (totalCost > 0) {
     result.push(makeInvoice({
-      yearMonth: ym, productId: pid, deliveryIds: deliveries.map(d => d.id),
+      yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
       from: '한국에이원', to: '화림', supply: totalCost, vat: true,
       basisDate: monthEnd(ym), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
       type: 'cost',
@@ -71,13 +72,13 @@ export function genAL30(
   if (totalGeumhwa > 0) {
     result.push(
       makeInvoice({
-        yearMonth: ym, productId: pid, deliveryIds: deliveries.map(d => d.id),
+        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
         basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
         type: 'commission', memo: '금화 커미션 1/3 — 익익월10일',
       }),
       makeInvoice({
-        yearMonth: ym, productId: pid, deliveryIds: deliveries.map(d => d.id),
+        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: deliveries.map(d => d.id),
         from: '한국에이원', to: '라성', supply: totalRaseong, vat: true,
         basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
         type: 'commission', memo: '라성 커미션 (나머지) — 익익월10일',

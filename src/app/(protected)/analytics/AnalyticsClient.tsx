@@ -77,8 +77,8 @@ export default function AnalyticsClient({
   )
 
   // ── 집계 ──
-  const totals      = useMemo(() => computeMargins(filtered),                       [filtered])
-  const productRows = useMemo(() => buildProductRows(filtered),                      [filtered])
+  const totals      = useMemo(() => computeMargins(filtered, fromYM, toYM),         [filtered, fromYM, toYM])
+  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),        [filtered, fromYM, toYM])
   const monthlyData = useMemo(() => buildMonthlyData(filtered, fromYM, toYM),       [filtered, fromYM, toYM])
   const showChart   = fromYM !== toYM && monthlyData.length > 1
 
