@@ -43,6 +43,7 @@ export type ProductRow = MarginTotals & {
   productId: string; name: string; displayName: string; buyer: string
   deliveryYearMonth: string   // 납품월 — "N월분" 표시용
   addlMarginTotal: number
+  addlA1: number; addlGm: number; addlRs: number  // addl 커미션 1/3 breakdown
 }
 
 export type MonthlyData = { ym: string } & MarginTotals
@@ -130,6 +131,7 @@ export function buildProductRows(
       ex.costKrw     += m.cost_price_krw * m.quantity_ton
       ex.totalMargin += m.total_margin + amTotal
       ex.addlMarginTotal += amTotal
+      ex.addlA1 += amA1; ex.addlGm += amGm; ex.addlRs += amRs
       ex.a1 += m.korea_a1 + amA1; ex.gm += m.geumhwa + amGm; ex.rs += m.raseong + amRs
       ex.geumhwaSellKrw += gmSell
     } else {
@@ -142,6 +144,7 @@ export function buildProductRows(
         costKrw:   m.cost_price_krw * m.quantity_ton,
         totalMargin: m.total_margin + amTotal,
         addlMarginTotal: amTotal,
+        addlA1: amA1, addlGm: amGm, addlRs: amRs,
         a1: m.korea_a1 + amA1,
         gm: m.geumhwa  + amGm,
         rs: m.raseong  + amRs,

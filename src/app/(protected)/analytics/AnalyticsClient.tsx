@@ -360,7 +360,10 @@ export default function AnalyticsClient({
       )}
 
       {/* ── 품목별 상세 ── */}
-      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">품목별 마진 현황</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">품목별 마진 현황</h3>
+        <span className="text-xs text-gray-400">* 부가세 별도</span>
+      </div>
       {productRows.length === 0 ? (
         <div className="card px-4 py-8 text-center text-sm text-gray-400">
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
@@ -385,28 +388,50 @@ export default function AnalyticsClient({
                 </tr>
               </thead>
               <tbody>
-                {productRows.map(row => (
-                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="table-td font-medium">{row.displayName}</td>
-                    <td className="table-td text-xs text-blue-600 tabular-nums whitespace-nowrap">
-                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
-                    </td>
-                    <td className="table-td text-gray-500 text-xs">{row.buyer}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-500">
-                      {row.addlMarginTotal > 0 ? fmtKrw(row.addlMarginTotal) : <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
-                  </tr>
-                ))}
+                {productRows.map(row => {
+                  const hasAddl = row.addlMarginTotal > 0
+                  const mainMargin = row.totalMargin - row.addlMarginTotal
+                  const mainA1 = row.a1 - row.addlA1
+                  const mainGm = row.gm - row.addlGm
+                  const mainRs = row.rs - row.addlRs
+                  return (
+                    <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>
+                      <tr className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="table-td font-medium">{row.displayName}</td>
+                        <td className="table-td text-xs text-blue-600 tabular-nums whitespace-nowrap">
+                          {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                        </td>
+                        <td className="table-td text-gray-500 text-xs">{row.buyer}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(mainMargin)}</td>
+                        <td className="table-td text-right text-gray-300">—</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(mainA1)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(mainGm)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(mainRs)}</td>
+                      </tr>
+                      {hasAddl && (
+                        <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
+                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ {row.displayName} 커미션</td>
+                          <td className="table-td text-gray-300">—</td>
+                          <td className="table-td text-amber-600 text-xs whitespace-nowrap">{row.buyer} (호진 추가)</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(row.addlMarginTotal)}</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.addlA1)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.addlGm)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.addlRs)}</td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
                 {shortageInPeriod.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                    <td className="table-td font-medium text-amber-800">└ 부족분 커미션</td>
+                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 부족분 커미션</td>
                     <td className="table-td text-gray-300">—</td>
                     <td className="table-td text-amber-600 text-xs">현대제철 (AL30)</td>
                     <td className="table-td text-right text-gray-300">—</td>
