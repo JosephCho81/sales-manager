@@ -447,19 +447,19 @@ export default function AnalyticsClient({
               {productRows.length > 1 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-2 py-3.5 text-xs">합계</td>
-                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
+                    <td colSpan={3} className="px-2 py-3.5 text-sm">합계</td>
+                    <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-500">
                       {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
                         ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
-                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
+                    <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
                   </tr>
                 </tfoot>
               )}
