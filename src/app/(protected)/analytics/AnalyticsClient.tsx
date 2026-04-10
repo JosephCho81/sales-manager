@@ -271,7 +271,7 @@ export default function AnalyticsClient({
             )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
-            <span className="text-xs text-gray-500">총 마진</span>
+            <span className="text-xs text-gray-500">금화 마진</span>
             <span className="text-base font-bold text-purple-600 whitespace-nowrap">{fmtKrw(totals.gm)}</span>
           </div>
           {totals.totalMargin > 0 && (
@@ -297,7 +297,7 @@ export default function AnalyticsClient({
             )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
-            <span className="text-xs text-gray-500">총 마진</span>
+            <span className="text-xs text-gray-500">라성 마진</span>
             <span className="text-base font-bold text-orange-600 whitespace-nowrap">{fmtKrw(totals.rs)}</span>
           </div>
           {totals.totalMargin > 0 && (
@@ -368,7 +368,7 @@ export default function AnalyticsClient({
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
         </div>
       ) : (
-        <div className="card overflow-hidden [&_.table-th]:py-2.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-td]:py-1.5 [&_.table-td]:px-2 [&_.table-td]:text-xs">
+        <div className="card overflow-hidden [&_.table-th]:py-3.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-th]:whitespace-nowrap [&_.table-td]:py-3.5 [&_.table-td]:px-2">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -447,19 +447,19 @@ export default function AnalyticsClient({
               {productRows.length > 1 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-2 py-2.5 text-xs">합계</td>
-                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
+                    <td colSpan={3} className="px-2 py-3.5 text-xs">합계</td>
+                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
                       {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
                         ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
-                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
+                    <td className="px-2 py-3.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
                   </tr>
                 </tfoot>
               )}
