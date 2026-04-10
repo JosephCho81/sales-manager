@@ -142,6 +142,13 @@ export default function InvoicesClient({
           >
             선택
           </button>
+          <button
+            onClick={handleGenerate}
+            disabled={generating || initialDeliveries.length === 0}
+            className="btn-secondary text-xs disabled:opacity-40"
+          >
+            재생성
+          </button>
         </div>
       </div>
 
