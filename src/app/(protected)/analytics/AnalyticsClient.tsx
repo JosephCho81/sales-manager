@@ -224,7 +224,7 @@ export default function AnalyticsClient({
         {/* 한국에이원 */}
         <div className="card p-3">
           <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">한국에이원</div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">매출 (동국/현대)</span>
               <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.sellKrw)}</span>
@@ -252,7 +252,7 @@ export default function AnalyticsClient({
         {/* 금화 */}
         <div className="card p-3">
           <div className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2">금화</div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {totals.geumhwaSellKrw > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-500">매출 (AL35 매매)</span>
@@ -284,7 +284,7 @@ export default function AnalyticsClient({
         {/* 라성 */}
         <div className="card p-3">
           <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-2">라성</div>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">배분 마진 (1/3+α)</span>
               <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
@@ -368,7 +368,7 @@ export default function AnalyticsClient({
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
         </div>
       ) : (
-        <div className="card overflow-hidden [&_.table-th]:py-1.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-td]:py-1 [&_.table-td]:px-2 [&_.table-td]:text-xs">
+        <div className="card overflow-hidden [&_.table-th]:py-2.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-td]:py-1.5 [&_.table-td]:px-2 [&_.table-td]:text-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -447,19 +447,19 @@ export default function AnalyticsClient({
               {productRows.length > 1 && (
                 <tfoot>
                   <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                    <td colSpan={3} className="px-2 py-1.5 text-xs">합계</td>
-                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
+                    <td colSpan={3} className="px-2 py-2.5 text-xs">합계</td>
+                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtNum(totals.qtyTon, 3)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500">
                       {productRows.reduce((s, r) => s + r.addlMarginTotal, 0) > 0
                         ? fmtKrw(productRows.reduce((s, r) => s + r.addlMarginTotal, 0))
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
-                    <td className="px-2 py-1.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
+                    <td className="px-2 py-2.5 text-right text-xs font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
                   </tr>
                 </tfoot>
               )}
