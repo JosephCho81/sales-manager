@@ -29,11 +29,11 @@ function fmtYearMonth(ym: string): string {
 export default function InvoiceTable({
   invoices,
   productMap,
-  onTogglePaid,
+  onSetPaidDate,
 }: {
   invoices: InvoiceRow[]
   productMap: Map<string, string>
-  onTogglePaid: (id: string, currentPaid: boolean) => void
+  onSetPaidDate: (id: string, date: string | null) => void
 }) {
   const totalAmount = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
 
@@ -98,7 +98,7 @@ export default function InvoiceTable({
                     <th className="px-4 py-1.5 text-center font-medium">합계</th>
                     <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">발행기준일</th>
                     <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">지급예정일</th>
-                    <th className="px-4 py-1.5 text-center font-medium w-20">지급완료</th>
+                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">지급완료일</th>
                   </tr>
 
                   {/* 계산서 행 */}
@@ -107,7 +107,7 @@ export default function InvoiceTable({
                     return (
                       <tr
                         key={inv.id}
-                        className={`border-t border-gray-100 hover:bg-gray-50 transition-colors ${inv.is_paid ? 'opacity-40' : ''}`}
+                        className={`border-t border-gray-100 hover:bg-gray-50 transition-colors ${inv.paid_at ? 'opacity-40' : ''}`}
                       >
                         <td className="table-td">
                           <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${TYPE_BADGE[typeKey] ?? TYPE_BADGE.other}`}>
@@ -143,9 +143,10 @@ export default function InvoiceTable({
                         </td>
                         <td className="table-td text-center">
                           <input
-                            type="checkbox" checked={inv.is_paid}
-                            onChange={() => onTogglePaid(inv.id, inv.is_paid)}
-                            className="w-4 h-4 text-blue-600 rounded border-gray-300 cursor-pointer"
+                            type="date"
+                            value={inv.paid_at ? inv.paid_at.slice(0, 10) : ''}
+                            onChange={(e) => onSetPaidDate(inv.id, e.target.value || null)}
+                            className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                           />
                         </td>
                       </tr>
@@ -167,7 +168,7 @@ export default function InvoiceTable({
               <td className="px-4 py-2 text-right text-sm font-bold tabular-nums">{fmtKrw(totalAmount)}</td>
               <td colSpan={2} />
               <td className="px-4 py-2 text-center text-xs text-gray-400">
-                {invoices.filter(i => i.is_paid).length}/{invoices.length}
+                {invoices.filter(i => i.paid_at).length}/{invoices.length} 지급
               </td>
             </tr>
           </tfoot>

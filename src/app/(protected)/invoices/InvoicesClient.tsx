@@ -1,9 +1,9 @@
 'use client'
 import { toMessage } from '@/lib/error'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { replaceInvoices, deleteAllInvoices, toggleInvoicePaid } from './actions'
+import { replaceInvoices, updatePaidDate } from './actions'
 import { generateInvoices } from '@/lib/invoice-generator'
 import { mapDeliveries, type DeliveryRawForInvoice, type FxRateRaw } from '@/lib/invoice-generator/mapper'
 import { fmtKrw } from '@/lib/margin'
@@ -27,8 +27,9 @@ export default function InvoicesClient({
   const router = useRouter()
   const [invoices, setInvoices] = useState<InvoiceRow[]>(initialInvoices)
   const [generating, setGenerating] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState(yearMonth)
+  const autoGenRef = useRef(false)
 
   // 품목명 맵 (product_id → display_name)
   const productMap = new Map<string, string>()
@@ -36,22 +37,17 @@ export default function InvoicesClient({
     if (d.product) productMap.set(d.product_id, d.product.display_name)
   }
 
-  // 월 변경 시 네비게이션
-  function handleMonthChange(e: React.ChangeEvent<HTMLInputElement>) {
-    router.push(`/invoices?month=${e.target.value}`)
-  }
-
-  // 발행 지시 생성
-  async function handleGenerate() {
-    if (invoices.length > 0) {
-      if (
-        !confirm(
-          `${yearMonth} 기존 발행 지시 ${invoices.length}건을 삭제하고 재생성합니다.\n계속하시겠습니까?`
-        )
-      )
-        return
+  // 자동 생성: 해당 월 입고는 있는데 계산서가 없을 때
+  useEffect(() => {
+    if (!autoGenRef.current && initialInvoices.length === 0 && initialDeliveries.length > 0) {
+      autoGenRef.current = true
+      handleGenerate()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
+  // 발행 지시 생성 (내부 함수)
+  async function handleGenerate() {
     setGenerating(true)
     setError(null)
     try {
@@ -96,50 +92,35 @@ export default function InvoicesClient({
     }
   }
 
-  // 전체 삭제
-  async function handleDeleteAll() {
-    if (!confirm(`${yearMonth} 발행 지시 ${invoices.length}건을 모두 삭제합니다.`)) return
-    setDeleting(true)
-    setError(null)
-    try {
-      const result = await deleteAllInvoices(yearMonth)
-      if (result.error) throw new Error(result.error)
-      setInvoices([])
-    } catch (e) {
-      setError(toMessage(e))
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  // 지급완료 토글
-  async function handleTogglePaid(id: string, currentPaid: boolean) {
-    const newPaid = !currentPaid
-    const paidAt = newPaid ? new Date().toISOString() : null
-    // 낙관적 업데이트
+  // 지급완료일 업데이트
+  async function handleSetPaidDate(id: string, paidDate: string | null) {
+    const snapshot = invoices
     setInvoices(prev =>
-      prev.map(inv => (inv.id === id ? { ...inv, is_paid: newPaid, paid_at: paidAt } : inv))
+      prev.map(inv =>
+        inv.id === id ? { ...inv, is_paid: paidDate !== null, paid_at: paidDate } : inv
+      )
     )
     try {
-      const result = await toggleInvoicePaid(id, newPaid, paidAt)
+      const result = await updatePaidDate(id, paidDate)
       if (result.error) {
-        setInvoices(prev =>
-          prev.map(inv => (inv.id === id ? { ...inv, is_paid: currentPaid } : inv))
-        )
+        setInvoices(snapshot)
         setError(result.error)
       }
     } catch (e) {
-      setInvoices(prev =>
-        prev.map(inv => (inv.id === id ? { ...inv, is_paid: currentPaid } : inv))
-      )
+      setInvoices(snapshot)
       setError(toMessage(e))
     }
+  }
+
+  // 월 선택 이동
+  function handleSelectMonth() {
+    router.push(`/invoices?month=${selectedMonth}`)
   }
 
   // ─── 집계 ───────────────────────────────────
   const totalAmount = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
-  const unpaidAmount = invoices.filter(inv => !inv.is_paid).reduce((s, inv) => s + Number(inv.total_amount), 0)
-  const paidAmount = invoices.filter(inv => inv.is_paid).reduce((s, inv) => s + Number(inv.total_amount), 0)
+  const unpaidAmount = invoices.filter(inv => !inv.paid_at).reduce((s, inv) => s + Number(inv.total_amount), 0)
+  const paidAmount = invoices.filter(inv => inv.paid_at).reduce((s, inv) => s + Number(inv.total_amount), 0)
 
   // ─── 렌더 ────────────────────────────────────
   return (
@@ -148,13 +129,28 @@ export default function InvoicesClient({
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">지급 일정 관리</h2>
         <p className="text-sm text-gray-500 mt-0.5">선택 월의 계산서 발행일 및 지급 예정일</p>
-        <input
-          type="month"
-          value={yearMonth}
-          onChange={handleMonthChange}
-          className="mt-3 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        <div className="flex items-center gap-2 mt-3">
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            onClick={handleSelectMonth}
+            className="btn-primary"
+          >
+            선택
+          </button>
+        </div>
       </div>
+
+      {/* 자동 생성 중 */}
+      {generating && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700">
+          {yearMonth} 발행 지시를 생성하고 있습니다…
+        </div>
+      )}
 
       {/* 오류 */}
       {error && (
@@ -174,53 +170,32 @@ export default function InvoicesClient({
           <p className="text-xs text-gray-500 font-medium">미지급 잔액</p>
           <p className="text-xl font-bold text-red-600 mt-1">{fmtKrw(unpaidAmount)}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {invoices.filter(i => !i.is_paid).length}건
+            {invoices.filter(i => !i.paid_at).length}건
           </p>
         </div>
         <div className="card p-4">
           <p className="text-xs text-gray-500 font-medium">지급 완료</p>
           <p className="text-xl font-bold text-green-600 mt-1">{fmtKrw(paidAmount)}</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {invoices.filter(i => i.is_paid).length}건
+            {invoices.filter(i => i.paid_at).length}건
           </p>
         </div>
       </div>
 
-      {/* 액션 버튼 */}
-      <div className="flex items-center gap-3 mb-4">
-        <button
-          onClick={handleGenerate}
-          disabled={generating || initialDeliveries.length === 0}
-          className="btn-primary disabled:opacity-50"
-        >
-          {generating ? '생성 중…' : '발행 지시 생성'}
-        </button>
-        {invoices.length > 0 && (
-          <button
-            onClick={handleDeleteAll}
-            disabled={deleting}
-            className="px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-md hover:bg-red-50 transition-colors disabled:opacity-50"
-          >
-            {deleting ? '삭제 중…' : '전체 삭제'}
-          </button>
-        )}
-        <span className="text-sm text-gray-400">입고 {initialDeliveries.length}건 기준</span>
-      </div>
-
       {/* 계산서 목록 */}
-      {invoices.length === 0 ? (
+      {invoices.length === 0 && !generating ? (
         <div className="card px-4 py-12 text-center">
           <p className="text-sm text-gray-400">
             {initialDeliveries.length === 0
               ? `${yearMonth} 입고 데이터가 없습니다.`
-              : `발행 지시가 없습니다. '발행 지시 생성' 버튼을 누르세요.`}
+              : `발행 지시 데이터가 없습니다.`}
           </p>
         </div>
       ) : (
         <InvoiceTable
           invoices={invoices}
           productMap={productMap}
-          onTogglePaid={handleTogglePaid}
+          onSetPaidDate={handleSetPaidDate}
         />
       )}
     </div>

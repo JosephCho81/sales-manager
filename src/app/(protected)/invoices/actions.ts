@@ -18,21 +18,11 @@ export async function replaceInvoices(yearMonth: string, rows: Record<string, un
   return { data }
 }
 
-export async function deleteAllInvoices(yearMonth: string) {
+export async function updatePaidDate(id: string, paidDate: string | null) {
   const supabase = createAdminClient()
   const { error } = await supabase
     .from('invoice_instructions')
-    .delete()
-    .eq('year_month', yearMonth)
-  if (error) return { error: error.message }
-  return { success: true }
-}
-
-export async function toggleInvoicePaid(id: string, isPaid: boolean, paidAt: string | null) {
-  const supabase = createAdminClient()
-  const { error } = await supabase
-    .from('invoice_instructions')
-    .update({ is_paid: isPaid, paid_at: paidAt })
+    .update({ is_paid: paidDate !== null, paid_at: paidDate })
     .eq('id', id)
   if (error) return { error: error.message }
   return { success: true }
