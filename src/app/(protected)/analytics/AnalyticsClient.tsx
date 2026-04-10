@@ -368,7 +368,7 @@ export default function AnalyticsClient({
           조회 기간({periodLabel})에 해당하는 입고 데이터가 없습니다.
         </div>
       ) : (
-        <div className="card overflow-hidden [&_.table-th]:py-1.5 [&_.table-th]:px-2 [&_.table-td]:py-1 [&_.table-td]:px-2">
+        <div className="card overflow-hidden [&_.table-th]:py-1.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-td]:py-1 [&_.table-td]:px-2 [&_.table-td]:text-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
