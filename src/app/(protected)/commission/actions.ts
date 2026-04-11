@@ -2,10 +2,17 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 
-export async function insertHyundaiTransaction(payload: Record<string, unknown>) {
+export async function insertCommission(payload: {
+  year_month: string
+  company: '동국제강' | '현대제철'
+  quantity_kg: number
+  price_per_ton: number
+  commission_amount: number
+  memo: string | null
+}) {
   const supabase = createAdminClient()
   const { data, error } = await supabase
-    .from('hyundai_transactions')
+    .from('commissions')
     .insert(payload)
     .select('*')
     .single()
@@ -13,9 +20,9 @@ export async function insertHyundaiTransaction(payload: Record<string, unknown>)
   return { data }
 }
 
-export async function deleteHyundaiTransaction(id: string) {
+export async function deleteCommission(id: string) {
   const supabase = createAdminClient()
-  const { error } = await supabase.from('hyundai_transactions').delete().eq('id', id)
+  const { error } = await supabase.from('commissions').delete().eq('id', id)
   if (error) return { error: error.message }
   return { success: true }
 }

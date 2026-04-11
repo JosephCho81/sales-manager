@@ -26,10 +26,6 @@ export interface DeliveryRow {
   product_id: string
   contract_id: string
   quantity_kg: number
-  addl_quantity_kg: number | null
-  addl_margin_per_ton: number | null
-  hoejin_shortage_kg: number | null
-  hoejin_shortage_price: number | null
   depreciation_amount: number | null
   memo: string | null
   created_at: string
@@ -51,12 +47,6 @@ export interface FormState {
   contract_id: string
   quantity_kg: string
   fesi_fx_rate: string
-  use_addl: boolean
-  addl_quantity_kg: string
-  addl_margin_per_ton: string
-  use_shortage: boolean
-  hoejin_shortage_kg: string
-  hoejin_shortage_price: string
   depreciation_amount: string
   memo: string
 }

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { upsertDelivery, upsertFxRate } from './actions'
-import { calcMarginFromContract, calcAddlMargin, fmtKrw, fmtNum } from '@/lib/margin'
+import { calcMarginFromContract, fmtKrw, fmtNum } from '@/lib/margin'
 import { getTodayDate, toYearMonth, monthStart, monthEnd, shiftMonths } from '@/lib/date'
 import type { ProductRow, ContractRow, DeliveryRow, FormState } from './types'
 import MarginPreview from './MarginPreview'
@@ -14,8 +14,6 @@ function makeEmptyForm(defaultDate?: string): FormState {
   return {
     delivery_date: defaultDate ?? getTodayDate(),
     product_id: '', contract_id: '', quantity_kg: '', fesi_fx_rate: '',
-    use_addl: false, addl_quantity_kg: '', addl_margin_per_ton: '',
-    use_shortage: false, hoejin_shortage_kg: '', hoejin_shortage_price: '',
     depreciation_amount: '',
     memo: '',
   }
@@ -28,12 +26,6 @@ function formFromDelivery(d: DeliveryRow): FormState {
     contract_id: d.contract_id,
     quantity_kg: String(d.quantity_kg / 1000),
     fesi_fx_rate: '',
-    use_addl: !!(d.addl_quantity_kg && d.addl_quantity_kg > 0),
-    addl_quantity_kg: d.addl_quantity_kg ? String(d.addl_quantity_kg / 1000) : '',
-    addl_margin_per_ton: d.addl_margin_per_ton ? String(d.addl_margin_per_ton) : '',
-    use_shortage: !!(d.hoejin_shortage_kg && d.hoejin_shortage_kg > 0),
-    hoejin_shortage_kg: d.hoejin_shortage_kg ? String(d.hoejin_shortage_kg / 1000) : '',
-    hoejin_shortage_price: d.hoejin_shortage_price ? String(d.hoejin_shortage_price) : '',
     depreciation_amount: d.depreciation_amount ? String(d.depreciation_amount) : '',
     memo: d.memo ?? '',
   }
@@ -73,6 +65,7 @@ export default function DeliveryForm({
   const isCoal = selectedProduct?.name === 'SOGGAE' || selectedProduct?.name === 'BUNTAN'
   const formYearMonth = form.delivery_date ? toYearMonth(form.delivery_date) : ''
 
+
   const availableContracts = useMemo(() => {
     if (!form.product_id || !formYearMonth) return []
     const ms = monthStart(formYearMonth)
@@ -103,21 +96,6 @@ export default function DeliveryForm({
     return calcMarginFromContract(contractForPreview, qty * 1000)
   }, [contractForPreview, form.quantity_kg])
 
-  const addlMargin = useMemo(() => {
-    if (!form.use_addl) return null
-    const qty = parseFloat(form.addl_quantity_kg)
-    const mpt = parseFloat(form.addl_margin_per_ton)
-    if (!qty || qty <= 0 || !mpt) return null
-    return calcAddlMargin(qty * 1000, mpt)
-  }, [form.use_addl, form.addl_quantity_kg, form.addl_margin_per_ton])
-
-  const combinedMargin = useMemo(() => {
-    if (!mainMargin && !addlMargin) return null
-    const total = (mainMargin?.total_margin ?? 0) + (addlMargin?.total_margin ?? 0)
-    const base = Math.floor(total / 3)
-    return { total, korea_a1: base, geumhwa: base, raseong: total - base * 2 }
-  }, [mainMargin, addlMargin])
-
   // ── 저장 ──
   async function handleSave() {
     if (!form.delivery_date) { setError('입고 날짜를 입력하세요.'); return }
@@ -125,13 +103,6 @@ export default function DeliveryForm({
     if (!form.contract_id)   { setError('낙찰 단가를 선택하세요.'); return }
     const qty = parseFloat(form.quantity_kg)
     if (!qty || qty <= 0)    { setError('물량(톤)을 입력하세요.'); return }
-    if (form.use_addl) {
-      if (!parseFloat(form.addl_quantity_kg) || parseFloat(form.addl_quantity_kg) <= 0)
-        { setError('추가 배분 물량을 입력하세요.'); return }
-      if (!parseFloat(form.addl_margin_per_ton))
-        { setError('추가 배분 마진 단가를 입력하세요.'); return }
-    }
-
     setSaving(true); setError('')
 
     const deliveryYearMonth = toYearMonth(form.delivery_date)
@@ -143,14 +114,6 @@ export default function DeliveryForm({
       product_id: form.product_id,
       contract_id: form.contract_id,
       quantity_kg: qty * 1000,
-      addl_quantity_kg: form.use_addl && form.addl_quantity_kg
-        ? parseFloat(form.addl_quantity_kg) * 1000 : null,
-      addl_margin_per_ton: form.use_addl && form.addl_margin_per_ton
-        ? parseFloat(form.addl_margin_per_ton) : null,
-      hoejin_shortage_kg: form.use_shortage && form.hoejin_shortage_kg
-        ? parseFloat(form.hoejin_shortage_kg) * 1000 : null,
-      hoejin_shortage_price: form.use_shortage && form.hoejin_shortage_price
-        ? parseFloat(form.hoejin_shortage_price) : null,
       depreciation_amount: isCoal && form.depreciation_amount
         ? parseFloat(form.depreciation_amount) : null,
       memo: form.memo || null,
@@ -393,103 +356,9 @@ export default function DeliveryForm({
         </div>
       )}
 
-      {/* 추가 배분 / 부족분 */}
-      {form.contract_id && (
-        <div className="mb-5">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox" checked={form.use_addl}
-              onChange={e => setForm(f => ({ ...f, use_addl: e.target.checked, addl_quantity_kg: '', addl_margin_per_ton: '' }))}
-              className="w-4 h-4 rounded border-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              추가 배분 입력 <span className="text-gray-400 font-normal">(호진 배분 등)</span>
-            </span>
-          </label>
-
-          {form.use_addl && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6 border-l-2 border-orange-200">
-              <div>
-                <label className="label">추가 물량 (톤) *</label>
-                <div className="relative">
-                  <input
-                    type="number" className="input pr-10" value={form.addl_quantity_kg}
-                    onChange={e => setForm(f => ({ ...f, addl_quantity_kg: e.target.value }))}
-                    placeholder="예: 20.000" step="0.001" min="0"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">톤</span>
-                </div>
-              </div>
-              <div>
-                <label className="label">추가 마진 단가 (원/톤) *<span className="text-gray-400 font-normal ml-1">화림 결정</span></label>
-                <div className="relative">
-                  <input
-                    type="number" className="input pr-14" value={form.addl_margin_per_ton}
-                    onChange={e => setForm(f => ({ ...f, addl_margin_per_ton: e.target.value }))}
-                    placeholder="예: 5000" step="100"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">원/톤</span>
-                </div>
-              </div>
-              <p className="col-span-full text-xs text-gray-500">
-                호진이 물량을 <strong>더</strong> 가져갈 때 — 화림→한국에이원 커미션 지급 (익월10일, 1/3 배분)
-              </p>
-            </div>
-          )}
-
-          <label className="flex items-center gap-2 cursor-pointer select-none mt-3">
-            <input
-              type="checkbox" checked={form.use_shortage}
-              onChange={e => setForm(f => ({ ...f, use_shortage: e.target.checked, hoejin_shortage_kg: '', hoejin_shortage_price: '' }))}
-              className="w-4 h-4 rounded border-gray-300"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              부족분 처리 <span className="text-gray-400 font-normal">(덜 가져갈 때)</span>
-            </span>
-          </label>
-
-          {form.use_shortage && (
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6 border-l-2 border-red-200">
-              <div>
-                <label className="label">부족 물량 (톤) *</label>
-                <div className="relative">
-                  <input
-                    type="number" className="input pr-10" value={form.hoejin_shortage_kg}
-                    onChange={e => setForm(f => ({ ...f, hoejin_shortage_kg: e.target.value }))}
-                    placeholder="예: 5.000" step="0.001" min="0"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">톤</span>
-                </div>
-              </div>
-              <div>
-                <label className="label">화림 통보 단가 (원/톤) *</label>
-                <div className="relative">
-                  <input
-                    type="number" className="input pr-14" value={form.hoejin_shortage_price}
-                    onChange={e => setForm(f => ({ ...f, hoejin_shortage_price: e.target.value }))}
-                    placeholder="예: 30000" step="100" min="0"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">원/톤</span>
-                </div>
-              </div>
-              {form.hoejin_shortage_kg && form.hoejin_shortage_price && (
-                <div className="col-span-full bg-red-50 border border-red-100 rounded p-3">
-                  <p className="text-xs text-red-600 font-medium">
-                    한국에이원→호진 지급: {fmtKrw(parseFloat(form.hoejin_shortage_kg) * parseFloat(form.hoejin_shortage_price))}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">당월말 기준, 익월10일 지급</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 마진 미리보기 */}
       <MarginPreview
         mainMargin={mainMargin}
-        addlMargin={addlMargin}
-        combinedMargin={combinedMargin}
         isFeSi={isFeSi}
         fesiRateInput={form.fesi_fx_rate}
         contractForPreview={contractForPreview}

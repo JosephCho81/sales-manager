@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fmtKrw, fmtNum, splitMargin } from '@/lib/margin'
 import { getCurrentYearMonth, shiftMonths } from '@/lib/date'
 import {
   computeMargins, buildProductRows, buildMonthlyData, PRODUCT_ORDER,
-  type DeliveryForAnalytics, type ShortageTransaction,
+  type DeliveryForAnalytics, type CommissionEntry,
 } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 
@@ -18,13 +18,13 @@ export default function AnalyticsClient({
   toYM,
   mode,
   deliveries,
-  shortageTransactions,
+  commissions,
 }: {
   fromYM: string
   toYM: string
   mode: 'month' | 'range' | 'year'
   deliveries: DeliveryForAnalytics[]
-  shortageTransactions: ShortageTransaction[]
+  commissions: CommissionEntry[]
 }) {
   const router = useRouter()
 
@@ -79,24 +79,24 @@ export default function AnalyticsClient({
   )
 
   // ── 집계 ──
-  const totals      = useMemo(() => computeMargins(filtered, shortageTransactions, fromYM, toYM),        [filtered, shortageTransactions, fromYM, toYM])
-  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),                            [filtered, fromYM, toYM])
-  const monthlyData = useMemo(() => buildMonthlyData(filtered, shortageTransactions, fromYM, toYM),      [filtered, shortageTransactions, fromYM, toYM])
+  const totals      = useMemo(() => computeMargins(filtered, commissions, fromYM, toYM),        [filtered, commissions, fromYM, toYM])
+  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),                   [filtered, fromYM, toYM])
+  const monthlyData = useMemo(() => buildMonthlyData(filtered, commissions, fromYM, toYM),      [filtered, commissions, fromYM, toYM])
 
-  // ── 조회 기간 내 부족분 커미션 집계 (품목별/3사 카드 세부 표시용) ──
-  const shortageInPeriod = useMemo(() => {
-    const inRange = shortageTransactions.filter(s => {
-      const pm = shiftMonths(s.year_month, 1)
+  // ── 조회 기간 내 커미션 집계 (3사 카드 세부 표시용) ──
+  const commissionsInPeriod = useMemo(() => {
+    const inRange = commissions.filter(c => {
+      const pm = shiftMonths(c.year_month, 1)
       return pm >= fromYM && pm <= toYM
     })
     let total = 0, a1 = 0, gm = 0, rs = 0
-    for (const s of inRange) {
-      const sp = splitMargin(s.commission_amount)
-      total += s.commission_amount
+    for (const c of inRange) {
+      const sp = splitMargin(c.commission_amount)
+      total += c.commission_amount
       a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
     }
     return { total, a1, gm, rs }
-  }, [shortageTransactions, fromYM, toYM])
+  }, [commissions, fromYM, toYM])
   const showChart   = fromYM !== toYM && monthlyData.length > 1
 
   // ── 기간 라벨 ──
@@ -260,13 +260,13 @@ export default function AnalyticsClient({
               </div>
             )}
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">동국제강 부족분</span>
-              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - shortageInPeriod.gm)}</span>
+              <span className="text-xs text-gray-500">납품 마진</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - commissionsInPeriod.gm)}</span>
             </div>
-            {shortageInPeriod.gm > 0 && (
+            {commissionsInPeriod.gm > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-amber-600">현대제철 부족분</span>
-                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(shortageInPeriod.gm)}</span>
+                <span className="text-xs text-amber-600">커미션</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.gm)}</span>
               </div>
             )}
           </div>
@@ -286,13 +286,13 @@ export default function AnalyticsClient({
           <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-2">라성</div>
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">동국제강</span>
-              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - shortageInPeriod.rs)}</span>
+              <span className="text-xs text-gray-500">납품 마진</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - commissionsInPeriod.rs)}</span>
             </div>
-            {shortageInPeriod.rs > 0 && (
+            {commissionsInPeriod.rs > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-xs text-amber-600">현대제철 부족분</span>
-                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(shortageInPeriod.rs)}</span>
+                <span className="text-xs text-amber-600">커미션</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.rs)}</span>
               </div>
             )}
           </div>
@@ -386,57 +386,34 @@ export default function AnalyticsClient({
                 </tr>
               </thead>
               <tbody>
-                {productRows.map(row => {
-                  const hasAddl = row.addlMarginTotal > 0
-                  const mainMargin = row.totalMargin - row.addlMarginTotal
-                  const mainA1 = row.a1 - row.addlA1
-                  const mainGm = row.gm - row.addlGm
-                  const mainRs = row.rs - row.addlRs
-                  return (
-                    <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>
-                      <tr className="border-t border-gray-100 hover:bg-gray-50">
-                        <td className="table-td font-medium">{row.displayName}</td>
-                        <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                          {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
-                        </td>
-                        <td className="table-td text-gray-500">{row.buyer}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(mainMargin)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(mainA1)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(mainGm)}</td>
-                        <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(mainRs)}</td>
-                      </tr>
-                      {hasAddl && (
-                        <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                          <td className="table-td text-gray-300">—</td>
-                          <td className="table-td text-amber-600 whitespace-nowrap">{row.buyer}</td>
-                          <td className="table-td text-right text-gray-300">—</td>
-                          <td className="table-td text-right text-gray-300">—</td>
-                          <td className="table-td text-right text-gray-300">—</td>
-                          <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(row.addlMarginTotal)}</td>
-                          <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.addlA1)}</td>
-                          <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.addlGm)}</td>
-                          <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.addlRs)}</td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  )
-                })}
-                {shortageInPeriod.total > 0 && (
+                {productRows.map(row => (
+                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="table-td font-medium">{row.displayName}</td>
+                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                    </td>
+                    <td className="table-td text-gray-500">{row.buyer}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
+                  </tr>
+                ))}
+                {commissionsInPeriod.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 부족분 커미션</td>
+                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
                     <td className="table-td text-gray-300">—</td>
-                    <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
+                    <td className="table-td text-amber-600 whitespace-nowrap">동국/현대</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(shortageInPeriod.total)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(shortageInPeriod.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(shortageInPeriod.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(shortageInPeriod.rs)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.total)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.rs)}</td>
                   </tr>
                 )}
               </tbody>

@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { shiftMonths } from '@/lib/date'
 import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
-import type { ShortageTransaction } from './analytics-compute'
+import type { CommissionEntry } from './analytics-compute'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,17 +38,17 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let deliveries: any[] = []
-  let shortageTransactions: ShortageTransaction[] = []
+  let commissions: CommissionEntry[] = []
   let fetchError: string | null = null
 
   try {
     const supabase = createAdminClient()
-    const [dRes, sRes] = await Promise.all([
+    const [dRes, cRes] = await Promise.all([
       supabase
         .from('deliveries')
         .select(`
           id, year_month, invoice_month, product_id,
-          quantity_kg, addl_quantity_kg, addl_margin_per_ton,
+          quantity_kg,
           product:products(id, name, display_name, buyer),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
@@ -56,21 +56,20 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
         .lte('invoice_month', toYM)
         .order('invoice_month'),
 
-      // AL30 부족분 커미션: 지급월 = year_month + 1, 조회 범위 내 지급월 기준 필터
+      // 커미션: 지급월 = year_month + 1, 조회 범위 내 지급월 기준 필터
       supabase
-        .from('hyundai_transactions')
+        .from('commissions')
         .select('year_month, commission_amount')
-        .eq('commission_type', 'shortage')
-        .gte('year_month', shiftMonths(fromYM, -1))  // 지급월이 fromYM인 것 = year_month가 fromYM-1
-        .lte('year_month', shiftMonths(toYM, -1)),   // 지급월이 toYM인 것 = year_month가 toYM-1
+        .gte('year_month', shiftMonths(fromYM, -1))
+        .lte('year_month', shiftMonths(toYM, -1)),
     ])
 
     if (dRes.error) fetchError = dRes.error.message
-    else if (sRes.error) fetchError = sRes.error.message
+    else if (cRes.error) fetchError = cRes.error.message
     else {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      deliveries = (dRes.data ?? []) as any[]
-      shortageTransactions = (sRes.data ?? []) as ShortageTransaction[]
+      deliveries  = (dRes.data ?? []) as any[]
+      commissions = (cRes.data ?? []) as CommissionEntry[]
     }
   } catch (e) {
     fetchError = toMessage(e)
@@ -85,7 +84,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
       mode={mode}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       deliveries={deliveries as any[]}
-      shortageTransactions={shortageTransactions}
+      commissions={commissions}
     />
   )
 }

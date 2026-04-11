@@ -4,8 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 
 const DELIVERY_SELECT = `
   id, year_month, invoice_month, delivery_date, product_id, contract_id,
-  quantity_kg, addl_quantity_kg, addl_margin_per_ton,
-  hoejin_shortage_kg, hoejin_shortage_price, depreciation_amount,
+  quantity_kg, depreciation_amount,
   memo, created_at,
   product:products(id, display_name, buyer),
   contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, start_date, end_date)
