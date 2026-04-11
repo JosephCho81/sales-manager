@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fmtKrw, fmtNum, splitMargin } from '@/lib/margin'
 import { getCurrentYearMonth, shiftMonths } from '@/lib/date'
@@ -391,87 +391,62 @@ export default function AnalyticsClient({
                 </tr>
               </thead>
               <tbody>
-                {/* 동국제강 제품 행 */}
-                {productRows.filter(r => r.buyer === '동국제강').map(row => (
-                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="table-td font-medium">{row.displayName}</td>
-                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
-                    </td>
-                    <td className="table-td text-gray-500">{row.buyer}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
-                  </tr>
-                ))}
-                {/* 동국제강 커미션 행 */}
-                {commissionsInPeriod.dongkuk.total > 0 && (
-                  <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                    <td className="table-td text-gray-300">—</td>
-                    <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.dongkuk.total)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.dongkuk.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.dongkuk.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</td>
-                  </tr>
-                )}
-                {/* 현대제철 제품 행 */}
-                {productRows.filter(r => r.buyer === '현대제철').map(row => (
-                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="table-td font-medium">{row.displayName}</td>
-                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
-                    </td>
-                    <td className="table-td text-gray-500">{row.buyer}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
-                  </tr>
-                ))}
-                {/* 현대제철 커미션 행 */}
-                {commissionsInPeriod.hyundai.total > 0 && (
-                  <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
-                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                    <td className="table-td text-gray-300">—</td>
-                    <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.hyundai.total)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.hyundai.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.hyundai.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.hyundai.rs)}</td>
-                  </tr>
-                )}
-                {/* 그 외 납품처 행 (동국/현대 아닌 경우) */}
-                {productRows.filter(r => r.buyer !== '동국제강' && r.buyer !== '현대제철').map(row => (
-                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="table-td font-medium">{row.displayName}</td>
-                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
-                    </td>
-                    <td className="table-td text-gray-500">{row.buyer}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
-                  </tr>
-                ))}
+                {productRows.map(row => {
+                  const isAL35 = row.name.toUpperCase() === 'AL35B'
+                  const isAL30 = row.name.toUpperCase() === 'AL30'
+                  // 이 row가 해당 품목의 마지막 행인지 (같은 name 기준)
+                  const sameNameRows = productRows.filter(r => r.name === row.name)
+                  const isLastOfName = sameNameRows[sameNameRows.length - 1] === row
+
+                  return (
+                    <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>
+                      <tr className="border-t border-gray-100 hover:bg-gray-50">
+                        <td className="table-td font-medium">{row.displayName}</td>
+                        <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                          {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                        </td>
+                        <td className="table-td text-gray-500">{row.buyer}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
+                        <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
+                      </tr>
+                      {/* AL35B 마지막 행 뒤 → 동국제강 커미션 */}
+                      {isAL35 && isLastOfName && commissionsInPeriod.dongkuk.total > 0 && (
+                        <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
+                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
+                          <td className="table-td text-gray-300">—</td>
+                          <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.dongkuk.total)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.dongkuk.a1)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.dongkuk.gm)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</td>
+                        </tr>
+                      )}
+                      {/* AL30 마지막 행 뒤 → 현대제철 커미션 */}
+                      {isAL30 && isLastOfName && commissionsInPeriod.hyundai.total > 0 && (
+                        <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
+                          <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
+                          <td className="table-td text-gray-300">—</td>
+                          <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right text-gray-300">—</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.hyundai.total)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.hyundai.a1)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.hyundai.gm)}</td>
+                          <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.hyundai.rs)}</td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
               </tbody>
               {productRows.length > 1 && (
                 <tfoot>
