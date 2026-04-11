@@ -391,7 +391,8 @@ export default function AnalyticsClient({
                 </tr>
               </thead>
               <tbody>
-                {productRows.map(row => (
+                {/* 동국제강 제품 행 */}
+                {productRows.filter(r => r.buyer === '동국제강').map(row => (
                   <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="table-td font-medium">{row.displayName}</td>
                     <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
@@ -407,6 +408,7 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
                   </tr>
                 ))}
+                {/* 동국제강 커미션 행 */}
                 {commissionsInPeriod.dongkuk.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                     <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
@@ -421,6 +423,24 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</td>
                   </tr>
                 )}
+                {/* 현대제철 제품 행 */}
+                {productRows.filter(r => r.buyer === '현대제철').map(row => (
+                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="table-td font-medium">{row.displayName}</td>
+                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                    </td>
+                    <td className="table-td text-gray-500">{row.buyer}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
+                  </tr>
+                ))}
+                {/* 현대제철 커미션 행 */}
                 {commissionsInPeriod.hyundai.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                     <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
@@ -435,6 +455,23 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.hyundai.rs)}</td>
                   </tr>
                 )}
+                {/* 그 외 납품처 행 (동국/현대 아닌 경우) */}
+                {productRows.filter(r => r.buyer !== '동국제강' && r.buyer !== '현대제철').map(row => (
+                  <tr key={`${row.productId}_${row.deliveryYearMonth}`} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="table-td font-medium">{row.displayName}</td>
+                    <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                      {row.deliveryYearMonth.slice(5, 7).replace(/^0/, '')}월분
+                    </td>
+                    <td className="table-td text-gray-500">{row.buyer}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
+                  </tr>
+                ))}
               </tbody>
               {productRows.length > 1 && (
                 <tfoot>
