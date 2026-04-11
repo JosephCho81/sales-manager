@@ -225,7 +225,7 @@ export default function AnalyticsClient({
 
       {/* ── 3사 요약 카드 ── */}
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
-      <div className="grid grid-cols-3 gap-3 mb-3 items-end">
+      <div className="grid grid-cols-3 gap-3 mb-3 items-stretch">
         {/* 한국에이원 */}
         <div className="card p-3 flex flex-col">
           <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">한국에이원</div>
