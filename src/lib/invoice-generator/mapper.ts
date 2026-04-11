@@ -10,10 +10,6 @@ export type DeliveryRawForInvoice = {
   delivery_date: string | null
   product_id: string
   quantity_kg: number
-  addl_quantity_kg: number | null
-  addl_margin_per_ton: number | null
-  hoejin_shortage_kg: number | null
-  hoejin_shortage_price: number | null
   depreciation_amount: number | null
   product: { id: string; name: string; display_name: string; vat: string } | null
   contract: {
@@ -51,10 +47,6 @@ export function mapDeliveries(
       product_name: d.product!.name,
       product_vat: d.product!.vat,
       quantity_kg: Number(d.quantity_kg),
-      addl_quantity_kg: d.addl_quantity_kg != null ? Number(d.addl_quantity_kg) : null,
-      addl_margin_per_ton: d.addl_margin_per_ton != null ? Number(d.addl_margin_per_ton) : null,
-      hoejin_shortage_kg: d.hoejin_shortage_kg != null ? Number(d.hoejin_shortage_kg) : null,
-      hoejin_shortage_price: d.hoejin_shortage_price != null ? Number(d.hoejin_shortage_price) : null,
       depreciation_amount: d.depreciation_amount != null ? Number(d.depreciation_amount) : null,
       fx_rate: d.delivery_date
         ? (fxRateMap.get(`${d.product_id}:${d.delivery_date}`) ?? null)

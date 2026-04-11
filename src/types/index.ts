@@ -55,8 +55,6 @@ export interface Delivery {
   product_id: string
   contract_id: string
   quantity_kg: number      // 기본 납품 물량 (kg)
-  addl_quantity_kg: number | null   // 추가 물량 (호진 배분 등)
-  addl_margin_per_ton: number | null  // 추가 물량 단위 마진
   memo: string | null
   created_at: string
   // join (선택적 — partial 포함 가능)

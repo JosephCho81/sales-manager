@@ -27,8 +27,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .from('deliveries')
         .select(`
           id, year_month, invoice_month, delivery_date, product_id,
-          quantity_kg, addl_quantity_kg, addl_margin_per_ton,
-          hoejin_shortage_kg, hoejin_shortage_price,
+          quantity_kg, depreciation_amount,
           product:products(id, name, display_name, vat),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)

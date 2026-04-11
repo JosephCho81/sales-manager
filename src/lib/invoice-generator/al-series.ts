@@ -29,7 +29,7 @@ export function genALSeries(
     return s + cost * d.quantity_kg / 1000
   }, 0)
 
-  const { main, addl, shortage } = separateALMargins(deliveries)
+  const { main } = separateALMargins(deliveries)
 
   const result: InvoiceToCreate[] = [
     // 1. 동국제강→한국에이원 역발행 (매출)
@@ -75,46 +75,6 @@ export function genALSeries(
       type: 'commission', memo: `${ymLabel} 마진 — 라성 커미션 (나머지)`,
     }),
   ]
-
-  // 호진 더 가져갈 때: 화림→한국에이원 + 배분
-  if (addl.total > 0) {
-    result.push(
-      makeInvoice({
-        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-        from: '화림', to: '한국에이원', supply: addl.total, vat: hasVat,
-        basisDate: monthEnd(deliveryYM), deadline: monthEnd(deliveryYM), paymentDue: nthDay(nextM, 5),
-        type: 'commission',
-        memo: `${ymLabel} 호진 추가 배분 커미션 (화림→한국에이원)`,
-      }),
-      makeInvoice({
-        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-        from: '한국에이원', to: '금화', supply: addl.geumhwa, vat: hasVat,
-        basisDate: monthEnd(deliveryYM), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
-        type: 'commission',
-        memo: `${ymLabel} 호진 추가 배분 — 금화 1/3`,
-      }),
-      makeInvoice({
-        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-        from: '한국에이원', to: '라성', supply: addl.raseong, vat: hasVat,
-        basisDate: nthDay(next2M, 10), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
-        type: 'commission',
-        memo: `${ymLabel} 호진 추가 배분 — 라성 (나머지)`,
-      }),
-    )
-  }
-
-  // 호진 덜 가져갈 때: 한국에이원→호진 부족분 지급
-  if (shortage > 0) {
-    result.push(
-      makeInvoice({
-        yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-        from: '한국에이원', to: '호진', supply: shortage, vat: hasVat,
-        basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 10), paymentDue: nthDay(nextM, 10),
-        type: 'other',
-        memo: `${ymLabel} 호진 부족분 지급 (화림 통보 단가)`,
-      }),
-    )
-  }
 
   return result
 }

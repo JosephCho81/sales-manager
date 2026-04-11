@@ -8,12 +8,6 @@ export interface DeliveryForInvoice {
   product_name: string
   product_vat: string         // 'TEN_PERCENT' | 'NONE'
   quantity_kg: number
-  addl_quantity_kg: number | null
-  addl_margin_per_ton: number | null
-  /** 호진 부족분 물량 (kg) — AL35B 전용 */
-  hoejin_shortage_kg: number | null
-  /** 호진 부족분 단가 (원/톤, 화림 통보) — AL35B 전용 */
-  hoejin_shortage_price: number | null
   /** 감가 금액 (원) — 소괴탄/분탄 전용, 동국제강 지정 */
   depreciation_amount: number | null
   /** FeSi BL 날짜 기준 실제 환율 (원/USD) */

@@ -1,4 +1,4 @@
-import { calcMarginFromContract, calcAddlMargin, splitMargin } from '@/lib/margin'
+import { calcMarginFromContract, splitMargin } from '@/lib/margin'
 import { monthEnd, nthDay, shiftMonths, addDays } from '@/lib/date'
 import type { DeliveryForInvoice, InvoiceToCreate, InvoiceType } from './types'
 
@@ -47,37 +47,24 @@ export function makeInvoice(p: {
 // 마진 계산 헬퍼
 // ────────────────────────────────────────────────────────
 
-/** 공통: 마진 합산 (기본 + 추가 배분) */
+/** 공통: 마진 합산 */
 export function calcCombinedMargin(deliveries: DeliveryForInvoice[]) {
   let totalMargin = 0
   for (const d of deliveries) {
     const m = calcMarginFromContract(d.contract, d.quantity_kg)
     totalMargin += m.total_margin
-    if (d.addl_quantity_kg && d.addl_margin_per_ton) {
-      const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-      totalMargin += am.total_margin
-    }
   }
   return { totalMargin, ...splitMargin(totalMargin) }
 }
 
-/** AL35B 전용: 기본 마진 / 호진 추가(addl) / 호진 부족분 분리 계산 */
+/** AL35B 전용: 기본 마진 분리 계산 */
 export function separateALMargins(deliveries: DeliveryForInvoice[]) {
-  let mainTotal = 0, addlTotal = 0, shortageTotal = 0
+  let mainTotal = 0
   for (const d of deliveries) {
     const m = calcMarginFromContract(d.contract, d.quantity_kg)
     mainTotal += m.total_margin
-    if (d.addl_quantity_kg && d.addl_margin_per_ton) {
-      const am = calcAddlMargin(d.addl_quantity_kg, d.addl_margin_per_ton)
-      addlTotal += am.total_margin
-    }
-    if (d.hoejin_shortage_kg && d.hoejin_shortage_price) {
-      shortageTotal += (d.hoejin_shortage_kg / 1000) * d.hoejin_shortage_price
-    }
   }
   return {
-    main:     { total: mainTotal,  ...splitMargin(mainTotal) },
-    addl:     { total: addlTotal,  ...splitMargin(addlTotal) },
-    shortage: shortageTotal,
+    main: { total: mainTotal, ...splitMargin(mainTotal) },
   }
 }
