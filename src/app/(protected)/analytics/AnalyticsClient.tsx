@@ -224,7 +224,7 @@ export default function AnalyticsClient({
       </p>
 
       {/* ── 3사 요약 카드 ── */}
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
+      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
       <div className="grid grid-cols-3 gap-3 mb-3 items-stretch">
         {/* 한국에이원 */}
         <div className="card p-3 flex flex-col">
@@ -235,7 +235,7 @@ export default function AnalyticsClient({
               <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.sellKrw)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">원가 (화림 등)</span>
+              <span className="text-xs text-gray-500">매입 (화림 등)</span>
               <span className="text-xs tabular-nums text-gray-600 whitespace-nowrap">{fmtKrw(totals.costKrw)}</span>
             </div>
             <div className="flex justify-between items-center">
