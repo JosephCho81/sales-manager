@@ -26,6 +26,7 @@ export type DeliveryForAnalytics = {
 export type CommissionEntry = {
   year_month: string        // 발생 기준월; 지급월 = year_month + 1
   commission_amount: number
+  company: string           // '동국제강' | '현대제철'
 }
 
 export type MarginTotals = {

@@ -59,7 +59,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
       // 커미션: 지급월 = year_month + 1, 조회 범위 내 지급월 기준 필터
       supabase
         .from('commissions')
-        .select('year_month, commission_amount')
+        .select('year_month, commission_amount, company')
         .gte('year_month', shiftMonths(fromYM, -1))
         .lte('year_month', shiftMonths(toYM, -1)),
     ])

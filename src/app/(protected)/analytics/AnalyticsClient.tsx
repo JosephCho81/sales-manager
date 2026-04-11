@@ -83,19 +83,24 @@ export default function AnalyticsClient({
   const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),                   [filtered, fromYM, toYM])
   const monthlyData = useMemo(() => buildMonthlyData(filtered, commissions, fromYM, toYM),      [filtered, commissions, fromYM, toYM])
 
-  // ── 조회 기간 내 커미션 집계 (3사 카드 세부 표시용) ──
+  // ── 조회 기간 내 커미션 집계 (회사별 분리) ──
   const commissionsInPeriod = useMemo(() => {
-    const inRange = commissions.filter(c => {
-      const pm = shiftMonths(c.year_month, 1)
-      return pm >= fromYM && pm <= toYM
-    })
-    let total = 0, a1 = 0, gm = 0, rs = 0
-    for (const c of inRange) {
-      const sp = splitMargin(c.commission_amount)
-      total += c.commission_amount
-      a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+    function sumByCompany(company: string) {
+      let total = 0, a1 = 0, gm = 0, rs = 0
+      for (const c of commissions) {
+        const pm = shiftMonths(c.year_month, 1)
+        if (pm < fromYM || pm > toYM) continue
+        if (c.company !== company) continue
+        const sp = splitMargin(c.commission_amount)
+        total += c.commission_amount
+        a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+      }
+      return { total, a1, gm, rs }
     }
-    return { total, a1, gm, rs }
+    const dongkuk = sumByCompany('동국제강')
+    const hyundai = sumByCompany('현대제철')
+    const all = { total: dongkuk.total + hyundai.total, a1: dongkuk.a1 + hyundai.a1, gm: dongkuk.gm + hyundai.gm, rs: dongkuk.rs + hyundai.rs }
+    return { dongkuk, hyundai, all }
   }, [commissions, fromYM, toYM])
   const showChart   = fromYM !== toYM && monthlyData.length > 1
 
@@ -261,12 +266,12 @@ export default function AnalyticsClient({
             )}
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">납품 마진</span>
-              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - commissionsInPeriod.gm)}</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - commissionsInPeriod.all.gm)}</span>
             </div>
-            {commissionsInPeriod.gm > 0 && (
+            {commissionsInPeriod.all.gm > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-amber-600">커미션</span>
-                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.gm)}</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.all.gm)}</span>
               </div>
             )}
           </div>
@@ -287,12 +292,12 @@ export default function AnalyticsClient({
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">납품 마진</span>
-              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - commissionsInPeriod.rs)}</span>
+              <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - commissionsInPeriod.all.rs)}</span>
             </div>
-            {commissionsInPeriod.rs > 0 && (
+            {commissionsInPeriod.all.rs > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-amber-600">커미션</span>
-                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.rs)}</span>
+                <span className="text-xs tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.all.rs)}</span>
               </div>
             )}
           </div>
@@ -402,18 +407,32 @@ export default function AnalyticsClient({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
                   </tr>
                 ))}
-                {commissionsInPeriod.total > 0 && (
+                {commissionsInPeriod.dongkuk.total > 0 && (
                   <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                     <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
                     <td className="table-td text-gray-300">—</td>
-                    <td className="table-td text-amber-600 whitespace-nowrap">동국/현대</td>
+                    <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
                     <td className="table-td text-right text-gray-300">—</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.total)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.rs)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.dongkuk.total)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.dongkuk.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.dongkuk.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</td>
+                  </tr>
+                )}
+                {commissionsInPeriod.hyundai.total > 0 && (
+                  <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
+                    <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
+                    <td className="table-td text-gray-300">—</td>
+                    <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right text-gray-300">—</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.hyundai.total)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.hyundai.a1)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.hyundai.gm)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.hyundai.rs)}</td>
                   </tr>
                 )}
               </tbody>
