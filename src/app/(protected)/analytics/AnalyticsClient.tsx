@@ -225,11 +225,11 @@ export default function AnalyticsClient({
 
       {/* ── 3사 요약 카드 ── */}
       <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
-      <div className="grid grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3 items-end">
         {/* 한국에이원 */}
-        <div className="card p-3">
+        <div className="card p-3 flex flex-col">
           <div className="text-xs font-bold text-green-700 uppercase tracking-wider mb-2">한국에이원</div>
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">매출 (동국/현대)</span>
               <span className="text-xs tabular-nums font-medium whitespace-nowrap">{fmtKrw(totals.sellKrw)}</span>
@@ -242,22 +242,23 @@ export default function AnalyticsClient({
               <span className="text-xs text-gray-500">총 마진</span>
               <span className="text-xs tabular-nums font-semibold text-blue-600 whitespace-nowrap">{fmtKrw(totals.totalMargin)}</span>
             </div>
+            {totals.totalMargin > 0 && totals.sellKrw > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-400">마진율</span>
+                <span className="text-xs tabular-nums text-gray-400 whitespace-nowrap">{fmtNum(totals.totalMargin / totals.sellKrw * 100, 1)}%</span>
+              </div>
+            )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
             <span className="text-xs text-gray-500">한국에이원 마진</span>
             <span className="text-base font-bold text-green-600 whitespace-nowrap">{fmtKrw(totals.a1)}</span>
           </div>
-          {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right">
-              마진율 {fmtNum(totals.totalMargin / totals.sellKrw * 100, 1)}%
-            </div>
-          )}
         </div>
 
         {/* 금화 */}
-        <div className="card p-3">
+        <div className="card p-3 flex flex-col">
           <div className="text-xs font-bold text-purple-700 uppercase tracking-wider mb-2">금화</div>
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1">
             {totals.geumhwaSellKrw > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-xs text-gray-500">매출</span>
@@ -279,17 +280,12 @@ export default function AnalyticsClient({
             <span className="text-xs text-gray-500">금화 마진</span>
             <span className="text-base font-bold text-purple-600 whitespace-nowrap">{fmtKrw(totals.gm)}</span>
           </div>
-          {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right">
-              총마진의 {fmtNum(totals.gm / totals.totalMargin * 100, 1)}%
-            </div>
-          )}
         </div>
 
         {/* 라성 */}
-        <div className="card p-3">
+        <div className="card p-3 flex flex-col">
           <div className="text-xs font-bold text-orange-700 uppercase tracking-wider mb-2">라성</div>
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1">
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">납품 마진</span>
               <span className="text-xs tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - commissionsInPeriod.all.rs)}</span>
@@ -305,11 +301,6 @@ export default function AnalyticsClient({
             <span className="text-xs text-gray-500">라성 마진</span>
             <span className="text-base font-bold text-orange-600 whitespace-nowrap">{fmtKrw(totals.rs)}</span>
           </div>
-          {totals.totalMargin > 0 && (
-            <div className="text-xs text-gray-400 text-right">
-              총마진의 {fmtNum(totals.rs / totals.totalMargin * 100, 1)}%
-            </div>
-          )}
         </div>
       </div>
 
