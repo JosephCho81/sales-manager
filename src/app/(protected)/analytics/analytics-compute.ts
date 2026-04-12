@@ -1,8 +1,18 @@
 /**
- * Analytics 계산 순수 함수
- * JSX 없음 — 마진 집계, 품목별/월별 breakdown 로직만 포함
+ * Analytics 계산 순수 함수 (JSX 없음)
  *
- * 집계 기준: invoice_month (지급 스케줄 월) — delivery.year_month (납품월)가 아님
+ * ┌─────────────────────────────────────────────────────┐
+ * │  서버 전용 (page.tsx에서만 호출)                      │
+ * │    buildAllAnalytics  — 단일 패스 전체 집계           │
+ * │    extractAvailableProducts — 필터 드롭다운용 품목 목록 │
+ * ├─────────────────────────────────────────────────────┤
+ * │  클라이언트 호환 (필터 활성 시 AnalyticsClient에서 호출) │
+ * │    computeMargins   — totals 재계산                  │
+ * │    buildProductRows — 품목별 행 재계산                │
+ * │    buildMonthlyData — 월별 데이터 재계산              │
+ * └─────────────────────────────────────────────────────┘
+ *
+ * 집계 기준: invoice_month (지급 스케줄 월) — year_month(납품월)가 아님
  * invoice_month = delivery_date + contract.invoice_month_offset
  */
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
@@ -111,6 +121,27 @@ function buildMonthRange(fromYM: string, toYM: string): string[] {
 // ────────────────────────────────────────────────────────────────────────────
 // 서버 사이드 — 단일 패스 전체 집계
 // ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 필터 드롭다운에 표시할 품목 목록 추출.
+ * 반드시 필터 적용 전(전체) deliveries에서 호출해야 모든 품목이 보인다.
+ */
+export function extractAvailableProducts(
+  deliveries: DeliveryForAnalytics[]
+): [string, string][] {
+  const seen = new Map<string, string>()
+  for (const d of deliveries) {
+    if (d.product && !seen.has(d.product.name)) {
+      seen.set(d.product.name, d.product.display_name)
+    }
+  }
+  return Array.from(seen.entries()).sort(
+    (a, b) =>
+      (PRODUCT_ORDER.indexOf(a[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(a[0])) -
+      (PRODUCT_ORDER.indexOf(b[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(b[0]))
+  )
+}
+
 /**
  * deliveries + commissions를 각각 한 번씩만 순회하여
  * totals / productRows / monthlyData / commissionsInPeriod / availableProducts를

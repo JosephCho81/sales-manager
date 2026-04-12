@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { upsertContract } from './actions'
+import { validateContract } from './validate'
 import { fmtNum } from '@/lib/margin'
 import type { Product } from '@/types'
 import type { ContractRow, ContractFormState as FormState } from './types'
@@ -70,26 +71,8 @@ export default function ContractForm({
   }, [form.sell_price, form.cost_price, form.reference_exchange_rate, isUsd])
 
   async function handleSave() {
-    if (!form.product_id) { setError('품목을 선택하세요.'); return }
-    if (!form.start_date || !form.end_date) { setError('낙찰 기간을 입력하세요.'); return }
-    if (form.start_date >= form.end_date) { setError('종료일은 시작일보다 이후여야 합니다.'); return }
-    if (!form.sell_price || isNaN(parseFloat(form.sell_price))) { setError('판매단가를 입력하세요.'); return }
-    if (!form.cost_price || isNaN(parseFloat(form.cost_price))) { setError('원가단가를 입력하세요.'); return }
-    if (isUsd && (!form.reference_exchange_rate || isNaN(parseFloat(form.reference_exchange_rate)))) {
-      setError('FeSi 품목은 참고 환율을 입력해야 합니다.')
-      return
-    }
-
-    const overlapping = existingContracts.filter(c => {
-      if (c.product_id !== form.product_id) return false
-      if (editContract && c.id === editContract.id) return false
-      return form.start_date < c.end_date && form.end_date > c.start_date
-    })
-    if (overlapping.length > 0) {
-      const o = overlapping[0]
-      setError(`기간이 겹칩니다: 기존 "${o.start_date} ~ ${o.end_date}" 계약과 충돌합니다.`)
-      return
-    }
+    const validationError = validateContract(form, isUsd, existingContracts, editContract?.id)
+    if (validationError) { setError(validationError); return }
 
     setSaving(true); setError('')
     const payload = {

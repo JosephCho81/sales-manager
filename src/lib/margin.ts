@@ -44,8 +44,15 @@ export function calcMarginFromContract(
   let cost_price_krw: number
   let exchange_rate_used: number | null = null
 
-  if (contract.currency === 'USD' && contract.reference_exchange_rate) {
+  if (contract.currency === 'USD') {
     const rate = contract.reference_exchange_rate
+    if (!rate || rate <= 0) {
+      // USD 계약에 참고환율이 없으면 마진 계산 불가 — 데이터 정합성 오류
+      throw new Error(
+        `USD 계약(판매가=${contract.sell_price})에 참고환율이 없습니다. ` +
+        `낙찰 단가 관리에서 참고 환율을 입력해 주세요.`
+      )
+    }
     sell_price_krw = contract.sell_price * rate
     cost_price_krw = contract.cost_price * rate
     exchange_rate_used = rate

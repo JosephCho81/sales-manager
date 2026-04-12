@@ -1,13 +1,11 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { fmtKrw, fmtNum } from '@/lib/margin'
 import { getCurrentYearMonth } from '@/lib/date'
-import {
-  computeMargins, buildProductRows, buildMonthlyData,
-  type DeliveryForAnalytics, type CommissionEntry, type AllAnalytics,
-} from './analytics-compute'
+import { useMemo } from 'react'
+import type { AllAnalytics } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 import DateControls from './DateControls'
 import SummaryCards from './SummaryCards'
@@ -17,20 +15,23 @@ export default function AnalyticsClient({
   fromYM,
   toYM,
   mode,
-  deliveries,
+  filterProduct,
+  filterBuyer,
+  availableProducts,
   commissions,
   precomputed,
 }: {
   fromYM: string
   toYM: string
   mode: 'month' | 'range' | 'year'
-  deliveries: DeliveryForAnalytics[]
-  commissions: CommissionEntry[]
+  filterProduct: string
+  filterBuyer: string
+  availableProducts: [string, string][]
   precomputed: AllAnalytics
 }) {
   const router = useRouter()
 
-  // ── 날짜 컨트롤 ──
+  // ── 날짜 컨트롤 상태 ──
   const [activeMode, setActiveMode] = useState<'month' | 'range' | 'year'>(mode)
   const [monthVal, setMonthVal] = useState(mode === 'month' ? fromYM : getCurrentYearMonth())
   const [fromVal,  setFromVal]  = useState(fromYM)
@@ -39,59 +40,52 @@ export default function AnalyticsClient({
     mode === 'year' ? fromYM.slice(0, 4) : String(new Date().getFullYear())
   )
 
-  // ── 필터 ──
-  const [filterProduct, setFilterProduct] = useState('all')
-  const [filterBuyer,   setFilterBuyer]   = useState('all')
-
   const yearOptions = useMemo(() => {
     const thisYear = new Date().getFullYear()
     return Array.from({ length: thisYear - 2019 + 1 }, (_, i) => 2020 + i)
   }, [])
 
+  // URL 빌더 — 날짜 + 필터를 한 번에 조합
+  const buildUrl = useCallback((overrides: {
+    mode?: typeof activeMode
+    month?: string; from?: string; to?: string; year?: string
+    product?: string; buyer?: string
+  } = {}) => {
+    const m   = overrides.mode    ?? activeMode
+    const p   = overrides.product ?? filterProduct
+    const b   = overrides.buyer   ?? filterBuyer
+    const qs  = new URLSearchParams()
+
+    if (m === 'month') qs.set('month', overrides.month ?? monthVal)
+    if (m === 'range') {
+      qs.set('from', overrides.from ?? fromVal)
+      qs.set('to',   overrides.to   ?? toVal)
+    }
+    if (m === 'year') qs.set('year', overrides.year ?? yearVal)
+    if (p !== 'all') qs.set('product', p)
+    if (b !== 'all') qs.set('buyer',   b)
+
+    return `/analytics?${qs.toString()}`
+  }, [activeMode, monthVal, fromVal, toVal, yearVal, filterProduct, filterBuyer])
+
+  // 날짜 조회 버튼
   const navigate = useCallback(() => {
-    if (activeMode === 'month') router.push(`/analytics?month=${monthVal}`)
-    if (activeMode === 'range') router.push(`/analytics?from=${fromVal}&to=${toVal}`)
-    if (activeMode === 'year')  router.push(`/analytics?year=${yearVal}`)
-  }, [activeMode, monthVal, fromVal, toVal, yearVal, router])
+    router.push(buildUrl())
+  }, [buildUrl, router])
 
-  // ── 필터 활성 여부 ──
-  const isFiltered = filterProduct !== 'all' || filterBuyer !== 'all'
+  // 필터 변경 시 즉시 서버 이동 (버튼 클릭 불필요)
+  const handleFilterChange = useCallback((product: string, buyer: string) => {
+    router.push(buildUrl({ product, buyer }))
+  }, [buildUrl, router])
 
-  // ── 필터 적용 (활성 시에만 deliveries를 재스캔) ──
-  const filtered = useMemo(
-    () =>
-      isFiltered
-        ? deliveries.filter(d => {
-            if (!d.product) return false
-            if (filterProduct !== 'all' && d.product.name  !== filterProduct) return false
-            if (filterBuyer   !== 'all' && d.product.buyer !== filterBuyer)   return false
-            return true
-          })
-        : deliveries,
-    [deliveries, filterProduct, filterBuyer, isFiltered]
-  )
-
-  // ── 집계: 필터 없음 → precomputed, 필터 있음 → 재계산 ──
-  const totals      = useMemo(
-    () => isFiltered ? computeMargins(filtered, commissions, fromYM, toYM) : precomputed.totals,
-    [isFiltered, filtered, commissions, fromYM, toYM, precomputed.totals]
-  )
-  const productRows = useMemo(
-    () => isFiltered ? buildProductRows(filtered, fromYM, toYM) : precomputed.productRows,
-    [isFiltered, filtered, fromYM, toYM, precomputed.productRows]
-  )
-  const monthlyData = useMemo(
-    () => isFiltered ? buildMonthlyData(filtered, commissions, fromYM, toYM) : precomputed.monthlyData,
-    [isFiltered, filtered, commissions, fromYM, toYM, precomputed.monthlyData]
-  )
-
-  // 커미션·품목 목록: 서버 계산값 고정 사용
-  const { commissionsInPeriod, availableProducts } = precomputed
+  const { totals, productRows, monthlyData, commissionsInPeriod } = precomputed
 
   const showChart   = fromYM !== toYM && monthlyData.length > 1
   const periodLabel = fromYM === toYM
     ? `${fromYM}`
     : `${fromYM} ~ ${toYM} (${monthlyData.length}개월)`
+
+  const isFiltered = filterProduct !== 'all' || filterBuyer !== 'all'
 
   return (
     <div>
@@ -109,8 +103,9 @@ export default function AnalyticsClient({
         yearVal={yearVal}       setYearVal={setYearVal}
         yearOptions={yearOptions}
         onNavigate={navigate}
-        filterProduct={filterProduct} setFilterProduct={setFilterProduct}
-        filterBuyer={filterBuyer}     setFilterBuyer={setFilterBuyer}
+        filterProduct={filterProduct}
+        filterBuyer={filterBuyer}
+        onFilterChange={handleFilterChange}
         availableProducts={availableProducts}
       />
 

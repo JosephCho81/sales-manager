@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
 
 export default async function ProtectedLayout({
@@ -5,12 +7,14 @@ export default async function ProtectedLayout({
 }: {
   children: React.ReactNode
 }) {
-  // TODO: 로그인 기능 임시 비활성화 — 테스트용
-  const userEmail = ''
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar userEmail={userEmail} />
+      <Sidebar userEmail={user.email ?? ''} />
       <main className="flex-1 overflow-y-auto bg-gray-50">
         <div className="p-6">{children}</div>
       </main>

@@ -9,8 +9,10 @@ type Props = {
   yearVal: string;  setYearVal:  (v: string) => void
   yearOptions: number[]
   onNavigate: () => void
-  filterProduct: string; setFilterProduct: (v: string) => void
-  filterBuyer: string;   setFilterBuyer:   (v: string) => void
+  filterProduct: string
+  filterBuyer: string
+  /** 필터 변경 즉시 서버 이동 — 버튼 클릭 불필요 */
+  onFilterChange: (product: string, buyer: string) => void
   availableProducts: [string, string][]
 }
 
@@ -18,7 +20,7 @@ export default function DateControls({
   activeMode, setActiveMode,
   monthVal, setMonthVal, fromVal, setFromVal, toVal, setToVal, yearVal, setYearVal,
   yearOptions, onNavigate,
-  filterProduct, setFilterProduct, filterBuyer, setFilterBuyer, availableProducts,
+  filterProduct, filterBuyer, onFilterChange, availableProducts,
 }: Props) {
   return (
     <div className="card p-3 mb-3">
@@ -88,11 +90,11 @@ export default function DateControls({
           조회
         </button>
 
-        {/* 필터 */}
+        {/* 필터 — 변경 즉시 서버 이동 */}
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <select
             value={filterProduct}
-            onChange={e => setFilterProduct(e.target.value)}
+            onChange={e => onFilterChange(e.target.value, filterBuyer)}
             className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">전체 품목</option>
@@ -102,7 +104,7 @@ export default function DateControls({
           </select>
           <select
             value={filterBuyer}
-            onChange={e => setFilterBuyer(e.target.value)}
+            onChange={e => onFilterChange(filterProduct, e.target.value)}
             className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">전체 납품처</option>

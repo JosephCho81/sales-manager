@@ -1,3 +1,5 @@
+// unstable_cache: Next.js 권장 서버 캐시 API. 이름의 "unstable_"은 역사적 명명으로,
+// 실제로는 프로덕션에서 안정적으로 사용 가능하다.
 import { unstable_cache } from 'next/cache'
 import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -6,13 +8,17 @@ import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
 import {
   buildAllAnalytics,
+  extractAvailableProducts,
   type DeliveryForAnalytics,
   type CommissionEntry,
 } from './analytics-compute'
 
 export const dynamic = 'force-dynamic'
 
-type SP = Promise<{ month?: string; from?: string; to?: string; year?: string }>
+type SP = Promise<{
+  month?: string; from?: string; to?: string; year?: string
+  product?: string; buyer?: string
+}>
 
 function currentYM() {
   const now = new Date()
@@ -21,8 +27,8 @@ function currentYM() {
 
 /**
  * Supabase 조회 결과를 2분간 캐싱.
- * 같은 기간을 반복 조회할 때 DB 왕복을 건너뛴다.
  * 캐시 키: ['analytics-data', fromYM, toYM]
+ * 필터(product/buyer)는 캐시 밖에서 처리 → 같은 기간은 캐시 재사용.
  */
 const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
@@ -57,7 +63,7 @@ const fetchAnalyticsData = unstable_cache(
     }
   },
   ['analytics-data'],
-  { revalidate: 120 },   // 2분 캐시
+  { revalidate: 120 },
 )
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: SP }) {
@@ -81,20 +87,32 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
     mode   = 'month'
   }
 
-  try {
-    const { deliveries, commissions } = await fetchAnalyticsData(fromYM, toYM)
+  const filterProduct = params.product ?? 'all'
+  const filterBuyer   = params.buyer   ?? 'all'
 
-    // 서버에서 단일 패스로 전체 계산 — 클라이언트는 필터 없는 초기 상태에서
-    // 이 결과를 그대로 사용하므로 첫 렌더에 계산 비용이 없다
-    const precomputed = buildAllAnalytics(deliveries, commissions, fromYM, toYM)
+  try {
+    const { deliveries: allDeliveries, commissions } = await fetchAnalyticsData(fromYM, toYM)
+
+    // 필터 드롭다운용 품목 목록은 반드시 전체(필터 전) 데이터에서 추출
+    const availableProducts = extractAvailableProducts(allDeliveries)
+
+    // 서버에서 필터 적용 — 클라이언트에 raw deliveries 전달 불필요
+    const filtered = allDeliveries.filter(d => {
+      if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
+      if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
+      return true
+    })
+
+    const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM)
 
     return (
       <AnalyticsClient
         fromYM={fromYM}
         toYM={toYM}
         mode={mode}
-        deliveries={deliveries}
-        commissions={commissions}
+        filterProduct={filterProduct}
+        filterBuyer={filterBuyer}
+        availableProducts={availableProducts}
         precomputed={precomputed}
       />
     )
