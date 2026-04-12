@@ -25,6 +25,19 @@ function CommissionSection({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // tfoot 합계: rows를 한 번만 순회 (이전: splitMargin을 3×N번 호출)
+  const rowTotals = useMemo(() => {
+    let total = 0, a1 = 0, gm = 0, rs = 0
+    for (const r of rows) {
+      const sp = splitMargin(r.commission_amount)
+      total += r.commission_amount
+      a1    += sp.korea_a1
+      gm    += sp.geumhwa
+      rs    += sp.raseong
+    }
+    return { total, a1, gm, rs }
+  }, [rows])
+
   const preview = useMemo(() => {
     const qty = parseFloat(form.qty_ton)
     const price = parseFloat(form.price_per_ton)
@@ -177,18 +190,10 @@ function CommissionSection({
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
                     <td className="px-4 py-2" colSpan={3}>합계</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-blue-700">
-                      {fmtKrw(rows.reduce((s, r) => s + r.commission_amount, 0))}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-green-600">
-                      {fmtKrw(rows.reduce((s, r) => s + splitMargin(r.commission_amount).korea_a1, 0))}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-purple-600">
-                      {fmtKrw(rows.reduce((s, r) => s + splitMargin(r.commission_amount).geumhwa, 0))}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums text-orange-600">
-                      {fmtKrw(rows.reduce((s, r) => s + splitMargin(r.commission_amount).raseong, 0))}
-                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-blue-700">{fmtKrw(rowTotals.total)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-green-600">{fmtKrw(rowTotals.a1)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-purple-600">{fmtKrw(rowTotals.gm)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-orange-600">{fmtKrw(rowTotals.rs)}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>

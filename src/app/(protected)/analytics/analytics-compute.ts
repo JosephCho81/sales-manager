@@ -45,15 +45,190 @@ export type ProductRow = MarginTotals & {
 
 export type MonthlyData = { ym: string } & MarginTotals
 
+export type CommissionsInPeriod = {
+  dongkuk: { total: number; a1: number; gm: number; rs: number }
+  hyundai: { total: number; a1: number; gm: number; rs: number }
+  all:     { total: number; a1: number; gm: number; rs: number }
+}
+
+export type AllAnalytics = {
+  totals: MarginTotals
+  productRows: ProductRow[]
+  monthlyData: MonthlyData[]
+  commissionsInPeriod: CommissionsInPeriod
+  availableProducts: [string, string][]   // [name, display_name][]
+}
+
 // ── 상수 ──
 export const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'FESI75', 'FESI60', 'AL30']
 
+// ── 내부 헬퍼 ──
 /** 커미션 지급월 = 발생 기준월 + 1 */
 function commissionPaymentMonth(ym: string): string {
   return shiftMonths(ym, 1)
 }
 
-// ── 집계 함수 ──
+function zeroMonthAcc(): Omit<MonthlyData, 'ym'> {
+  return { qtyTon: 0, sellKrw: 0, costKrw: 0, totalMargin: 0, a1: 0, gm: 0, rs: 0, geumhwaSellKrw: 0, commissionTotal: 0 }
+}
+
+function zeroSplit() {
+  return { total: 0, a1: 0, gm: 0, rs: 0 }
+}
+
+/** fromYM~toYM 사이의 YYYY-MM 배열 생성 */
+function buildMonthRange(fromYM: string, toYM: string): string[] {
+  const months: string[] = []
+  const cur = new Date(fromYM + '-02')
+  const end = new Date(toYM   + '-02')
+  while (cur <= end) {
+    months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`)
+    cur.setMonth(cur.getMonth() + 1)
+  }
+  return months
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 서버 사이드 — 단일 패스 전체 집계
+// ────────────────────────────────────────────────────────────────────────────
+/**
+ * deliveries + commissions를 각각 한 번씩만 순회하여
+ * totals / productRows / monthlyData / commissionsInPeriod / availableProducts를
+ * 한꺼번에 반환한다.
+ *
+ * page.tsx(서버 컴포넌트)에서 호출 → 클라이언트에 raw 계산 비용을 넘기지 않는다.
+ * 초기 렌더(필터 없음) 시 클라이언트는 이 결과를 그대로 사용한다.
+ */
+export function buildAllAnalytics(
+  deliveries: DeliveryForAnalytics[],
+  commissions: CommissionEntry[],
+  fromYM: string,
+  toYM: string,
+): AllAnalytics {
+  let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
+  let geumhwaSellKrw = 0
+
+  const productMap   = new Map<string, ProductRow>()
+  const monthlyMap   = new Map<string, Omit<MonthlyData, 'ym'>>()
+  const productsSeen = new Map<string, string>()   // name → display_name
+
+  // ─── 1) deliveries 단일 패스 ───────────────────────────
+  for (const d of deliveries) {
+    if (!d.contract) continue
+
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
+    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+
+    // totals
+    qtyTon         += m.quantity_ton
+    sellKrw        += m.sell_price_krw * m.quantity_ton
+    costKrw        += m.cost_price_krw * m.quantity_ton
+    totalMargin    += m.total_margin
+    a1             += m.korea_a1
+    gm             += m.geumhwa
+    rs             += m.raseong
+    geumhwaSellKrw += gmSell
+
+    // productRows
+    if (d.product) {
+      if (!productsSeen.has(d.product.name)) {
+        productsSeen.set(d.product.name, d.product.display_name)
+      }
+      const key = `${d.product_id}_${d.year_month}`
+      const ex  = productMap.get(key)
+      if (ex) {
+        ex.qtyTon      += m.quantity_ton
+        ex.sellKrw     += m.sell_price_krw * m.quantity_ton
+        ex.costKrw     += m.cost_price_krw * m.quantity_ton
+        ex.totalMargin += m.total_margin
+        ex.a1 += m.korea_a1; ex.gm += m.geumhwa; ex.rs += m.raseong
+        ex.geumhwaSellKrw += gmSell
+      } else {
+        productMap.set(key, {
+          productId: d.product_id, name: d.product.name,
+          displayName: d.product.display_name, buyer: d.product.buyer,
+          deliveryYearMonth: d.year_month,
+          qtyTon:  m.quantity_ton,
+          sellKrw: m.sell_price_krw * m.quantity_ton,
+          costKrw: m.cost_price_krw * m.quantity_ton,
+          totalMargin: m.total_margin,
+          a1: m.korea_a1, gm: m.geumhwa, rs: m.raseong,
+          geumhwaSellKrw: gmSell, commissionTotal: 0,
+        })
+      }
+    }
+
+    // monthlyMap (invoice_month 기준 버킷)
+    const ma = monthlyMap.get(d.invoice_month) ?? zeroMonthAcc()
+    ma.qtyTon      += m.quantity_ton
+    ma.sellKrw     += m.sell_price_krw * m.quantity_ton
+    ma.costKrw     += m.cost_price_krw * m.quantity_ton
+    ma.totalMargin += m.total_margin
+    ma.a1 += m.korea_a1; ma.gm += m.geumhwa; ma.rs += m.raseong
+    ma.geumhwaSellKrw += gmSell
+    monthlyMap.set(d.invoice_month, ma)
+  }
+
+  // ─── 2) commissions 단일 패스 ──────────────────────────
+  let commissionTotal = 0
+  const cp: CommissionsInPeriod = {
+    dongkuk: zeroSplit(),
+    hyundai: zeroSplit(),
+    all:     zeroSplit(),
+  }
+
+  for (const c of commissions) {
+    const payMonth = commissionPaymentMonth(c.year_month)
+    if (payMonth < fromYM || payMonth > toYM) continue
+
+    const sp = splitMargin(c.commission_amount)
+    commissionTotal += c.commission_amount
+    totalMargin     += c.commission_amount
+    a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+
+    const ma = monthlyMap.get(payMonth) ?? zeroMonthAcc()
+    ma.totalMargin     += c.commission_amount
+    ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
+    ma.commissionTotal += c.commission_amount
+    monthlyMap.set(payMonth, ma)
+
+    const key = c.company === '동국제강' ? 'dongkuk' : 'hyundai'
+    cp[key].total += c.commission_amount
+    cp[key].a1    += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
+    cp.all.total  += c.commission_amount
+    cp.all.a1     += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+  }
+
+  // ─── 3) 결과 조립 ─────────────────────────────────────
+  const monthlyData = buildMonthRange(fromYM, toYM).map(ym => ({
+    ym, ...(monthlyMap.get(ym) ?? zeroMonthAcc()),
+  }))
+
+  const productRows = Array.from(productMap.values()).sort((a, b) => {
+    const ai = PRODUCT_ORDER.indexOf(a.name), bi = PRODUCT_ORDER.indexOf(b.name)
+    const nameOrder = (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
+    return nameOrder !== 0 ? nameOrder : a.deliveryYearMonth.localeCompare(b.deliveryYearMonth)
+  })
+
+  const availableProducts = Array.from(productsSeen.entries()).sort(
+    (a, b) => (PRODUCT_ORDER.indexOf(a[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(a[0])) -
+              (PRODUCT_ORDER.indexOf(b[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(b[0]))
+  )
+
+  return {
+    totals: { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, commissionTotal },
+    productRows,
+    monthlyData,
+    commissionsInPeriod: cp,
+    availableProducts,
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 클라이언트 사이드 — 필터 적용 후 재집계
+// (product/buyer 필터가 활성화된 경우에만 호출됨)
+// ────────────────────────────────────────────────────────────────────────────
 export function computeMargins(
   deliveries: DeliveryForAnalytics[],
   commissions: CommissionEntry[],
@@ -64,8 +239,7 @@ export function computeMargins(
   let geumhwaSellKrw = 0
   for (const d of deliveries) {
     if (!d.contract) continue
-    const inRange = !fromYM || (d.invoice_month >= fromYM && d.invoice_month <= toYM!)
-    if (!inRange) continue
+    if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
 
     const m = calcMarginFromContract(d.contract, d.quantity_kg)
     qtyTon      += m.quantity_ton
@@ -80,16 +254,14 @@ export function computeMargins(
     }
   }
 
-  // 커미션 (지급월 기준으로 집계)
   let commissionTotal = 0
   for (const c of commissions) {
     const payMonth = commissionPaymentMonth(c.year_month)
-    if (!fromYM || (payMonth >= fromYM && payMonth <= toYM!)) {
-      const sp = splitMargin(c.commission_amount)
-      commissionTotal += c.commission_amount
-      totalMargin += c.commission_amount
-      a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
-    }
+    if (fromYM && (payMonth < fromYM || payMonth > toYM!)) continue
+    const sp = splitMargin(c.commission_amount)
+    commissionTotal += c.commission_amount
+    totalMargin += c.commission_amount
+    a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
   }
 
   return { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, commissionTotal }
@@ -103,15 +275,14 @@ export function buildProductRows(
   const map = new Map<string, ProductRow>()
   for (const d of deliveries) {
     if (!d.contract || !d.product) continue
-    const inRange = !fromYM || (d.invoice_month >= fromYM && d.invoice_month <= toYM!)
-    if (!inRange) continue
+    if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
 
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
 
     const key = `${d.product_id}_${d.year_month}`
-    const ex = map.get(key)
+    const ex  = map.get(key)
     if (ex) {
       ex.qtyTon      += m.quantity_ton
       ex.sellKrw     += m.sell_price_krw * m.quantity_ton
@@ -128,11 +299,8 @@ export function buildProductRows(
         sellKrw:   m.sell_price_krw * m.quantity_ton,
         costKrw:   m.cost_price_krw * m.quantity_ton,
         totalMargin: m.total_margin,
-        a1: m.korea_a1,
-        gm: m.geumhwa,
-        rs: m.raseong,
-        geumhwaSellKrw: gmSell,
-        commissionTotal: 0,
+        a1: m.korea_a1, gm: m.geumhwa, rs: m.raseong,
+        geumhwaSellKrw: gmSell, commissionTotal: 0,
       })
     }
   }
@@ -140,51 +308,48 @@ export function buildProductRows(
   return Array.from(map.values()).sort((a, b) => {
     const ai = PRODUCT_ORDER.indexOf(a.name), bi = PRODUCT_ORDER.indexOf(b.name)
     const nameOrder = (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
-    if (nameOrder !== 0) return nameOrder
-    return a.deliveryYearMonth.localeCompare(b.deliveryYearMonth)
+    return nameOrder !== 0 ? nameOrder : a.deliveryYearMonth.localeCompare(b.deliveryYearMonth)
   })
 }
 
+/**
+ * buildMonthlyData — O(n) 구현
+ * 이전: 월별로 deliveries 전체를 재스캔 → O(months × n)
+ * 현재: deliveries + commissions를 각 한 번씩 순회하여 Map에 버킷 → O(n)
+ */
 export function buildMonthlyData(
   deliveries: DeliveryForAnalytics[],
   commissions: CommissionEntry[],
   fromYM: string,
   toYM: string,
 ): MonthlyData[] {
-  const months: string[] = []
-  const cur = new Date(fromYM + '-02')
-  const end = new Date(toYM   + '-02')
-  while (cur <= end) {
-    months.push(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`)
-    cur.setMonth(cur.getMonth() + 1)
+  const monthlyMap = new Map<string, Omit<MonthlyData, 'ym'>>()
+
+  for (const d of deliveries) {
+    if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
+    const m  = calcMarginFromContract(d.contract, d.quantity_kg)
+    const ma = monthlyMap.get(d.invoice_month) ?? zeroMonthAcc()
+    ma.qtyTon      += m.quantity_ton
+    ma.sellKrw     += m.sell_price_krw * m.quantity_ton
+    ma.costKrw     += m.cost_price_krw * m.quantity_ton
+    ma.totalMargin += m.total_margin
+    ma.a1 += m.korea_a1; ma.gm += m.geumhwa; ma.rs += m.raseong
+    if (d.product?.name.toUpperCase() === 'AL35B') {
+      ma.geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
+    }
+    monthlyMap.set(d.invoice_month, ma)
   }
-  return months.map(ym => {
-    let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
-    let geumhwaSellKrw = 0
-    for (const d of deliveries) {
-      if (!d.contract || d.invoice_month !== ym) continue
-      const m = calcMarginFromContract(d.contract, d.quantity_kg)
-      qtyTon      += m.quantity_ton
-      sellKrw     += m.sell_price_krw * m.quantity_ton
-      costKrw     += m.cost_price_krw * m.quantity_ton
-      totalMargin += m.total_margin
-      a1 += m.korea_a1; gm += m.geumhwa; rs += m.raseong
-      if (d.product?.name.toUpperCase() === 'AL35B') {
-        geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
-      }
-    }
 
-    // 커미션 (지급월 기준)
-    let commissionTotal = 0
-    for (const c of commissions) {
-      if (commissionPaymentMonth(c.year_month) === ym) {
-        const sp = splitMargin(c.commission_amount)
-        commissionTotal += c.commission_amount
-        totalMargin += c.commission_amount
-        a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
-      }
-    }
+  for (const c of commissions) {
+    const payMonth = commissionPaymentMonth(c.year_month)
+    if (payMonth < fromYM || payMonth > toYM) continue
+    const sp = splitMargin(c.commission_amount)
+    const ma = monthlyMap.get(payMonth) ?? zeroMonthAcc()
+    ma.totalMargin     += c.commission_amount
+    ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
+    ma.commissionTotal += c.commission_amount
+    monthlyMap.set(payMonth, ma)
+  }
 
-    return { ym, qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, commissionTotal }
-  })
+  return buildMonthRange(fromYM, toYM).map(ym => ({ ym, ...(monthlyMap.get(ym) ?? zeroMonthAcc()) }))
 }

@@ -2,11 +2,11 @@
 
 import React, { useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { fmtKrw, fmtNum, splitMargin } from '@/lib/margin'
-import { getCurrentYearMonth, shiftMonths } from '@/lib/date'
+import { fmtKrw, fmtNum } from '@/lib/margin'
+import { getCurrentYearMonth } from '@/lib/date'
 import {
   computeMargins, buildProductRows, buildMonthlyData, PRODUCT_ORDER,
-  type DeliveryForAnalytics, type CommissionEntry,
+  type DeliveryForAnalytics, type CommissionEntry, type AllAnalytics, type ProductRow,
 } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 
@@ -19,12 +19,14 @@ export default function AnalyticsClient({
   mode,
   deliveries,
   commissions,
+  precomputed,
 }: {
   fromYM: string
   toYM: string
   mode: 'month' | 'range' | 'year'
   deliveries: DeliveryForAnalytics[]
   commissions: CommissionEntry[]
+  precomputed: AllAnalytics
 }) {
   const router = useRouter()
 
@@ -41,18 +43,6 @@ export default function AnalyticsClient({
   const [filterProduct, setFilterProduct] = useState('all')
   const [filterBuyer,   setFilterBuyer]   = useState('all')
 
-  // 사용 가능한 품목 목록
-  const availableProducts = useMemo(() => {
-    const seen = new Map<string, string>()
-    for (const d of deliveries) {
-      if (d.product && !seen.has(d.product.name)) seen.set(d.product.name, d.product.display_name)
-    }
-    return Array.from(seen.entries()).sort(
-      (a, b) => (PRODUCT_ORDER.indexOf(a[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(a[0])) -
-                (PRODUCT_ORDER.indexOf(b[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(b[0]))
-    )
-  }, [deliveries])
-
   // 연도 목록 (2020 ~ 현재+1)
   const yearOptions = useMemo(() => {
     const thisYear = new Date().getFullYear()
@@ -66,42 +56,54 @@ export default function AnalyticsClient({
     if (activeMode === 'year')  router.push(`/analytics?year=${yearVal}`)
   }, [activeMode, monthVal, fromVal, toVal, yearVal, router])
 
-  // ── 필터 적용 ──
+  // ── 필터 활성 여부 ──
+  const isFiltered = filterProduct !== 'all' || filterBuyer !== 'all'
+
+  // ── 필터 적용 (활성 시에만 deliveries를 재스캔) ──
   const filtered = useMemo(
     () =>
-      deliveries.filter(d => {
-        if (!d.product) return false
-        if (filterProduct !== 'all' && d.product.name !== filterProduct) return false
-        if (filterBuyer   !== 'all' && d.product.buyer !== filterBuyer)  return false
-        return true
-      }),
-    [deliveries, filterProduct, filterBuyer]
+      isFiltered
+        ? deliveries.filter(d => {
+            if (!d.product) return false
+            if (filterProduct !== 'all' && d.product.name  !== filterProduct) return false
+            if (filterBuyer   !== 'all' && d.product.buyer !== filterBuyer)   return false
+            return true
+          })
+        : deliveries,
+    [deliveries, filterProduct, filterBuyer, isFiltered]
   )
 
   // ── 집계 ──
-  const totals      = useMemo(() => computeMargins(filtered, commissions, fromYM, toYM),        [filtered, commissions, fromYM, toYM])
-  const productRows = useMemo(() => buildProductRows(filtered, fromYM, toYM),                   [filtered, fromYM, toYM])
-  const monthlyData = useMemo(() => buildMonthlyData(filtered, commissions, fromYM, toYM),      [filtered, commissions, fromYM, toYM])
+  // 필터 없음: 서버에서 미리 계산한 precomputed를 그대로 사용 (계산 비용 0)
+  // 필터 있음: filtered deliveries 기준으로 재계산
+  const totals      = useMemo(
+    () => isFiltered ? computeMargins(filtered, commissions, fromYM, toYM) : precomputed.totals,
+    [isFiltered, filtered, commissions, fromYM, toYM, precomputed.totals]
+  )
+  const productRows = useMemo(
+    () => isFiltered ? buildProductRows(filtered, fromYM, toYM) : precomputed.productRows,
+    [isFiltered, filtered, fromYM, toYM, precomputed.productRows]
+  )
+  const monthlyData = useMemo(
+    () => isFiltered ? buildMonthlyData(filtered, commissions, fromYM, toYM) : precomputed.monthlyData,
+    [isFiltered, filtered, commissions, fromYM, toYM, precomputed.monthlyData]
+  )
 
-  // ── 조회 기간 내 커미션 집계 (회사별 분리) ──
-  const commissionsInPeriod = useMemo(() => {
-    function sumByCompany(company: string) {
-      let total = 0, a1 = 0, gm = 0, rs = 0
-      for (const c of commissions) {
-        const pm = shiftMonths(c.year_month, 1)
-        if (pm < fromYM || pm > toYM) continue
-        if (c.company !== company) continue
-        const sp = splitMargin(c.commission_amount)
-        total += c.commission_amount
-        a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
-      }
-      return { total, a1, gm, rs }
-    }
-    const dongkuk = sumByCompany('동국제강')
-    const hyundai = sumByCompany('현대제철')
-    const all = { total: dongkuk.total + hyundai.total, a1: dongkuk.a1 + hyundai.a1, gm: dongkuk.gm + hyundai.gm, rs: dongkuk.rs + hyundai.rs }
-    return { dongkuk, hyundai, all }
-  }, [commissions, fromYM, toYM])
+  // 커미션: 회사 레벨이므로 product/buyer 필터와 무관 — 항상 서버 계산값 사용
+  const { commissionsInPeriod } = precomputed
+
+  // 품목 목록: 서버에서 미리 추출 — deliveries 재스캔 없음
+  const availableProducts = precomputed.availableProducts
+
+  // ── isLastOfName: O(1) 조회 ──
+  // 이전: 매 행 렌더 시 productRows.filter() → O(n²)
+  // 현재: Map으로 "이름별 마지막 행" 사전 계산 → O(n) 1회
+  const lastRowOfName = useMemo(() => {
+    const m = new Map<string, ProductRow>()
+    for (const row of productRows) m.set(row.name, row)
+    return m
+  }, [productRows])
+
   const showChart   = fromYM !== toYM && monthlyData.length > 1
 
   // ── 기간 라벨 ──
@@ -215,7 +217,7 @@ export default function AnalyticsClient({
       {/* ── 기간 라벨 ── */}
       <p className="text-xs text-gray-500 mb-2">
         📅 조회 기간: <span className="font-medium text-gray-700">{periodLabel}</span>
-        {(filterProduct !== 'all' || filterBuyer !== 'all') && (
+        {isFiltered && (
           <span className="ml-2 text-blue-600">
             {filterProduct !== 'all' && `[${availableProducts.find(([n]) => n === filterProduct)?.[1] ?? filterProduct}]`}
             {filterBuyer !== 'all' && ` [${filterBuyer}]`}
@@ -383,11 +385,10 @@ export default function AnalyticsClient({
               </thead>
               <tbody>
                 {productRows.map(row => {
-                  const isAL35 = row.name.toUpperCase() === 'AL35B'
-                  const isAL30 = row.name.toUpperCase() === 'AL30'
-                  // 이 row가 해당 품목의 마지막 행인지 (같은 name 기준)
-                  const sameNameRows = productRows.filter(r => r.name === row.name)
-                  const isLastOfName = sameNameRows[sameNameRows.length - 1] === row
+                  const isAL35      = row.name.toUpperCase() === 'AL35B'
+                  const isAL30      = row.name.toUpperCase() === 'AL30'
+                  // O(1): Map에서 이름별 마지막 행 조회 (이전: O(n) filter)
+                  const isLastOfName = lastRowOfName.get(row.name) === row
 
                   return (
                     <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>

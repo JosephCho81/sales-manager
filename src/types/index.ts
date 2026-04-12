@@ -27,6 +27,26 @@ export interface ChainInfo {
 }
 
 // ────────────────────────────────────────────────────────
+// 납품 건 join 결과 타입 (select에 따라 일부 필드만 포함)
+// ────────────────────────────────────────────────────────
+export interface DeliveryProduct {
+  id: string
+  name: string
+  display_name: string
+  buyer: string
+}
+
+export interface DeliveryContract {
+  id: string
+  sell_price: number
+  cost_price: number
+  currency: Currency
+  reference_exchange_rate: number | null
+  start_date?: string
+  end_date?: string
+}
+
+// ────────────────────────────────────────────────────────
 // 낙찰 단가 계약 (Contracts)
 // ────────────────────────────────────────────────────────
 export interface Contract {
@@ -41,9 +61,7 @@ export interface Contract {
   reference_exchange_rate: number | null  // FeSi 참고 환율 (원/USD)
   memo: string | null
   created_at: string
-  // join (선택적 — partial product 포함 가능)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  product?: any
+  product?: DeliveryProduct | null
 }
 
 // ────────────────────────────────────────────────────────
@@ -51,17 +69,18 @@ export interface Contract {
 // ────────────────────────────────────────────────────────
 export interface Delivery {
   id: string
-  year_month: string       // YYYY-MM (예: 2024-03)
+  year_month: string         // YYYY-MM (예: 2024-03)
+  invoice_month: string | null  // 지급 스케줄 월 (집계 기준)
+  delivery_date: string | null  // 실제 납품일
   product_id: string
   contract_id: string
-  quantity_kg: number      // 기본 납품 물량 (kg)
+  quantity_kg: number        // 기본 납품 물량 (kg)
+  depreciation_amount: number | null
   memo: string | null
   created_at: string
   // join (선택적 — partial 포함 가능)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  product?: any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  contract?: any
+  product?: DeliveryProduct | null
+  contract?: DeliveryContract | null
 }
 
 // ────────────────────────────────────────────────────────
