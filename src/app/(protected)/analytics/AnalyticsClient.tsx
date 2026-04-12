@@ -18,7 +18,6 @@ export default function AnalyticsClient({
   filterProduct,
   filterBuyer,
   availableProducts,
-  commissions,
   precomputed,
 }: {
   fromYM: string
