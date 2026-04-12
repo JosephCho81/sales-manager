@@ -38,8 +38,10 @@ export default function ProductTable({
               <th className="table-th">입고일</th>
               <th className="table-th">납품처</th>
               <th className="table-th">물량(톤)</th>
+              <th className="table-th">매출단가(원/톤)</th>
+              <th className="table-th">매입단가(원/톤)</th>
               <th className="table-th">매출</th>
-              <th className="table-th">원가</th>
+              <th className="table-th">매입</th>
               <th className="table-th">총마진</th>
               <th className="table-th text-green-700">한국에이원</th>
               <th className="table-th text-purple-700">금화</th>
@@ -61,6 +63,12 @@ export default function ProductTable({
                     </td>
                     <td className="table-td text-gray-500">{row.buyer}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">
+                      {row.sellPricePerTon !== null ? fmtKrw(row.sellPricePerTon) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">
+                      {row.costPricePerTon !== null ? fmtKrw(row.costPricePerTon) : <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
@@ -74,6 +82,14 @@ export default function ProductTable({
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
                       <td className="table-td text-gray-300">—</td>
                       <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">
+                        {fmtNum(commissionsInPeriod.dongkuk.qtyTon, 3)}
+                      </td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">
+                        {commissionsInPeriod.dongkuk.pricePerTon !== null
+                          ? fmtKrw(commissionsInPeriod.dongkuk.pricePerTon)
+                          : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
@@ -89,6 +105,14 @@ export default function ProductTable({
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
                       <td className="table-td text-gray-300">—</td>
                       <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">
+                        {fmtNum(commissionsInPeriod.hyundai.qtyTon, 3)}
+                      </td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">
+                        {commissionsInPeriod.hyundai.pricePerTon !== null
+                          ? fmtKrw(commissionsInPeriod.hyundai.pricePerTon)
+                          : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
@@ -106,6 +130,8 @@ export default function ProductTable({
             <tfoot>
               <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                 <td colSpan={3} className="px-2 py-3.5 text-sm">합계</td>
+                <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
+                <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
                 <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
                 <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
                 <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>

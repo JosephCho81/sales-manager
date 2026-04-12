@@ -49,7 +49,7 @@ const fetchAnalyticsData = unstable_cache(
       // 커미션: 지급월 = year_month + 1 → 범위 -1개월 shift
       supabase
         .from('commissions')
-        .select('year_month, commission_amount, company')
+        .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
         .gte('year_month', shiftMonths(fromYM, -1))
         .lte('year_month', shiftMonths(toYM, -1)),
     ])

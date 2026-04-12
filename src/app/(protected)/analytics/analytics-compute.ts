@@ -37,6 +37,8 @@ export type CommissionEntry = {
   year_month: string        // 발생 기준월; 지급월 = year_month + 1
   commission_amount: number
   company: string           // '동국제강' | '현대제철'
+  quantity_kg: number       // 저장된 물량(kg) — 표시 시 /1000 하여 톤 변환
+  price_per_ton: number     // 저장된 단가(원/톤)
 }
 
 export type MarginTotals = {
@@ -51,13 +53,15 @@ export type MarginTotals = {
 export type ProductRow = MarginTotals & {
   productId: string; name: string; displayName: string; buyer: string
   deliveryYearMonth: string   // 납품월 — "N월분" 표시용
+  sellPricePerTon: number | null  // 계약 매출단가(원/톤). 동일 버킷 내 단가 불일치 시 null
+  costPricePerTon: number | null  // 계약 매입단가(원/톤). 동일 버킷 내 단가 불일치 시 null
 }
 
 export type MonthlyData = { ym: string } & MarginTotals
 
 export type CommissionsInPeriod = {
-  dongkuk: { total: number; a1: number; gm: number; rs: number }
-  hyundai: { total: number; a1: number; gm: number; rs: number }
+  dongkuk: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null }
+  hyundai: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null }
   all:     { total: number; a1: number; gm: number; rs: number }
 }
 
@@ -83,7 +87,7 @@ function zeroTotals(): MarginTotals {
 }
 
 function zeroSplit() {
-  return { total: 0, a1: 0, gm: 0, rs: 0 }
+  return { total: 0, a1: 0, gm: 0, rs: 0, qtyTon: 0, pricePerTon: null as number | null }
 }
 
 /**
@@ -180,6 +184,9 @@ export function buildAllAnalytics(
       const key = `${d.product_id}_${d.year_month}`
       const ex  = productMap.get(key)
       if (ex) {
+        // 단가 일관성 체크 — 동일 버킷 내 단가 불일치 시 null
+        if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
+        if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
         accDelivery(ex, m, gmSell)
       } else {
         const row: ProductRow = {
@@ -187,6 +194,8 @@ export function buildAllAnalytics(
           productId: d.product_id, name: d.product.name,
           displayName: d.product.display_name, buyer: d.product.buyer,
           deliveryYearMonth: d.year_month,
+          sellPricePerTon: m.sell_price_krw,
+          costPricePerTon: m.cost_price_krw,
         }
         accDelivery(row, m, gmSell)
         productMap.set(key, row)
@@ -205,6 +214,8 @@ export function buildAllAnalytics(
     hyundai: zeroSplit(),
     all:     zeroSplit(),
   }
+  // 커미션 단가 일관성 추적 (-1 = 아직 항목 없음)
+  const commPriceSample: { dongkuk: number; hyundai: number } = { dongkuk: -1, hyundai: -1 }
 
   for (const c of commissions) {
     const payMonth = commissionPaymentMonth(c.year_month)
@@ -222,11 +233,24 @@ export function buildAllAnalytics(
     monthlyMap.set(payMonth, ma)
 
     const key = c.company === '동국제강' ? 'dongkuk' : 'hyundai'
-    cp[key].total += c.commission_amount
-    cp[key].a1    += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
-    cp.all.total  += c.commission_amount
-    cp.all.a1     += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+    cp[key].total  += c.commission_amount
+    cp[key].qtyTon += c.quantity_kg / 1000
+    cp[key].a1     += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
+    cp.all.total   += c.commission_amount
+    cp.all.a1      += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+
+    // 단가 일관성 체크
+    const cur = commPriceSample[key]
+    if (cur === -1) {
+      commPriceSample[key] = c.price_per_ton
+    } else if (cur !== c.price_per_ton) {
+      commPriceSample[key] = -2  // 불일치 마킹
+    }
   }
+
+  // pricePerTon 확정 (-1: 항목없음→null, -2: 불일치→null, 그 외: 단가 값)
+  cp.dongkuk.pricePerTon = commPriceSample.dongkuk > 0 ? commPriceSample.dongkuk : null
+  cp.hyundai.pricePerTon = commPriceSample.hyundai > 0 ? commPriceSample.hyundai : null
 
   // ─── 3) 결과 조립 ─────────────────────────────────────
   const monthlyData = buildMonthRange(fromYM, toYM).map(ym => ({
@@ -294,6 +318,8 @@ export function buildProductRows(
     const key = `${d.product_id}_${d.year_month}`
     const ex  = map.get(key)
     if (ex) {
+      if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
+      if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
       accDelivery(ex, m, gmSell)
     } else {
       const row: ProductRow = {
@@ -301,6 +327,8 @@ export function buildProductRows(
         productId: d.product_id, name: d.product.name,
         displayName: d.product.display_name, buyer: d.product.buyer,
         deliveryYearMonth: d.year_month,
+        sellPricePerTon: m.sell_price_krw,
+        costPricePerTon: m.cost_price_krw,
       }
       accDelivery(row, m, gmSell)
       map.set(key, row)
