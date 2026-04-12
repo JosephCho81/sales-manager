@@ -68,12 +68,32 @@ function commissionPaymentMonth(ym: string): string {
   return shiftMonths(ym, 1)
 }
 
-function zeroMonthAcc(): Omit<MonthlyData, 'ym'> {
+function zeroTotals(): MarginTotals {
   return { qtyTon: 0, sellKrw: 0, costKrw: 0, totalMargin: 0, a1: 0, gm: 0, rs: 0, geumhwaSellKrw: 0, commissionTotal: 0 }
 }
 
 function zeroSplit() {
   return { total: 0, a1: 0, gm: 0, rs: 0 }
+}
+
+/**
+ * 납품 건 1개를 MarginTotals 누산기에 반영 (mutates acc)
+ * buildAllAnalytics / computeMargins / buildProductRows / buildMonthlyData
+ * 4개 함수의 동일 누산 패턴을 한 곳으로 통합
+ */
+function accDelivery(
+  acc: MarginTotals,
+  m: { quantity_ton: number; sell_price_krw: number; cost_price_krw: number; total_margin: number; korea_a1: number; geumhwa: number; raseong: number },
+  gmSell: number,
+): void {
+  acc.qtyTon         += m.quantity_ton
+  acc.sellKrw        += m.sell_price_krw * m.quantity_ton
+  acc.costKrw        += m.cost_price_krw * m.quantity_ton
+  acc.totalMargin    += m.total_margin
+  acc.a1             += m.korea_a1
+  acc.gm             += m.geumhwa
+  acc.rs             += m.raseong
+  acc.geumhwaSellKrw += gmSell
 }
 
 /** fromYM~toYM 사이의 YYYY-MM 배열 생성 */
@@ -105,11 +125,9 @@ export function buildAllAnalytics(
   fromYM: string,
   toYM: string,
 ): AllAnalytics {
-  let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
-  let geumhwaSellKrw = 0
-
+  const totals       = zeroTotals()
   const productMap   = new Map<string, ProductRow>()
-  const monthlyMap   = new Map<string, Omit<MonthlyData, 'ym'>>()
+  const monthlyMap   = new Map<string, MarginTotals>()
   const productsSeen = new Map<string, string>()   // name → display_name
 
   // ─── 1) deliveries 단일 패스 ───────────────────────────
@@ -121,14 +139,7 @@ export function buildAllAnalytics(
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
 
     // totals
-    qtyTon         += m.quantity_ton
-    sellKrw        += m.sell_price_krw * m.quantity_ton
-    costKrw        += m.cost_price_krw * m.quantity_ton
-    totalMargin    += m.total_margin
-    a1             += m.korea_a1
-    gm             += m.geumhwa
-    rs             += m.raseong
-    geumhwaSellKrw += gmSell
+    accDelivery(totals, m, gmSell)
 
     // productRows
     if (d.product) {
@@ -138,40 +149,26 @@ export function buildAllAnalytics(
       const key = `${d.product_id}_${d.year_month}`
       const ex  = productMap.get(key)
       if (ex) {
-        ex.qtyTon      += m.quantity_ton
-        ex.sellKrw     += m.sell_price_krw * m.quantity_ton
-        ex.costKrw     += m.cost_price_krw * m.quantity_ton
-        ex.totalMargin += m.total_margin
-        ex.a1 += m.korea_a1; ex.gm += m.geumhwa; ex.rs += m.raseong
-        ex.geumhwaSellKrw += gmSell
+        accDelivery(ex, m, gmSell)
       } else {
-        productMap.set(key, {
+        const row: ProductRow = {
+          ...zeroTotals(),
           productId: d.product_id, name: d.product.name,
           displayName: d.product.display_name, buyer: d.product.buyer,
           deliveryYearMonth: d.year_month,
-          qtyTon:  m.quantity_ton,
-          sellKrw: m.sell_price_krw * m.quantity_ton,
-          costKrw: m.cost_price_krw * m.quantity_ton,
-          totalMargin: m.total_margin,
-          a1: m.korea_a1, gm: m.geumhwa, rs: m.raseong,
-          geumhwaSellKrw: gmSell, commissionTotal: 0,
-        })
+        }
+        accDelivery(row, m, gmSell)
+        productMap.set(key, row)
       }
     }
 
     // monthlyMap (invoice_month 기준 버킷)
-    const ma = monthlyMap.get(d.invoice_month) ?? zeroMonthAcc()
-    ma.qtyTon      += m.quantity_ton
-    ma.sellKrw     += m.sell_price_krw * m.quantity_ton
-    ma.costKrw     += m.cost_price_krw * m.quantity_ton
-    ma.totalMargin += m.total_margin
-    ma.a1 += m.korea_a1; ma.gm += m.geumhwa; ma.rs += m.raseong
-    ma.geumhwaSellKrw += gmSell
+    const ma = monthlyMap.get(d.invoice_month) ?? zeroTotals()
+    accDelivery(ma, m, gmSell)
     monthlyMap.set(d.invoice_month, ma)
   }
 
   // ─── 2) commissions 단일 패스 ──────────────────────────
-  let commissionTotal = 0
   const cp: CommissionsInPeriod = {
     dongkuk: zeroSplit(),
     hyundai: zeroSplit(),
@@ -183,11 +180,11 @@ export function buildAllAnalytics(
     if (payMonth < fromYM || payMonth > toYM) continue
 
     const sp = splitMargin(c.commission_amount)
-    commissionTotal += c.commission_amount
-    totalMargin     += c.commission_amount
-    a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+    totals.commissionTotal += c.commission_amount
+    totals.totalMargin     += c.commission_amount
+    totals.a1 += sp.korea_a1; totals.gm += sp.geumhwa; totals.rs += sp.raseong
 
-    const ma = monthlyMap.get(payMonth) ?? zeroMonthAcc()
+    const ma = monthlyMap.get(payMonth) ?? zeroTotals()
     ma.totalMargin     += c.commission_amount
     ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
     ma.commissionTotal += c.commission_amount
@@ -202,7 +199,7 @@ export function buildAllAnalytics(
 
   // ─── 3) 결과 조립 ─────────────────────────────────────
   const monthlyData = buildMonthRange(fromYM, toYM).map(ym => ({
-    ym, ...(monthlyMap.get(ym) ?? zeroMonthAcc()),
+    ym, ...(monthlyMap.get(ym) ?? zeroTotals()),
   }))
 
   const productRows = Array.from(productMap.values()).sort((a, b) => {
@@ -216,13 +213,7 @@ export function buildAllAnalytics(
               (PRODUCT_ORDER.indexOf(b[0]) < 0 ? 99 : PRODUCT_ORDER.indexOf(b[0]))
   )
 
-  return {
-    totals: { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, commissionTotal },
-    productRows,
-    monthlyData,
-    commissionsInPeriod: cp,
-    availableProducts,
-  }
+  return { totals, productRows, monthlyData, commissionsInPeriod: cp, availableProducts }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -235,36 +226,24 @@ export function computeMargins(
   fromYM?: string,
   toYM?: string,
 ): MarginTotals {
-  let qtyTon = 0, sellKrw = 0, costKrw = 0, totalMargin = 0, a1 = 0, gm = 0, rs = 0
-  let geumhwaSellKrw = 0
+  const acc = zeroTotals()
   for (const d of deliveries) {
     if (!d.contract) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
-
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
-    qtyTon      += m.quantity_ton
-    sellKrw     += m.sell_price_krw  * m.quantity_ton
-    costKrw     += m.cost_price_krw  * m.quantity_ton
-    totalMargin += m.total_margin
-    a1          += m.korea_a1
-    gm          += m.geumhwa
-    rs          += m.raseong
-    if (d.product?.name.toUpperCase() === 'AL35B') {
-      geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
-    }
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
+    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    accDelivery(acc, m, gmSell)
   }
-
-  let commissionTotal = 0
   for (const c of commissions) {
     const payMonth = commissionPaymentMonth(c.year_month)
     if (fromYM && (payMonth < fromYM || payMonth > toYM!)) continue
     const sp = splitMargin(c.commission_amount)
-    commissionTotal += c.commission_amount
-    totalMargin += c.commission_amount
-    a1 += sp.korea_a1; gm += sp.geumhwa; rs += sp.raseong
+    acc.commissionTotal += c.commission_amount
+    acc.totalMargin     += c.commission_amount
+    acc.a1 += sp.korea_a1; acc.gm += sp.geumhwa; acc.rs += sp.raseong
   }
-
-  return { qtyTon, sellKrw, costKrw, totalMargin, a1, gm, rs, geumhwaSellKrw, commissionTotal }
+  return acc
 }
 
 export function buildProductRows(
@@ -284,24 +263,16 @@ export function buildProductRows(
     const key = `${d.product_id}_${d.year_month}`
     const ex  = map.get(key)
     if (ex) {
-      ex.qtyTon      += m.quantity_ton
-      ex.sellKrw     += m.sell_price_krw * m.quantity_ton
-      ex.costKrw     += m.cost_price_krw * m.quantity_ton
-      ex.totalMargin += m.total_margin
-      ex.a1 += m.korea_a1; ex.gm += m.geumhwa; ex.rs += m.raseong
-      ex.geumhwaSellKrw += gmSell
+      accDelivery(ex, m, gmSell)
     } else {
-      map.set(key, {
+      const row: ProductRow = {
+        ...zeroTotals(),
         productId: d.product_id, name: d.product.name,
         displayName: d.product.display_name, buyer: d.product.buyer,
         deliveryYearMonth: d.year_month,
-        qtyTon:    m.quantity_ton,
-        sellKrw:   m.sell_price_krw * m.quantity_ton,
-        costKrw:   m.cost_price_krw * m.quantity_ton,
-        totalMargin: m.total_margin,
-        a1: m.korea_a1, gm: m.geumhwa, rs: m.raseong,
-        geumhwaSellKrw: gmSell, commissionTotal: 0,
-      })
+      }
+      accDelivery(row, m, gmSell)
+      map.set(key, row)
     }
   }
 
@@ -323,20 +294,15 @@ export function buildMonthlyData(
   fromYM: string,
   toYM: string,
 ): MonthlyData[] {
-  const monthlyMap = new Map<string, Omit<MonthlyData, 'ym'>>()
+  const monthlyMap = new Map<string, MarginTotals>()
 
   for (const d of deliveries) {
     if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
-    const m  = calcMarginFromContract(d.contract, d.quantity_kg)
-    const ma = monthlyMap.get(d.invoice_month) ?? zeroMonthAcc()
-    ma.qtyTon      += m.quantity_ton
-    ma.sellKrw     += m.sell_price_krw * m.quantity_ton
-    ma.costKrw     += m.cost_price_krw * m.quantity_ton
-    ma.totalMargin += m.total_margin
-    ma.a1 += m.korea_a1; ma.gm += m.geumhwa; ma.rs += m.raseong
-    if (d.product?.name.toUpperCase() === 'AL35B') {
-      ma.geumhwaSellKrw += m.cost_price_krw * m.quantity_ton + m.geumhwa
-    }
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
+    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const ma     = monthlyMap.get(d.invoice_month) ?? zeroTotals()
+    accDelivery(ma, m, gmSell)
     monthlyMap.set(d.invoice_month, ma)
   }
 
@@ -344,12 +310,12 @@ export function buildMonthlyData(
     const payMonth = commissionPaymentMonth(c.year_month)
     if (payMonth < fromYM || payMonth > toYM) continue
     const sp = splitMargin(c.commission_amount)
-    const ma = monthlyMap.get(payMonth) ?? zeroMonthAcc()
+    const ma = monthlyMap.get(payMonth) ?? zeroTotals()
     ma.totalMargin     += c.commission_amount
     ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
     ma.commissionTotal += c.commission_amount
     monthlyMap.set(payMonth, ma)
   }
 
-  return buildMonthRange(fromYM, toYM).map(ym => ({ ym, ...(monthlyMap.get(ym) ?? zeroMonthAcc()) }))
+  return buildMonthRange(fromYM, toYM).map(ym => ({ ym, ...(monthlyMap.get(ym) ?? zeroTotals()) }))
 }

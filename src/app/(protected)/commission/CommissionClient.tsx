@@ -212,8 +212,10 @@ function CommissionSection({
 export default function CommissionClient({ initialRows }: { initialRows: CommissionRow[] }) {
   const [rows, setRows] = useState<CommissionRow[]>(initialRows)
 
-  const dongkukRows  = rows.filter(r => r.company === '동국제강').sort((a, b) => b.year_month.localeCompare(a.year_month))
-  const hyundaiRows  = rows.filter(r => r.company === '현대제철').sort((a, b) => b.year_month.localeCompare(a.year_month))
+  const [dongkukRows, hyundaiRows] = useMemo(() => [
+    rows.filter(r => r.company === '동국제강').sort((a, b) => b.year_month.localeCompare(a.year_month)),
+    rows.filter(r => r.company === '현대제철').sort((a, b) => b.year_month.localeCompare(a.year_month)),
+  ], [rows])
 
   function handleInserted(row: CommissionRow) {
     setRows(prev => [row, ...prev])
