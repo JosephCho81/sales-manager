@@ -3,7 +3,6 @@
 import { unstable_cache } from 'next/cache'
 import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
-import { shiftMonths } from '@/lib/date'
 import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
 import {
@@ -46,12 +45,12 @@ const fetchAnalyticsData = unstable_cache(
         .lte('invoice_month', toYM)
         .order('invoice_month'),
 
-      // 커미션: 지급월 = year_month + 1 → 범위 -1개월 shift
+      // 커미션: 발생 기준월(year_month) = 납품월 기준으로 직접 매칭
       supabase
         .from('commissions')
         .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
-        .gte('year_month', shiftMonths(fromYM, -1))
-        .lte('year_month', shiftMonths(toYM, -1)),
+        .gte('year_month', fromYM)
+        .lte('year_month', toYM),
     ])
 
     if (dRes.error) throw new Error(dRes.error.message)

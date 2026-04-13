@@ -16,7 +16,6 @@
  * invoice_month = delivery_date + contract.invoice_month_offset
  */
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
-import { shiftMonths } from '@/lib/date'
 
 // ── 타입 ──
 export type DeliveryForAnalytics = {
@@ -35,7 +34,7 @@ export type DeliveryForAnalytics = {
 
 /** commissions 테이블에서 가져오는 커미션 데이터 */
 export type CommissionEntry = {
-  year_month: string        // 발생 기준월; 지급월 = year_month + 1
+  year_month: string        // 발생 기준월 = 납품월 기준으로 커미션 매칭
   commission_amount: number
   company: string           // '동국제강' | '현대제철'
   quantity_kg: number       // 저장된 물량(kg) — 표시 시 /1000 하여 톤 변환
@@ -78,11 +77,6 @@ export type AllAnalytics = {
 export const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'FESI75', 'FESI60', 'AL30']
 
 // ── 내부 헬퍼 ──
-/** 커미션 지급월 = 발생 기준월 + 1 */
-function commissionPaymentMonth(ym: string): string {
-  return shiftMonths(ym, 1)
-}
-
 function zeroTotals(): MarginTotals {
   return { qtyTon: 0, sellKrw: 0, costKrw: 0, totalMargin: 0, a1: 0, gm: 0, rs: 0, geumhwaSellKrw: 0, commissionTotal: 0 }
 }
@@ -224,19 +218,18 @@ export function buildAllAnalytics(
   const commPriceSample: { dongkuk: number; hyundai: number } = { dongkuk: -1, hyundai: -1 }
 
   for (const c of commissions) {
-    const payMonth = commissionPaymentMonth(c.year_month)
-    if (payMonth < fromYM || payMonth > toYM) continue
+    if (c.year_month < fromYM || c.year_month > toYM) continue
 
     const sp = splitMargin(c.commission_amount)
     totals.commissionTotal += c.commission_amount
     totals.totalMargin     += c.commission_amount
     totals.a1 += sp.korea_a1; totals.gm += sp.geumhwa; totals.rs += sp.raseong
 
-    const ma = monthlyMap.get(payMonth) ?? zeroTotals()
+    const ma = monthlyMap.get(c.year_month) ?? zeroTotals()
     ma.totalMargin     += c.commission_amount
     ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
     ma.commissionTotal += c.commission_amount
-    monthlyMap.set(payMonth, ma)
+    monthlyMap.set(c.year_month, ma)
 
     const key = c.company === '동국제강' ? 'dongkuk' : 'hyundai'
     cp[key].total  += c.commission_amount
@@ -304,8 +297,7 @@ export function computeMargins(
     accDelivery(acc, m, gmSell, d.depreciation_amount ?? 0)
   }
   for (const c of commissions) {
-    const payMonth = commissionPaymentMonth(c.year_month)
-    if (fromYM && (payMonth < fromYM || payMonth > toYM!)) continue
+    if (fromYM && (c.year_month < fromYM || c.year_month > toYM!)) continue
     const sp = splitMargin(c.commission_amount)
     acc.commissionTotal += c.commission_amount
     acc.totalMargin     += c.commission_amount
@@ -380,14 +372,13 @@ export function buildMonthlyData(
   }
 
   for (const c of commissions) {
-    const payMonth = commissionPaymentMonth(c.year_month)
-    if (payMonth < fromYM || payMonth > toYM) continue
+    if (c.year_month < fromYM || c.year_month > toYM) continue
     const sp = splitMargin(c.commission_amount)
-    const ma = monthlyMap.get(payMonth) ?? zeroTotals()
+    const ma = monthlyMap.get(c.year_month) ?? zeroTotals()
     ma.totalMargin     += c.commission_amount
     ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
     ma.commissionTotal += c.commission_amount
-    monthlyMap.set(payMonth, ma)
+    monthlyMap.set(c.year_month, ma)
   }
 
   return buildMonthRange(fromYM, toYM).map(ym => ({ ym, ...(monthlyMap.get(ym) ?? zeroTotals()) }))
