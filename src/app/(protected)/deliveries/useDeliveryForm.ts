@@ -83,11 +83,20 @@ export function useDeliveryForm({
     const qty = parseFloat(form.quantity_kg)
     if (!qty || qty <= 0) return null
     try {
-      return calcMarginFromContract(contractForPreview, qty * 1000)
+      const m   = calcMarginFromContract(contractForPreview, qty * 1000)
+      const dep = isCoal && form.depreciation_amount ? parseFloat(form.depreciation_amount) : 0
+      if (!dep) return m
+      // 감가: 매출·매입 표시금액에서 차감 (마진은 양쪽 상쇄로 불변)
+      return {
+        ...m,
+        sell_price_krw_total: m.sell_price_krw * m.quantity_ton - dep,
+        cost_price_krw_total: m.cost_price_krw * m.quantity_ton - dep,
+        depreciation_amount: dep,
+      }
     } catch {
       return null
     }
-  }, [contractForPreview, form.quantity_kg])
+  }, [contractForPreview, form.quantity_kg, isCoal, form.depreciation_amount])
 
   async function handleSave() {
     if (!form.delivery_date) { setError('입고 날짜를 입력하세요.'); return }

@@ -92,31 +92,22 @@ function zeroSplit() {
 }
 
 /**
- * 감가 금액(소괴탄/분탄)을 마진 계산 결과에 차감.
- * 감가가 없으면 원본 그대로 반환.
- */
-function applyDepreciation<T extends {
-  total_margin: number; korea_a1: number; geumhwa: number; raseong: number
-}>(m: T, depAmount: number | null): T {
-  if (!depAmount) return m
-  const netMargin = m.total_margin - depAmount
-  const { korea_a1, geumhwa, raseong } = splitMargin(netMargin)
-  return { ...m, total_margin: netMargin, korea_a1, geumhwa, raseong }
-}
-
-/**
  * 납품 건 1개를 MarginTotals 누산기에 반영 (mutates acc)
  * buildAllAnalytics / computeMargins / buildProductRows / buildMonthlyData
- * 4개 함수의 동일 누산 패턴을 한 곳으로 통합
+ * 4개 함수의 동일 누산 패턴을 한 곳으로 통합.
+ *
+ * depAmount: 소괴탄/분탄 감가 금액(원). 매출·매입 합계에서 동일하게 차감.
+ * 마진(total_margin)은 불변 — 감가가 매출·매입 양쪽에서 상쇄되기 때문.
  */
 function accDelivery(
   acc: MarginTotals,
   m: { quantity_ton: number; sell_price_krw: number; cost_price_krw: number; total_margin: number; korea_a1: number; geumhwa: number; raseong: number },
   gmSell: number,
+  depAmount: number = 0,
 ): void {
   acc.qtyTon         += m.quantity_ton
-  acc.sellKrw        += m.sell_price_krw * m.quantity_ton
-  acc.costKrw        += m.cost_price_krw * m.quantity_ton
+  acc.sellKrw        += m.sell_price_krw * m.quantity_ton - depAmount
+  acc.costKrw        += m.cost_price_krw * m.quantity_ton - depAmount
   acc.totalMargin    += m.total_margin
   acc.a1             += m.korea_a1
   acc.gm             += m.geumhwa
@@ -183,12 +174,13 @@ export function buildAllAnalytics(
   for (const d of deliveries) {
     if (!d.contract) continue
 
-    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const dep    = d.depreciation_amount ?? 0
 
     // totals
-    accDelivery(totals, m, gmSell)
+    accDelivery(totals, m, gmSell, dep)
 
     // productRows
     if (d.product) {
@@ -201,7 +193,7 @@ export function buildAllAnalytics(
         // 단가 일관성 체크 — 동일 버킷 내 단가 불일치 시 null
         if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
         if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
-        accDelivery(ex, m, gmSell)
+        accDelivery(ex, m, gmSell, dep)
       } else {
         const row: ProductRow = {
           ...zeroTotals(),
@@ -211,14 +203,14 @@ export function buildAllAnalytics(
           sellPricePerTon: m.sell_price_krw,
           costPricePerTon: m.cost_price_krw,
         }
-        accDelivery(row, m, gmSell)
+        accDelivery(row, m, gmSell, dep)
         productMap.set(key, row)
       }
     }
 
     // monthlyMap (invoice_month 기준 버킷)
     const ma = monthlyMap.get(d.invoice_month) ?? zeroTotals()
-    accDelivery(ma, m, gmSell)
+    accDelivery(ma, m, gmSell, dep)
     monthlyMap.set(d.invoice_month, ma)
   }
 
@@ -299,10 +291,10 @@ export function computeMargins(
   for (const d of deliveries) {
     if (!d.contract) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
-    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
-    accDelivery(acc, m, gmSell)
+    accDelivery(acc, m, gmSell, d.depreciation_amount ?? 0)
   }
   for (const c of commissions) {
     const payMonth = commissionPaymentMonth(c.year_month)
@@ -325,16 +317,17 @@ export function buildProductRows(
     if (!d.contract || !d.product) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
 
-    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const dep    = d.depreciation_amount ?? 0
 
     const key = `${d.product_id}_${d.year_month}`
     const ex  = map.get(key)
     if (ex) {
       if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
       if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
-      accDelivery(ex, m, gmSell)
+      accDelivery(ex, m, gmSell, dep)
     } else {
       const row: ProductRow = {
         ...zeroTotals(),
@@ -344,7 +337,7 @@ export function buildProductRows(
         sellPricePerTon: m.sell_price_krw,
         costPricePerTon: m.cost_price_krw,
       }
-      accDelivery(row, m, gmSell)
+      accDelivery(row, m, gmSell, dep)
       map.set(key, row)
     }
   }
@@ -371,11 +364,11 @@ export function buildMonthlyData(
 
   for (const d of deliveries) {
     if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
-    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
+    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
     const ma     = monthlyMap.get(d.invoice_month) ?? zeroTotals()
-    accDelivery(ma, m, gmSell)
+    accDelivery(ma, m, gmSell, d.depreciation_amount ?? 0)
     monthlyMap.set(d.invoice_month, ma)
   }
 

@@ -10,6 +10,10 @@ type MarginData = {
   sell_price_krw: number
   cost_price_krw: number
   korea_a1?: number; geumhwa?: number; raseong?: number
+  /** 감가 적용 시 설정 — 미리보기 표시용 조정 합계 */
+  sell_price_krw_total?: number
+  cost_price_krw_total?: number
+  depreciation_amount?: number
 }
 
 export default function MarginPreview({
@@ -26,8 +30,9 @@ export default function MarginPreview({
   if (!mainMargin) return null
 
   const qty     = mainMargin.quantity_ton
-  const sellAmt = mainMargin.sell_price_krw * qty
-  const costAmt = mainMargin.cost_price_krw * qty
+  const dep     = mainMargin.depreciation_amount ?? 0
+  const sellAmt = mainMargin.sell_price_krw_total ?? mainMargin.sell_price_krw * qty
+  const costAmt = mainMargin.cost_price_krw_total ?? mainMargin.cost_price_krw * qty
 
   return (
     <div className="mb-5 space-y-3">
@@ -66,6 +71,12 @@ export default function MarginPreview({
             <span className="text-xs text-gray-500">원가금액</span>
             <span className="text-gray-600">{fmtKrw(costAmt)}</span>
           </div>
+          {dep > 0 && (
+            <div className="flex justify-between items-center text-orange-600">
+              <span className="text-xs">감가</span>
+              <span className="text-sm font-medium">-{fmtKrw(dep)}</span>
+            </div>
+          )}
           <div className="flex justify-between items-center border-t border-gray-200 pt-1.5 mt-1">
             <span className="text-xs font-semibold text-gray-600">총 마진</span>
             <span className="font-bold text-blue-700">{fmtKrw(mainMargin.total_margin)}</span>
