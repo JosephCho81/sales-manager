@@ -68,7 +68,8 @@ export default function DeliveryTable({
             {filtered.map(d => {
               if (!d.contract) return null
               const main = calcMarginFromContract(d.contract, d.quantity_kg)
-              const sellTotal = main.sell_price_krw * main.quantity_ton
+              const dep      = d.depreciation_amount ?? 0
+              const sellTotal = main.sell_price_krw * main.quantity_ton - dep
               const isUsd = d.contract.currency === 'USD'
 
               return (
@@ -93,7 +94,12 @@ export default function DeliveryTable({
                       : <>{fmtNum(d.contract.sell_price)}<span className="text-gray-400 text-xs">원</span></>
                     }
                   </td>
-                  <td className="table-td text-right font-semibold text-blue-700 whitespace-nowrap">{fmtKrw(sellTotal)}</td>
+                  <td className="table-td text-right font-semibold text-blue-700 whitespace-nowrap">
+                    {fmtKrw(sellTotal)}
+                    {dep > 0 && (
+                      <span className="block text-xs font-normal text-orange-500">감가 -{fmtKrw(dep)}</span>
+                    )}
+                  </td>
                   <td className="table-td text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
                   <td className="table-td whitespace-nowrap">
                     <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>
