@@ -38,7 +38,7 @@ const fetchAnalyticsData = unstable_cache(
         .from('deliveries')
         .select(`
           id, year_month, invoice_month, product_id,
-          quantity_kg,
+          quantity_kg, depreciation_amount,
           product:products(id, name, display_name, buyer),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)

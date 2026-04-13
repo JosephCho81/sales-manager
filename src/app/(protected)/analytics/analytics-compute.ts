@@ -25,6 +25,7 @@ export type DeliveryForAnalytics = {
   invoice_month: string     // 지급 스케줄 월 — 집계 기준
   product_id: string
   quantity_kg: number
+  depreciation_amount: number | null  // 소괴탄/분탄 감가 금액
   product: { id: string; name: string; display_name: string; buyer: string } | null
   contract: {
     sell_price: number; cost_price: number
@@ -88,6 +89,19 @@ function zeroTotals(): MarginTotals {
 
 function zeroSplit() {
   return { total: 0, a1: 0, gm: 0, rs: 0, qtyTon: 0, pricePerTon: null as number | null }
+}
+
+/**
+ * 감가 금액(소괴탄/분탄)을 마진 계산 결과에 차감.
+ * 감가가 없으면 원본 그대로 반환.
+ */
+function applyDepreciation<T extends {
+  total_margin: number; korea_a1: number; geumhwa: number; raseong: number
+}>(m: T, depAmount: number | null): T {
+  if (!depAmount) return m
+  const netMargin = m.total_margin - depAmount
+  const { korea_a1, geumhwa, raseong } = splitMargin(netMargin)
+  return { ...m, total_margin: netMargin, korea_a1, geumhwa, raseong }
 }
 
 /**
@@ -169,7 +183,7 @@ export function buildAllAnalytics(
   for (const d of deliveries) {
     if (!d.contract) continue
 
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
 
@@ -285,7 +299,7 @@ export function computeMargins(
   for (const d of deliveries) {
     if (!d.contract) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
     accDelivery(acc, m, gmSell)
@@ -311,7 +325,7 @@ export function buildProductRows(
     if (!d.contract || !d.product) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
 
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
 
@@ -357,7 +371,7 @@ export function buildMonthlyData(
 
   for (const d of deliveries) {
     if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const m      = applyDepreciation(calcMarginFromContract(d.contract, d.quantity_kg), d.depreciation_amount)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
     const ma     = monthlyMap.get(d.invoice_month) ?? zeroTotals()
