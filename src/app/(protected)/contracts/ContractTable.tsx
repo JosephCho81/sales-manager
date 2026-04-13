@@ -68,9 +68,9 @@ export default function ContractTable({
               <th className="table-th">품목</th>
               <th className="table-th">낙찰 기간</th>
               <th className="table-th text-right">판매단가</th>
-              <th className="table-th text-right">원가단가</th>
+              <th className="table-th text-right">매입단가</th>
               <th className="table-th text-right">참고 환율</th>
-              <th className="table-th text-right">마진 단가</th>
+              <th className="table-th text-right">마진</th>
               <th className="table-th text-center">상태</th>
               <th className="table-th">메모</th>
               <th className="table-th">관리</th>

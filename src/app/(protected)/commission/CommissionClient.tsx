@@ -162,7 +162,7 @@ function CommissionSection({
                   <th className="table-th text-right text-purple-700">금화</th>
                   <th className="table-th text-right text-orange-700">라성</th>
                   <th className="table-th">메모</th>
-                  <th className="table-th text-center w-14">관리</th>
+                  <th className="table-th text-center whitespace-nowrap">관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -178,7 +178,7 @@ function CommissionSection({
                       <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(sp.geumhwa)}</td>
                       <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(sp.raseong)}</td>
                       <td className="table-td text-xs text-gray-400 max-w-xs truncate">{row.memo ?? ''}</td>
-                      <td className="table-td text-center">
+                      <td className="table-td text-center whitespace-nowrap">
                         <button onClick={() => handleDelete(row.id)}
                           className="text-xs text-red-400 hover:text-red-600">삭제</button>
                       </td>
