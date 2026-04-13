@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { fmtKrw, fmtNum } from '@/lib/margin'
+import { fmtNum } from '@/lib/margin'
 import type { MarginTotals, ProductRow, CommissionsInPeriod } from './analytics-compute'
 
 export default function ProductTable({
@@ -30,6 +30,7 @@ export default function ProductTable({
 
   return (
     <div className="card overflow-hidden [&_.table-th]:py-3.5 [&_.table-th]:px-2 [&_.table-th]:text-xs [&_.table-th]:whitespace-nowrap [&_.table-th]:text-center [&_.table-td]:py-3.5 [&_.table-td]:px-2">
+      <div className="px-2 pt-3 pb-1 text-right text-xs text-gray-400">*부가세 별도 (원/톤, 원)</div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -38,8 +39,8 @@ export default function ProductTable({
               <th className="table-th">입고일</th>
               <th className="table-th">납품처</th>
               <th className="table-th">물량(톤)</th>
-              <th className="table-th">매출단가(원/톤)</th>
-              <th className="table-th">매입단가(원/톤)</th>
+              <th className="table-th">매출단가</th>
+              <th className="table-th">매입단가</th>
               <th className="table-th">매출</th>
               <th className="table-th">매입</th>
               <th className="table-th">총마진</th>
@@ -64,17 +65,17 @@ export default function ProductTable({
                     <td className="table-td text-gray-500">{row.buyer}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.qtyTon, 3)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap">
-                      {row.sellPricePerTon !== null ? fmtKrw(row.sellPricePerTon) : <span className="text-gray-300">—</span>}
+                      {row.sellPricePerTon !== null ? fmtNum(row.sellPricePerTon, 0) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">
-                      {row.costPricePerTon !== null ? fmtKrw(row.costPricePerTon) : <span className="text-gray-300">—</span>}
+                      {row.costPricePerTon !== null ? fmtNum(row.costPricePerTon, 0) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtKrw(row.sellKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(row.costKrw)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtKrw(row.totalMargin)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(row.a1)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(row.gm)}</td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(row.rs)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.sellKrw, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtNum(row.costKrw, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtNum(row.totalMargin, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(row.a1, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(row.gm, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(row.rs, 0)}</td>
                   </tr>
                   {/* AL35B 마지막 행 뒤 → 동국제강 커미션 */}
                   {isAL35 && isLastOfName && commissionsInPeriod.dongkuk.total > 0 && (
@@ -87,16 +88,16 @@ export default function ProductTable({
                       </td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
                         {commissionsInPeriod.dongkuk.pricePerTon !== null
-                          ? fmtKrw(commissionsInPeriod.dongkuk.pricePerTon)
+                          ? fmtNum(commissionsInPeriod.dongkuk.pricePerTon, 0)
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.dongkuk.total)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.dongkuk.a1)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.dongkuk.gm)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(commissionsInPeriod.dongkuk.total, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(commissionsInPeriod.dongkuk.a1, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(commissionsInPeriod.dongkuk.gm, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(commissionsInPeriod.dongkuk.rs, 0)}</td>
                     </tr>
                   )}
                   {/* AL30 마지막 행 뒤 → 현대제철 커미션 */}
@@ -110,16 +111,16 @@ export default function ProductTable({
                       </td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
                         {commissionsInPeriod.hyundai.pricePerTon !== null
-                          ? fmtKrw(commissionsInPeriod.hyundai.pricePerTon)
+                          ? fmtNum(commissionsInPeriod.hyundai.pricePerTon, 0)
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtKrw(commissionsInPeriod.hyundai.total)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtKrw(commissionsInPeriod.hyundai.a1)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtKrw(commissionsInPeriod.hyundai.gm)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtKrw(commissionsInPeriod.hyundai.rs)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(commissionsInPeriod.hyundai.total, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(commissionsInPeriod.hyundai.a1, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(commissionsInPeriod.hyundai.gm, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(commissionsInPeriod.hyundai.rs, 0)}</td>
                     </tr>
                   )}
                 </React.Fragment>
@@ -133,12 +134,12 @@ export default function ProductTable({
                 <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
                 <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
                 <td className="px-2 py-3.5 text-right text-sm text-gray-300">—</td>
-                <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtKrw(totals.sellKrw)}</td>
-                <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtKrw(totals.costKrw)}</td>
-                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtKrw(totals.totalMargin)}</td>
-                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-green-700">{fmtKrw(totals.a1)}</td>
-                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtKrw(totals.gm)}</td>
-                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtKrw(totals.rs)}</td>
+                <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap">{fmtNum(totals.sellKrw, 0)}</td>
+                <td className="px-2 py-3.5 text-right text-sm tabular-nums whitespace-nowrap text-gray-600">{fmtNum(totals.costKrw, 0)}</td>
+                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-blue-700">{fmtNum(totals.totalMargin, 0)}</td>
+                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-green-700">{fmtNum(totals.a1, 0)}</td>
+                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-purple-700">{fmtNum(totals.gm, 0)}</td>
+                <td className="px-2 py-3.5 text-right text-sm font-bold tabular-nums whitespace-nowrap text-orange-700">{fmtNum(totals.rs, 0)}</td>
               </tr>
             </tfoot>
           )}
