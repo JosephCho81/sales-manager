@@ -81,7 +81,11 @@ export default function ProductTable({
                   {isAL35 && isLastOfName && commissionsInPeriod.dongkuk.total > 0 && (
                     <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                      <td className="table-td text-gray-300">—</td>
+                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                        {commissionsInPeriod.dongkuk.yearMonth && commissionsInPeriod.dongkuk.yearMonth !== 'mixed'
+                          ? `${commissionsInPeriod.dongkuk.yearMonth.slice(5, 7).replace(/^0/, '')}월분`
+                          : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
                         {fmtNum(commissionsInPeriod.dongkuk.qtyTon, 3)}
@@ -104,7 +108,11 @@ export default function ProductTable({
                   {isAL30 && isLastOfName && commissionsInPeriod.hyundai.total > 0 && (
                     <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                      <td className="table-td text-gray-300">—</td>
+                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
+                        {commissionsInPeriod.hyundai.yearMonth && commissionsInPeriod.hyundai.yearMonth !== 'mixed'
+                          ? `${commissionsInPeriod.hyundai.yearMonth.slice(5, 7).replace(/^0/, '')}월분`
+                          : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
                         {fmtNum(commissionsInPeriod.hyundai.qtyTon, 3)}

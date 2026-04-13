@@ -61,8 +61,8 @@ export type ProductRow = MarginTotals & {
 export type MonthlyData = { ym: string } & MarginTotals
 
 export type CommissionsInPeriod = {
-  dongkuk: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null }
-  hyundai: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null }
+  dongkuk: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null; yearMonth: string | null }
+  hyundai: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null; yearMonth: string | null }
   all:     { total: number; a1: number; gm: number; rs: number }
 }
 
@@ -88,7 +88,7 @@ function zeroTotals(): MarginTotals {
 }
 
 function zeroSplit() {
-  return { total: 0, a1: 0, gm: 0, rs: 0, qtyTon: 0, pricePerTon: null as number | null }
+  return { total: 0, a1: 0, gm: 0, rs: 0, qtyTon: 0, pricePerTon: null as number | null, yearMonth: null as string | null }
 }
 
 /**
@@ -244,6 +244,13 @@ export function buildAllAnalytics(
     cp[key].a1     += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
     cp.all.total   += c.commission_amount
     cp.all.a1      += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+
+    // year_month(발생 기준월) 추적 — 복수 월이면 'mixed'로 마킹
+    if (cp[key].yearMonth === null) {
+      cp[key].yearMonth = c.year_month
+    } else if (cp[key].yearMonth !== c.year_month) {
+      cp[key].yearMonth = 'mixed'
+    }
 
     // 단가 일관성 체크
     const cur = commPriceSample[key]
