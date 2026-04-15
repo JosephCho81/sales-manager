@@ -169,6 +169,8 @@ export function buildAllAnalytics(
   const productsSeen = new Map<string, string>()   // name → display_name
 
   // ─── 1) deliveries 단일 패스 ───────────────────────────
+  const deliveryYearMonths = new Set<string>()   // 커미션 매칭용
+
   for (const d of deliveries) {
     if (!d.contract) continue
 
@@ -176,6 +178,8 @@ export function buildAllAnalytics(
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
     const dep    = d.depreciation_amount ?? 0
+
+    deliveryYearMonths.add(d.year_month)
 
     // totals
     accDelivery(totals, m, gmSell, dep)
@@ -225,7 +229,8 @@ export function buildAllAnalytics(
   const byMonthPriceSample: Record<string, number> = {}
 
   for (const c of commissions) {
-    if (c.year_month < fromYM || c.year_month > toYM) continue
+    // invoice_month ≠ year_month이므로 날짜 범위 대신 실제 납품 year_month 집합으로 매칭
+    if (!deliveryYearMonths.has(c.year_month)) continue
 
     const sp = splitMargin(c.commission_amount)
     totals.commissionTotal += c.commission_amount

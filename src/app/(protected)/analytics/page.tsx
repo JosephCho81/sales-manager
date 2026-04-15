@@ -32,32 +32,39 @@ function currentYM() {
 const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
     const supabase = createAdminClient()
-    const [dRes, cRes] = await Promise.all([
-      supabase
-        .from('deliveries')
-        .select(`
-          id, year_month, invoice_month, product_id,
-          quantity_kg, depreciation_amount,
-          product:products(id, name, display_name, buyer),
-          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-        `)
-        .gte('invoice_month', fromYM)
-        .lte('invoice_month', toYM)
-        .order('invoice_month'),
 
-      // 커미션: 발생 기준월(year_month) = 납품월 기준으로 직접 매칭
-      supabase
-        .from('commissions')
-        .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
-        .gte('year_month', fromYM)
-        .lte('year_month', toYM),
-    ])
+    // 1) 납품 먼저 조회 (invoice_month 기준)
+    const dRes = await supabase
+      .from('deliveries')
+      .select(`
+        id, year_month, invoice_month, product_id,
+        quantity_kg, depreciation_amount,
+        product:products(id, name, display_name, buyer),
+        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+      `)
+      .gte('invoice_month', fromYM)
+      .lte('invoice_month', toYM)
+      .order('invoice_month')
 
     if (dRes.error) throw new Error(dRes.error.message)
+    const deliveries = (dRes.data ?? []) as unknown as DeliveryForAnalytics[]
+
+    // 2) 커미션은 납품의 실제 year_month(납품월) 범위로 조회
+    //    invoice_month ≠ year_month이므로 별도 범위 계산 필요
+    const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
+    const commFromYM = yms.length ? yms[0]           : fromYM
+    const commToYM   = yms.length ? yms[yms.length - 1] : toYM
+
+    const cRes = await supabase
+      .from('commissions')
+      .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
+      .gte('year_month', commFromYM)
+      .lte('year_month', commToYM)
+
     if (cRes.error) throw new Error(cRes.error.message)
 
     return {
-      deliveries:  (dRes.data ?? []) as unknown as DeliveryForAnalytics[],
+      deliveries,
       commissions: (cRes.data ?? []) as CommissionEntry[],
     }
   },
