@@ -34,6 +34,18 @@ export default function SummaryCards({
                 <span className="text-sm tabular-nums text-gray-400 whitespace-nowrap">{fmtNum(totals.totalMargin / totals.sellKrw * 100, 1)}%</span>
               </div>
             )}
+            {commissionsInPeriod.dongkuk.a1 > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-amber-600">동국 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.dongkuk.a1)}</span>
+              </div>
+            )}
+            {commissionsInPeriod.hyundai.a1 > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-amber-600">현대 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.hyundai.a1)}</span>
+              </div>
+            )}
           </div>
           <div className="border-t border-gray-100 mt-2 pt-2 flex justify-between items-center">
             <span className="text-sm text-gray-500">한국에이원 마진</span>
@@ -55,10 +67,16 @@ export default function SummaryCards({
               <span className="text-sm text-gray-500">납품 마진</span>
               <span className="text-sm tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.gm - commissionsInPeriod.all.gm)}</span>
             </div>
-            {commissionsInPeriod.all.gm > 0 && (
+            {commissionsInPeriod.dongkuk.gm > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-amber-600">커미션</span>
-                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.all.gm)}</span>
+                <span className="text-sm text-amber-600">동국 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.dongkuk.gm)}</span>
+              </div>
+            )}
+            {commissionsInPeriod.hyundai.gm > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-amber-600">현대 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.hyundai.gm)}</span>
               </div>
             )}
           </div>
@@ -76,10 +94,16 @@ export default function SummaryCards({
               <span className="text-sm text-gray-500">납품 마진</span>
               <span className="text-sm tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.rs - commissionsInPeriod.all.rs)}</span>
             </div>
-            {commissionsInPeriod.all.rs > 0 && (
+            {commissionsInPeriod.dongkuk.rs > 0 && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-amber-600">커미션</span>
-                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.all.rs)}</span>
+                <span className="text-sm text-amber-600">동국 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.dongkuk.rs)}</span>
+              </div>
+            )}
+            {commissionsInPeriod.hyundai.rs > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-amber-600">현대 커미션</span>
+                <span className="text-sm tabular-nums font-medium text-amber-700 whitespace-nowrap">{fmtKrw(commissionsInPeriod.hyundai.rs)}</span>
               </div>
             )}
           </div>

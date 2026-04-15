@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 import { fmtNum } from '@/lib/margin'
 import type { MarginTotals, ProductRow, CommissionsInPeriod } from './analytics-compute'
 
@@ -13,13 +13,6 @@ export default function ProductTable({
   commissionsInPeriod: CommissionsInPeriod
   periodLabel: string
 }) {
-  // O(1) 조회: 이름별 마지막 행 사전 계산
-  const lastRowOfName = useMemo(() => {
-    const m = new Map<string, ProductRow>()
-    for (const row of productRows) m.set(row.name, row)
-    return m
-  }, [productRows])
-
   if (productRows.length === 0) {
     return (
       <div className="card px-4 py-8 text-center text-sm text-gray-400">
@@ -51,9 +44,12 @@ export default function ProductTable({
           </thead>
           <tbody>
             {productRows.map(row => {
-              const isAL35       = row.name.toUpperCase() === 'AL35B'
-              const isAL30       = row.name.toUpperCase() === 'AL30'
-              const isLastOfName = lastRowOfName.get(row.name) === row
+              const isAL35 = row.name.toUpperCase() === 'AL35B'
+              const isAL30 = row.name.toUpperCase() === 'AL30'
+              const bm     = commissionsInPeriod.byMonth[row.deliveryYearMonth]
+              const dongkukComm = isAL35 ? (bm?.dongkuk ?? null) : null
+              const hyundaiComm = isAL30 ? (bm?.hyundai ?? null) : null
+              const monthLabel  = row.deliveryYearMonth.slice(5, 7).replace(/^0/, '') + '월분'
 
               return (
                 <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>
@@ -77,58 +73,46 @@ export default function ProductTable({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(row.gm, 0)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(row.rs, 0)}</td>
                   </tr>
-                  {/* AL35B 마지막 행 뒤 → 동국제강 커미션 */}
-                  {isAL35 && isLastOfName && commissionsInPeriod.dongkuk.total > 0 && (
+                  {/* AL35B 행 바로 아래 → 해당 납품월 동국제강 커미션 */}
+                  {dongkukComm && (
                     <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                        {commissionsInPeriod.dongkuk.yearMonth && commissionsInPeriod.dongkuk.yearMonth !== 'mixed'
-                          ? `${commissionsInPeriod.dongkuk.yearMonth.slice(5, 7).replace(/^0/, '')}월분`
-                          : <span className="text-gray-300">—</span>}
-                      </td>
+                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">{monthLabel}</td>
                       <td className="table-td text-amber-600 whitespace-nowrap">동국제강</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(dongkukComm.qtyTon, 3)}</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
-                        {fmtNum(commissionsInPeriod.dongkuk.qtyTon, 3)}
-                      </td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap">
-                        {commissionsInPeriod.dongkuk.pricePerTon !== null
-                          ? fmtNum(commissionsInPeriod.dongkuk.pricePerTon, 0)
+                        {dongkukComm.pricePerTon !== null
+                          ? fmtNum(dongkukComm.pricePerTon, 0)
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(commissionsInPeriod.dongkuk.total, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(commissionsInPeriod.dongkuk.a1, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(commissionsInPeriod.dongkuk.gm, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(commissionsInPeriod.dongkuk.rs, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(dongkukComm.total, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(dongkukComm.a1, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(dongkukComm.gm, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(dongkukComm.rs, 0)}</td>
                     </tr>
                   )}
-                  {/* AL30 마지막 행 뒤 → 현대제철 커미션 */}
-                  {isAL30 && isLastOfName && commissionsInPeriod.hyundai.total > 0 && (
+                  {/* AL30 행 바로 아래 → 해당 납품월 현대제철 커미션 */}
+                  {hyundaiComm && (
                     <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">
-                        {commissionsInPeriod.hyundai.yearMonth && commissionsInPeriod.hyundai.yearMonth !== 'mixed'
-                          ? `${commissionsInPeriod.hyundai.yearMonth.slice(5, 7).replace(/^0/, '')}월분`
-                          : <span className="text-gray-300">—</span>}
-                      </td>
+                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">{monthLabel}</td>
                       <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(hyundaiComm.qtyTon, 3)}</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
-                        {fmtNum(commissionsInPeriod.hyundai.qtyTon, 3)}
-                      </td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap">
-                        {commissionsInPeriod.hyundai.pricePerTon !== null
-                          ? fmtNum(commissionsInPeriod.hyundai.pricePerTon, 0)
+                        {hyundaiComm.pricePerTon !== null
+                          ? fmtNum(hyundaiComm.pricePerTon, 0)
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
                       <td className="table-td text-right text-gray-300">—</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(commissionsInPeriod.hyundai.total, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(commissionsInPeriod.hyundai.a1, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(commissionsInPeriod.hyundai.gm, 0)}</td>
-                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(commissionsInPeriod.hyundai.rs, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-amber-700">{fmtNum(hyundaiComm.total, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(hyundaiComm.a1, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(hyundaiComm.gm, 0)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap text-orange-600">{fmtNum(hyundaiComm.rs, 0)}</td>
                     </tr>
                   )}
                 </React.Fragment>

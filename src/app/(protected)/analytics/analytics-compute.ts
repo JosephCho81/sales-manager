@@ -59,10 +59,14 @@ export type ProductRow = MarginTotals & {
 
 export type MonthlyData = { ym: string } & MarginTotals
 
+export type CommissionMonthSlice = { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null }
+
 export type CommissionsInPeriod = {
-  dongkuk: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null; yearMonth: string | null }
-  hyundai: { total: number; a1: number; gm: number; rs: number; qtyTon: number; pricePerTon: number | null; yearMonth: string | null }
+  dongkuk: CommissionMonthSlice & { yearMonth: string | null }
+  hyundai: CommissionMonthSlice & { yearMonth: string | null }
   all:     { total: number; a1: number; gm: number; rs: number }
+  /** 납품월(year_month) 기준 — ProductTable에서 각 행 바로 아래에 표시용 */
+  byMonth: Record<string, { dongkuk: CommissionMonthSlice | null; hyundai: CommissionMonthSlice | null }>
 }
 
 export type AllAnalytics = {
@@ -213,9 +217,12 @@ export function buildAllAnalytics(
     dongkuk: zeroSplit(),
     hyundai: zeroSplit(),
     all:     zeroSplit(),
+    byMonth: {},
   }
   // 커미션 단가 일관성 추적 (-1 = 아직 항목 없음)
   const commPriceSample: { dongkuk: number; hyundai: number } = { dongkuk: -1, hyundai: -1 }
+  // byMonth 단가 일관성 추적: Record<`${year_month}_${key}`, number>
+  const byMonthPriceSample: Record<string, number> = {}
 
   for (const c of commissions) {
     if (c.year_month < fromYM || c.year_month > toYM) continue
@@ -245,12 +252,31 @@ export function buildAllAnalytics(
       cp[key].yearMonth = 'mixed'
     }
 
-    // 단가 일관성 체크
+    // 기간 전체 단가 일관성 체크
     const cur = commPriceSample[key]
     if (cur === -1) {
       commPriceSample[key] = c.price_per_ton
     } else if (cur !== c.price_per_ton) {
       commPriceSample[key] = -2  // 불일치 마킹
+    }
+
+    // byMonth 집계 — 납품월별 커미션 (ProductTable 행별 표시용)
+    if (!cp.byMonth[c.year_month]) {
+      cp.byMonth[c.year_month] = { dongkuk: null, hyundai: null }
+    }
+    const bm = cp.byMonth[c.year_month]
+    if (!bm[key]) {
+      bm[key] = { total: 0, a1: 0, gm: 0, rs: 0, qtyTon: 0, pricePerTon: c.price_per_ton }
+    }
+    bm[key]!.total  += c.commission_amount
+    bm[key]!.qtyTon += c.quantity_kg / 1000
+    bm[key]!.a1     += sp.korea_a1; bm[key]!.gm += sp.geumhwa; bm[key]!.rs += sp.raseong
+    // 단가 불일치 시 null 처리
+    const bmPriceKey = `${c.year_month}_${key}`
+    if (byMonthPriceSample[bmPriceKey] === undefined) {
+      byMonthPriceSample[bmPriceKey] = c.price_per_ton
+    } else if (byMonthPriceSample[bmPriceKey] !== c.price_per_ton) {
+      bm[key]!.pricePerTon = null
     }
   }
 
