@@ -1,5 +1,6 @@
 import React from 'react'
 import { fmtNum } from '@/lib/margin'
+import { shiftMonths } from '@/lib/date'
 import type { MarginTotals, ProductRow, CommissionsInPeriod } from './analytics-compute'
 
 export default function ProductTable({
@@ -47,8 +48,10 @@ export default function ProductTable({
               const isAL35 = row.name.toUpperCase() === 'AL35B'
               const isAL30 = row.name.toUpperCase() === 'AL30'
               const bm     = commissionsInPeriod.byMonth[row.deliveryYearMonth]
+              // 현대제철 AL30 커미션 year_month = 납품월 M-1
+              const bmPrev = commissionsInPeriod.byMonth[shiftMonths(row.deliveryYearMonth, -1)]
               const dongkukComm = isAL35 ? (bm?.dongkuk ?? null) : null
-              const hyundaiComm = isAL30 ? (bm?.hyundai ?? null) : null
+              const hyundaiComm = isAL30 ? (bmPrev?.hyundai ?? null) : null
               const monthLabel  = row.deliveryYearMonth.slice(5, 7).replace(/^0/, '') + '월분'
 
               return (

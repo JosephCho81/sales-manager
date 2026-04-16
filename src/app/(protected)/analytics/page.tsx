@@ -2,6 +2,7 @@
 // 실제로는 프로덕션에서 안정적으로 사용 가능하다.
 import { unstable_cache } from 'next/cache'
 import { toMessage } from '@/lib/error'
+import { shiftMonths } from '@/lib/date'
 import { createAdminClient } from '@/lib/supabase/server'
 import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
@@ -51,8 +52,9 @@ const fetchAnalyticsData = unstable_cache(
 
     // 2) 커미션은 납품의 실제 year_month(납품월) 범위로 조회
     //    invoice_month ≠ year_month이므로 별도 범위 계산 필요
+    //    현대제철 AL30 커미션은 납품월 M-1 기준이므로 1개월 더 앞으로 확장
     const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
-    const commFromYM = yms.length ? yms[0]           : fromYM
+    const commFromYM = shiftMonths(yms.length ? yms[0] : fromYM, -1)
     const commToYM   = yms.length ? yms[yms.length - 1] : toYM
 
     const cRes = await supabase
