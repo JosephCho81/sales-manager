@@ -168,12 +168,14 @@ export function buildAllAnalytics(
   const productMap   = new Map<string, ProductRow>()
   const monthlyMap   = new Map<string, MarginTotals>()
   const productsSeen = new Map<string, string>()   // name → display_name
-  const deliveryYMSet = new Set<string>()           // 실제 납품월 집합 — 커미션 필터용
+  const dongkukDeliveryYMSet = new Set<string>()   // AL35B 납품월 집합 — 동국 커미션 필터용
+  const hyundaiDeliveryYMSet = new Set<string>()   // AL30 납품월 집합 — 현대 커미션 필터용
 
   // ─── 1) deliveries 단일 패스 ───────────────────────────
   for (const d of deliveries) {
     if (!d.contract) continue
-    deliveryYMSet.add(d.year_month)
+    if (d.product?.name.toUpperCase() === 'AL35B') dongkukDeliveryYMSet.add(d.year_month)
+    if (d.product?.name.toUpperCase() === 'AL30')  hyundaiDeliveryYMSet.add(d.year_month)
 
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
@@ -232,11 +234,11 @@ export function buildAllAnalytics(
     const sp  = splitMargin(c.commission_amount)
 
     // 납품 기간에 속하는 커미션만 totals/cp에 합산
-    // 동국: c.year_month ∈ deliveryYMSet
-    // 현대: shiftMonths(c.year_month, -1) ∈ deliveryYMSet (AL30 커미션은 납품월+1이 year_month)
+    // 동국: c.year_month ∈ dongkukDeliveryYMSet (AL35B 납품월)
+    // 현대: shiftMonths(c.year_month, -1) ∈ hyundaiDeliveryYMSet (AL30 납품월+1이 year_month)
     const isRelevant = key === 'dongkuk'
-      ? deliveryYMSet.has(c.year_month)
-      : deliveryYMSet.has(shiftMonths(c.year_month, -1))
+      ? dongkukDeliveryYMSet.has(c.year_month)
+      : hyundaiDeliveryYMSet.has(shiftMonths(c.year_month, -1))
 
     if (isRelevant) {
       totals.commissionTotal += c.commission_amount
