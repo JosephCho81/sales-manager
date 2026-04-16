@@ -1,4 +1,4 @@
-import { fmtKrw, fmtNum } from '@/lib/margin'
+import { fmtKrw } from '@/lib/margin'
 import type { MarginTotals, CommissionsInPeriod } from './analytics-compute'
 
 export default function SummaryCards({
@@ -25,15 +25,9 @@ export default function SummaryCards({
               <span className="text-sm tabular-nums text-gray-600 whitespace-nowrap">{fmtKrw(totals.costKrw)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">총 마진</span>
-              <span className="text-sm tabular-nums font-semibold text-blue-600 whitespace-nowrap">{fmtKrw(totals.totalMargin)}</span>
+              <span className="text-sm text-gray-500">납품 마진</span>
+              <span className="text-sm tabular-nums font-medium text-gray-800 whitespace-nowrap">{fmtKrw(totals.a1 - commissionsInPeriod.all.a1)}</span>
             </div>
-            {totals.totalMargin > 0 && totals.sellKrw > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-400">마진율</span>
-                <span className="text-sm tabular-nums text-gray-400 whitespace-nowrap">{fmtNum(totals.totalMargin / totals.sellKrw * 100, 1)}%</span>
-              </div>
-            )}
             {commissionsInPeriod.dongkuk.a1 > 0 && (
               <div className="flex justify-between items-center">
                 <span className="text-sm text-amber-600">동국 커미션</span>
