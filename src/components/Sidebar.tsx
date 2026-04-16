@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { usePathname } from 'next/navigation'
+// [로그인 비활성화] 추후 활성화 시 복원
+// import { useRouter } from 'next/navigation'
+// import { createClient } from '@/lib/supabase/client'
 
 const navItems = [
   { href: '/analytics',   label: '매출·마진 현황',    icon: '📈' },
@@ -13,16 +15,18 @@ const navItems = [
   { href: '/products',    label: '품목 설정',         icon: '⚙️' },
 ]
 
-export default function Sidebar({ userEmail }: { userEmail: string }) {
+// [로그인 비활성화] 추후 활성화 시 { userEmail }: { userEmail: string } 복원
+export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
 
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+  // [로그인 비활성화] 추후 활성화 시 복원
+  // const router = useRouter()
+  // async function handleLogout() {
+  //   const supabase = createClient()
+  //   await supabase.auth.signOut()
+  //   router.push('/login')
+  //   router.refresh()
+  // }
 
   return (
     <aside className="w-56 flex-shrink-0 bg-gray-900 text-white flex flex-col">
@@ -53,7 +57,7 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
         })}
       </nav>
 
-      {/* 사용자 / 로그아웃 */}
+      {/* [로그인 비활성화] 추후 활성화 시 아래 블록 복원
       <div className="px-4 py-4 border-t border-gray-700">
         <p className="text-xs text-gray-400 truncate mb-2">{userEmail}</p>
         <button
@@ -63,6 +67,7 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
           로그아웃
         </button>
       </div>
+      */}
     </aside>
   )
 }
