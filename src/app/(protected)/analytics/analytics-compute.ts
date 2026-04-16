@@ -16,6 +16,7 @@
  * invoice_month = delivery_date + contract.invoice_month_offset
  */
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
+import { shiftMonths } from '@/lib/date'
 
 // ── 타입 ──
 export type DeliveryForAnalytics = {
@@ -167,10 +168,12 @@ export function buildAllAnalytics(
   const productMap   = new Map<string, ProductRow>()
   const monthlyMap   = new Map<string, MarginTotals>()
   const productsSeen = new Map<string, string>()   // name → display_name
+  const deliveryYMSet = new Set<string>()           // 실제 납품월 집합 — 커미션 필터용
 
   // ─── 1) deliveries 단일 패스 ───────────────────────────
   for (const d of deliveries) {
     if (!d.contract) continue
+    deliveryYMSet.add(d.year_month)
 
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
@@ -225,38 +228,47 @@ export function buildAllAnalytics(
   const byMonthPriceSample: Record<string, number> = {}
 
   for (const c of commissions) {
-
-    const sp = splitMargin(c.commission_amount)
-    totals.commissionTotal += c.commission_amount
-    totals.totalMargin     += c.commission_amount
-    totals.a1 += sp.korea_a1; totals.gm += sp.geumhwa; totals.rs += sp.raseong
-
-    const ma = monthlyMap.get(c.year_month) ?? zeroTotals()
-    ma.totalMargin     += c.commission_amount
-    ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
-    ma.commissionTotal += c.commission_amount
-    monthlyMap.set(c.year_month, ma)
-
     const key = c.company === '동국제강' ? 'dongkuk' : 'hyundai'
-    cp[key].total  += c.commission_amount
-    cp[key].qtyTon += c.quantity_kg / 1000
-    cp[key].a1     += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
-    cp.all.total   += c.commission_amount
-    cp.all.a1      += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+    const sp  = splitMargin(c.commission_amount)
 
-    // year_month(발생 기준월) 추적 — 복수 월이면 'mixed'로 마킹
-    if (cp[key].yearMonth === null) {
-      cp[key].yearMonth = c.year_month
-    } else if (cp[key].yearMonth !== c.year_month) {
-      cp[key].yearMonth = 'mixed'
-    }
+    // 납품 기간에 속하는 커미션만 totals/cp에 합산
+    // 동국: c.year_month ∈ deliveryYMSet
+    // 현대: shiftMonths(c.year_month, -1) ∈ deliveryYMSet (AL30 커미션은 납품월+1이 year_month)
+    const isRelevant = key === 'dongkuk'
+      ? deliveryYMSet.has(c.year_month)
+      : deliveryYMSet.has(shiftMonths(c.year_month, -1))
 
-    // 기간 전체 단가 일관성 체크
-    const cur = commPriceSample[key]
-    if (cur === -1) {
-      commPriceSample[key] = c.price_per_ton
-    } else if (cur !== c.price_per_ton) {
-      commPriceSample[key] = -2  // 불일치 마킹
+    if (isRelevant) {
+      totals.commissionTotal += c.commission_amount
+      totals.totalMargin     += c.commission_amount
+      totals.a1 += sp.korea_a1; totals.gm += sp.geumhwa; totals.rs += sp.raseong
+
+      const ma = monthlyMap.get(c.year_month) ?? zeroTotals()
+      ma.totalMargin     += c.commission_amount
+      ma.a1 += sp.korea_a1; ma.gm += sp.geumhwa; ma.rs += sp.raseong
+      ma.commissionTotal += c.commission_amount
+      monthlyMap.set(c.year_month, ma)
+
+      cp[key].total  += c.commission_amount
+      cp[key].qtyTon += c.quantity_kg / 1000
+      cp[key].a1     += sp.korea_a1; cp[key].gm += sp.geumhwa; cp[key].rs += sp.raseong
+      cp.all.total   += c.commission_amount
+      cp.all.a1      += sp.korea_a1; cp.all.gm  += sp.geumhwa; cp.all.rs  += sp.raseong
+
+      // year_month(발생 기준월) 추적 — 복수 월이면 'mixed'로 마킹
+      if (cp[key].yearMonth === null) {
+        cp[key].yearMonth = c.year_month
+      } else if (cp[key].yearMonth !== c.year_month) {
+        cp[key].yearMonth = 'mixed'
+      }
+
+      // 기간 전체 단가 일관성 체크
+      const cur = commPriceSample[key]
+      if (cur === -1) {
+        commPriceSample[key] = c.price_per_ton
+      } else if (cur !== c.price_per_ton) {
+        commPriceSample[key] = -2  // 불일치 마킹
+      }
     }
 
     // byMonth 집계 — 납품월별 커미션 (ProductTable 행별 표시용)
