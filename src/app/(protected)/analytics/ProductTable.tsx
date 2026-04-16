@@ -52,7 +52,8 @@ export default function ProductTable({
               const bmNext = commissionsInPeriod.byMonth[shiftMonths(row.deliveryYearMonth, +1)]
               const dongkukComm = isAL35 ? (bm?.dongkuk ?? null) : null
               const hyundaiComm = isAL30 ? (bmNext?.hyundai ?? null) : null
-              const monthLabel  = row.deliveryYearMonth.slice(5, 7).replace(/^0/, '') + '월분'
+              const monthLabel      = row.deliveryYearMonth.slice(5, 7).replace(/^0/, '') + '월분'
+              const hyundaiCommLabel = shiftMonths(row.deliveryYearMonth, +1).slice(5, 7).replace(/^0/, '') + '월분'
 
               return (
                 <React.Fragment key={`${row.productId}_${row.deliveryYearMonth}`}>
@@ -101,7 +102,7 @@ export default function ProductTable({
                   {hyundaiComm && (
                     <tr className="border-t border-amber-200 bg-amber-50 hover:bg-amber-100">
                       <td className="table-td font-medium text-amber-800 whitespace-nowrap">└ 커미션</td>
-                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">{monthLabel}</td>
+                      <td className="table-td text-blue-600 tabular-nums whitespace-nowrap">{hyundaiCommLabel}</td>
                       <td className="table-td text-amber-600 whitespace-nowrap">현대제철</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(hyundaiComm.qtyTon, 3)}</td>
                       <td className="table-td text-right tabular-nums whitespace-nowrap">
