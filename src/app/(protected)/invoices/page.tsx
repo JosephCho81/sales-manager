@@ -61,12 +61,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     // - AL40/AL30 (현대제철): 커미션 year_month = 납품 year_month + 1
     // invoice_month_offset이 0인 경우 납품 year_month ≠ yearMonth가 되므로
     // 단순 eq(yearMonth)로는 현대제철 커미션을 놓칠 수 있어 별도 계산
-    const commMonths = new Set<string>([yearMonth])
+    const commMonths = new Set<string>([yearMonth, shiftMonths(yearMonth, -1)])
     for (const d of (dRes.data ?? []) as unknown as DeliveryRawForInvoice[]) {
       const name = d.product?.name?.toUpperCase() ?? ''
       if (name === 'AL35B') {
         commMonths.add(d.year_month)
-      } else if (name === 'AL40' || name === 'AL30') {
+      } else if (name.startsWith('AL40') || name === 'AL30') {
         commMonths.add(shiftMonths(d.year_month, 1))
       }
     }
@@ -109,7 +109,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       extraDeliveries = ((edRes.data ?? []) as unknown as DeliveryRawForInvoice[])
         .filter(d => {
           const n = d.product?.name?.toUpperCase()
-          return n === 'AL40' || n === 'AL30'
+          return (n?.startsWith('AL40') ?? false) || n === 'AL30'
         })
     }
 

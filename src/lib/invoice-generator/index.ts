@@ -21,7 +21,8 @@ export type { CommissionForInvoice } from './commission'
 export { generateCommissionInvoices } from './commission'
 
 // 지급일정 표시 순서: AL35B → 소괴탄 → 분탄 → AL40 → AL30 → FeSi
-const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'AL40', 'AL30', 'FESI75', 'FESI60']
+// AL40 제품명은 DB에서 'AL40고품위알믹스'로 저장됨 — startsWith('AL40')로 비교
+const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'AL40고품위알믹스', 'AL30', 'FESI75', 'FESI60']
 
 export { PRODUCT_ORDER }
 
@@ -52,7 +53,7 @@ export function generateInvoices(
       result.push(...genSoggae(group, yearMonth))
     } else if (name === 'BUNTAN') {
       result.push(...genBuntan(group, yearMonth))
-    } else if (name === 'AL40' || name === 'AL30') {
+    } else if (name.startsWith('AL40') || name === 'AL30') {
       result.push(...genAL30(group, yearMonth))
     } else if (name === 'FESI75' || name === 'FESI60') {
       for (const d of group) result.push(...genFeSi(d, yearMonth))
