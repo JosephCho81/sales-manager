@@ -33,10 +33,16 @@ export function generateCommissionInvoices(
     const basis = monthEnd(c.year_month)
     const due   = nthDay(nextM, 15)
 
+    // 현대제철: 커미션 year_month = 납품월+1 이므로 실제 납품월은 -1
+    // 동국제강: 커미션 year_month = 납품월 (동일)
+    const deliveryYM = c.company === '현대제철'
+      ? shiftMonths(c.year_month, -1)
+      : c.year_month
+
     // 1. 수취: company → 한국에이원
     result.push({
       year_month:          yearMonth,
-      delivery_year_month: c.year_month,
+      delivery_year_month: deliveryYM,
       product_id:          null,
       delivery_ids:        [c.id],
       from_company:        c.company,
@@ -56,7 +62,7 @@ export function generateCommissionInvoices(
     if (geumhwa > 0) {
       result.push({
         year_month:          yearMonth,
-        delivery_year_month: c.year_month,
+        delivery_year_month: deliveryYM,
         product_id:          null,
         delivery_ids:        [c.id],
         from_company:        '한국에이원',
@@ -77,7 +83,7 @@ export function generateCommissionInvoices(
     if (raseong > 0) {
       result.push({
         year_month:          yearMonth,
-        delivery_year_month: c.year_month,
+        delivery_year_month: deliveryYM,
         product_id:          null,
         delivery_ids:        [c.id],
         from_company:        '한국에이원',
