@@ -29,7 +29,8 @@ export function generateCommissionInvoices(
   for (const c of commissions) {
     const { geumhwa, raseong } = splitMargin(c.commission_amount)
     const nextM = shiftMonths(c.year_month, 1)
-    const label = c.memo ?? `${c.year_month.replace('-', '년 ')}월 ${c.company} 커미션`
+    // 회사명을 항상 포함 — commGroupLabel이 memo에서 회사명을 감지하므로
+    const label = `${c.year_month.replace('-', '년 ')}월 ${c.company} 커미션${c.memo ? ' — ' + c.memo : ''}`
     const basis = monthEnd(c.year_month)
     const due   = nthDay(nextM, 15)
 
