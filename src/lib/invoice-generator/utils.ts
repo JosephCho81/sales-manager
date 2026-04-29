@@ -10,7 +10,7 @@ import type { DeliveryForInvoice, InvoiceToCreate, InvoiceType } from './types'
 export function makeInvoice(p: {
   yearMonth: string
   deliveryYearMonth: string
-  productId: string
+  productId: string | null
   deliveryIds: string[]
   from: string
   to: string

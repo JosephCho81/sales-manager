@@ -2,7 +2,7 @@ import { toMessage } from '@/lib/error'
 import { createAdminClient } from '@/lib/supabase/server'
 import FetchErrorView from '@/components/FetchErrorView'
 import InvoicesClient from './InvoicesClient'
-import { type DeliveryRawForInvoice, type FxRateRaw, type InvoiceRow } from '@/lib/invoice-generator'
+import { type DeliveryRawForInvoice, type FxRateRaw, type InvoiceRow, type CommissionForInvoice } from '@/lib/invoice-generator'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
   try {
     const supabase = createAdminClient()
 
-    const [dRes, iRes, fxRes] = await Promise.all([
+    const [dRes, iRes, fxRes, cRes] = await Promise.all([
       supabase
         .from('deliveries')
         .select(`
@@ -44,6 +44,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .select('id, bl_date, product_id, rate_krw_per_usd')
         .gte('bl_date', `${yearMonth}-01`)
         .lte('bl_date', `${yearMonth}-31`),
+
+      // 동국제강 / 현대제철 커미션 (해당 월 발생분)
+      supabase
+        .from('commissions')
+        .select('id, year_month, company, commission_amount, memo')
+        .eq('year_month', yearMonth)
+        .order('created_at', { ascending: true }),
     ])
 
     if (dRes.error) throw new Error(`입고 조회 실패: ${dRes.error.message}`)
@@ -56,6 +63,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         initialDeliveries={(dRes.data ?? []) as unknown as DeliveryRawForInvoice[]}
         initialInvoices={(iRes.data ?? []) as unknown as InvoiceRow[]}
         fxRates={(fxRes.data ?? []) as unknown as FxRateRaw[]}
+        initialCommissions={(cRes.data ?? []) as unknown as CommissionForInvoice[]}
       />
     )
   } catch (e) {

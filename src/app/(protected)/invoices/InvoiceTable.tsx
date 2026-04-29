@@ -24,32 +24,53 @@ function fmtDeliveryYM(ym: string): string {
 export default function InvoiceTable({
   invoices,
   productMap,
+  productOrderMap,
   onSetPaidDate,
 }: {
   invoices: InvoiceRow[]
   productMap: Map<string, string>
+  productOrderMap: Map<string, number>
   onSetPaidDate: (id: string, date: string | null) => void
 }) {
   const totalAmount = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
 
-  // 품목별 그룹화 (순서 유지)
+  // 품목별 그룹화
+  // null product_id인 커미션은 delivery_ids[0](커미션 row ID)로 개별 그룹화
   const grouped = new Map<string, InvoiceRow[]>()
   for (const inv of invoices) {
-    const key  = inv.product_id ?? '__none__'
+    const key = inv.product_id
+      ?? (inv.delivery_ids?.[0] ? `__comm_${inv.delivery_ids[0]}` : '__none__')
     const list = grouped.get(key) ?? []
     list.push(inv)
     grouped.set(key, list)
   }
 
-  // 그룹 내 타입 순서 정렬 (매출→매입→커미션→기타)
+  // 커미션 그룹 순서: 수취 invoice의 from_company로 회사 구분
+  function commGroupOrder(rows: InvoiceRow[]): number {
+    const receipt = rows.find(r => r.to_company === '한국에이원')
+    if (receipt?.from_company === '동국제강') return 900
+    if (receipt?.from_company === '현대제철') return 901
+    return 950
+  }
+
+  // 그룹 정렬: 품목 순서(0~7) → 커미션(900+) → 기타(999)
   const sortedGroups = Array.from(grouped.entries()).map(([pid, rows]) => ({
     pid,
+    order: pid.startsWith('__comm_') ? commGroupOrder(rows)
+         : pid === '__none__'        ? 999
+         : (productOrderMap.get(pid) ?? 998),
     rows: [...rows].sort((a, b) => {
       const ai = TYPE_ORDER.indexOf((a.invoice_type ?? 'other') as typeof TYPE_ORDER[number])
       const bi = TYPE_ORDER.indexOf((b.invoice_type ?? 'other') as typeof TYPE_ORDER[number])
       return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi)
     }),
-  }))
+  })).sort((a, b) => a.order - b.order)
+
+  // 커미션 그룹 헤더 라벨 derivation
+  function commGroupLabel(rows: InvoiceRow[]): string {
+    const receipt = rows.find(r => r.to_company === '한국에이원')
+    return receipt?.from_company ? `${receipt.from_company} 커미션` : '커미션'
+  }
 
   return (
     <div className="card overflow-hidden">
@@ -57,17 +78,19 @@ export default function InvoiceTable({
         <table className="w-full text-sm">
           <tbody>
             {sortedGroups.map(({ pid, rows }) => {
-              const displayName = pid === '__none__' ? '기타' : (productMap.get(pid) ?? pid)
+              const displayName = pid.startsWith('__comm_') ? commGroupLabel(rows)
+                                : pid === '__none__'        ? '기타'
+                                : (productMap.get(pid) ?? pid)
               const groupTotal  = rows.reduce((s, r) => s + Number(r.total_amount), 0)
               const groupUnpaid = rows.filter(r => !r.paid_at).reduce((s, r) => s + Number(r.total_amount), 0)
 
               return (
                 <React.Fragment key={pid}>
                   {/* 품목 헤더 */}
-                  <tr className="border-t-2 border-gray-300 bg-gray-100">
+                  <tr className={`border-t-2 ${pid.startsWith('__comm_') ? 'border-amber-300 bg-amber-50' : 'border-gray-300 bg-gray-100'}`}>
                     <td colSpan={6} className="px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-gray-800">{displayName}</span>
+                        <span className={`text-sm font-bold ${pid.startsWith('__comm_') ? 'text-amber-800' : 'text-gray-800'}`}>{displayName}</span>
                         {rows[0]?.delivery_year_month && (
                           <span className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                             {fmtDeliveryYM(rows[0].delivery_year_month)}

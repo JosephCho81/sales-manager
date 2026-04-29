@@ -6,10 +6,13 @@ import { toMessage } from '@/lib/error'
 import { fmtKrw } from '@/lib/margin'
 import {
   generateInvoices,
+  generateCommissionInvoices,
   mapDeliveries,
+  PRODUCT_ORDER,
   type DeliveryRawForInvoice,
   type FxRateRaw,
   type InvoiceRow,
+  type CommissionForInvoice,
 } from '@/lib/invoice-generator'
 import { replaceInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
@@ -19,11 +22,13 @@ export default function InvoicesClient({
   initialDeliveries,
   initialInvoices,
   fxRates,
+  initialCommissions,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
   fxRates: FxRateRaw[]
+  initialCommissions: CommissionForInvoice[]
 }) {
   const router        = useRouter()
   const [invoices,   setInvoices]   = useState<InvoiceRow[]>(initialInvoices)
@@ -32,10 +37,15 @@ export default function InvoicesClient({
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const autoGenRef = useRef(false)
 
-  // 품목명 맵 (product_id → display_name)
+  // 품목명 맵 (product_id → display_name, null이면 name으로 fallback)
   const productMap = new Map<string, string>()
+  const productOrderMap = new Map<string, number>()
   for (const d of initialDeliveries) {
-    if (d.product) productMap.set(d.product_id, d.product.display_name)
+    if (d.product) {
+      productMap.set(d.product_id, d.product.display_name ?? d.product.name)
+      const idx = PRODUCT_ORDER.indexOf(d.product.name.toUpperCase())
+      productOrderMap.set(d.product_id, idx >= 0 ? idx : 999)
+    }
   }
 
   // 계산서 생성
@@ -44,12 +54,15 @@ export default function InvoicesClient({
     setError(null)
     try {
       const mapped = mapDeliveries(initialDeliveries, fxRates)
-      if (mapped.length === 0) {
+      if (mapped.length === 0 && initialCommissions.length === 0) {
         setError('이 달에 입고 데이터가 없거나 계약 정보가 없습니다.')
         return
       }
 
-      const generated = generateInvoices(mapped, yearMonth)
+      const generated = [
+        ...generateInvoices(mapped, yearMonth),
+        ...generateCommissionInvoices(initialCommissions, yearMonth),
+      ]
       if (generated.length === 0) {
         setError('생성된 계산서가 없습니다. 등록된 품목 타입을 확인하세요.')
         return
@@ -64,15 +77,16 @@ export default function InvoicesClient({
     } finally {
       setGenerating(false)
     }
-  }, [initialDeliveries, fxRates, yearMonth])
+  }, [initialDeliveries, initialCommissions, fxRates, yearMonth])
 
-  // 자동 생성: 입고는 있는데 계산서가 없을 때
+  // 자동 생성: 데이터는 있는데 계산서가 없을 때
   useEffect(() => {
-    if (!autoGenRef.current && initialInvoices.length === 0 && initialDeliveries.length > 0) {
+    if (!autoGenRef.current && initialInvoices.length === 0 &&
+        (initialDeliveries.length > 0 || initialCommissions.length > 0)) {
       autoGenRef.current = true
       handleGenerate()
     }
-  }, [handleGenerate, initialInvoices.length, initialDeliveries.length])
+  }, [handleGenerate, initialInvoices.length, initialDeliveries.length, initialCommissions.length])
 
   // 지급완료일 업데이트 (optimistic update)
   async function handleSetPaidDate(id: string, paidDate: string | null) {
@@ -123,7 +137,7 @@ export default function InvoicesClient({
           </button>
           <button
             onClick={handleGenerate}
-            disabled={generating || initialDeliveries.length === 0}
+            disabled={generating || (initialDeliveries.length === 0 && initialCommissions.length === 0)}
             className="btn-secondary text-xs disabled:opacity-40"
           >
             재생성
@@ -168,8 +182,8 @@ export default function InvoicesClient({
       {invoices.length === 0 && !generating ? (
         <div className="card px-4 py-12 text-center">
           <p className="text-sm text-gray-400">
-            {initialDeliveries.length === 0
-              ? `${yearMonth} 입고 데이터가 없습니다.`
+            {initialDeliveries.length === 0 && initialCommissions.length === 0
+              ? `${yearMonth} 입고 및 커미션 데이터가 없습니다.`
               : '발행 지시 데이터가 없습니다.'}
           </p>
         </div>
@@ -177,6 +191,7 @@ export default function InvoicesClient({
         <InvoiceTable
           invoices={invoices}
           productMap={productMap}
+          productOrderMap={productOrderMap}
           onSetPaidDate={handleSetPaidDate}
         />
       )}

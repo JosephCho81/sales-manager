@@ -26,7 +26,7 @@ export interface DeliveryForInvoice {
 export interface InvoiceToCreate {
   year_month: string
   delivery_year_month: string | null
-  product_id: string
+  product_id: string | null   // null = 커미션 등 품목 없는 계산서
   delivery_ids: string[]
   from_company: string
   to_company: string
