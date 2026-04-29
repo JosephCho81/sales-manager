@@ -45,11 +45,12 @@ export default function InvoiceTable({
     grouped.set(key, list)
   }
 
-  // 커미션 그룹 순서: 수취 invoice의 from_company로 회사 구분
+  // 커미션 그룹 순서: 수취 invoice의 memo로 회사 구분 (from_company는 항상 '화림')
   function commGroupOrder(rows: InvoiceRow[]): number {
     const receipt = rows.find(r => r.to_company === '한국에이원')
-    if (receipt?.from_company === '동국제강') return 900
-    if (receipt?.from_company === '현대제철') return 901
+    const memo = receipt?.memo ?? ''
+    if (memo.includes('동국제강')) return 900
+    if (memo.includes('현대제철')) return 901
     return 950
   }
 
@@ -66,9 +67,12 @@ export default function InvoiceTable({
     }),
   })).sort((a, b) => a.order - b.order)
 
-  // 커미션 그룹 헤더 라벨 derivation
+  // 커미션 그룹 헤더 라벨 derivation (memo에서 회사명 추출)
   function commGroupLabel(rows: InvoiceRow[]): string {
     const receipt = rows.find(r => r.to_company === '한국에이원')
+    const memo = receipt?.memo ?? ''
+    if (memo.includes('동국제강')) return '동국제강 커미션'
+    if (memo.includes('현대제철')) return '현대제철 커미션'
     return receipt?.from_company ? `${receipt.from_company} 커미션` : '커미션'
   }
 

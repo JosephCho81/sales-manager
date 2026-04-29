@@ -39,13 +39,13 @@ export function generateCommissionInvoices(
       ? shiftMonths(c.year_month, -1)
       : c.year_month
 
-    // 1. 수취: company → 한국에이원
+    // 1. 수취: 화림 → 한국에이원
     result.push({
       year_month:          yearMonth,
       delivery_year_month: deliveryYM,
       product_id:          null,
       delivery_ids:        [c.id],
-      from_company:        c.company,
+      from_company:        '화림',
       to_company:          '한국에이원',
       supply_amount:       Math.round(c.commission_amount),
       vat_amount:          0,
