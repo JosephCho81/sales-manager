@@ -143,15 +143,15 @@ export default function InvoiceTable({
                             <p className="text-xs text-gray-400 mt-0.5 leading-snug">{inv.memo}</p>
                           )}
                         </td>
-                        <td className="table-td text-right tabular-nums">
+                        <td className="table-td text-right tabular-nums whitespace-nowrap">
                           {fmtKrw(Number(inv.supply_amount))}
                         </td>
-                        <td className="table-td text-right tabular-nums text-gray-500">
+                        <td className="table-td text-right tabular-nums text-gray-500 whitespace-nowrap">
                           {Number(inv.vat_amount) > 0
                             ? fmtKrw(Number(inv.vat_amount))
                             : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="table-td text-right tabular-nums font-semibold">
+                        <td className="table-td text-right tabular-nums font-semibold whitespace-nowrap">
                           {fmtKrw(Number(inv.total_amount))}
                         </td>
                         <td className="table-td text-gray-600 whitespace-nowrap">
