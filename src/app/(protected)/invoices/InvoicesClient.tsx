@@ -23,12 +23,14 @@ export default function InvoicesClient({
   initialInvoices,
   fxRates,
   initialCommissions,
+  products,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
   fxRates: FxRateRaw[]
   initialCommissions: CommissionForInvoice[]
+  products: Array<{ id: string; name: string; display_name: string | null }>
 }) {
   const router        = useRouter()
   const [invoices,   setInvoices]   = useState<InvoiceRow[]>(initialInvoices)
@@ -37,9 +39,16 @@ export default function InvoicesClient({
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const autoGenRef = useRef(false)
 
-  // 품목명 맵 (product_id → display_name, null이면 name으로 fallback)
+  // 품목명 맵 (product_id → display_name)
+  // products 전체 목록을 먼저 채워 UUID fallback 방지
   const productMap = new Map<string, string>()
   const productOrderMap = new Map<string, number>()
+  for (const p of products) {
+    productMap.set(p.id, p.display_name ?? p.name)
+    const idx = PRODUCT_ORDER.indexOf(p.name.toUpperCase())
+    productOrderMap.set(p.id, idx >= 0 ? idx : 999)
+  }
+  // 입고 데이터에서 추가 정보 보완 (이미 products로 채웠으므로 순서 정보만 재확인)
   for (const d of initialDeliveries) {
     if (d.product) {
       productMap.set(d.product_id, d.product.display_name ?? d.product.name)
