@@ -56,46 +56,33 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     if (dRes.error) throw new Error(`입고 조회 실패: ${dRes.error.message}`)
     if (iRes.error) throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
 
-    // 2단계: 입고 데이터 기반으로 커미션 조회 월 계산
-    // - AL35B (동국제강): 커미션 year_month = 납품 year_month (동일)
-    // - AL40/AL30 (현대제철): 커미션 year_month = 납품 year_month + 1
-    // invoice_month_offset이 0인 경우 납품 year_month ≠ yearMonth가 되므로
-    // 단순 eq(yearMonth)로는 현대제철 커미션을 놓칠 수 있어 별도 계산
-    // shiftMonths(yearMonth, -1) 제거: 입고 데이터와 무관한 전월 커미션이 유입되는 것을 방지
-    const commMonths = new Set<string>([yearMonth])
-    for (const d of (dRes.data ?? []) as unknown as DeliveryRawForInvoice[]) {
-      const name = d.product?.name?.toUpperCase() ?? ''
-      if (name === 'AL35B') {
-        commMonths.add(d.year_month)
-      } else if (name.startsWith('AL40') || name === 'AL30') {
-        commMonths.add(shiftMonths(d.year_month, 1))
-      }
-    }
+    // 2단계: 커미션 조회 — 고정 오프셋
+    // - 동국제강: 커미션 year_month = M-2
+    // - 현대제철: 커미션 year_month = M-1
+    const dongkukCommMonth = shiftMonths(yearMonth, -2)
+    const hyundaiCommMonth = shiftMonths(yearMonth, -1)
 
-    // 3단계: 커미션 조회 (계산된 월 목록으로)
     const cRes = await supabase
       .from('commissions')
       .select('id, year_month, company, commission_amount, memo')
-      .in('year_month', Array.from(commMonths))
+      .in('year_month', [dongkukCommMonth, hyundaiCommMonth])
       .order('created_at', { ascending: true })
 
-    // 4단계: 현대제철 커미션에서 역산한 납품월로 AL40/AL30 입고 추가 조회
-    // 현대제철 커미션 year_month = 납품월+1 이므로 -1 하면 실제 납품월
-    // invoice_month_offset=0 이면 AL40 납품이 step1 조회에서 누락되는 경우를 보완
+    // 회사별 월 매칭 (동국제강=M-2, 현대제철=M-1만 허용)
+    const commissions = ((cRes.data ?? []) as unknown as CommissionForInvoice[]).filter(c =>
+      (c.company === '동국제강' && c.year_month === dongkukCommMonth) ||
+      (c.company === '현대제철' && c.year_month === hyundaiCommMonth)
+    )
+
+    // 3단계: 현대제철 납품 데이터 보완
+    // 현대제철 커미션 year_month = M-1 이므로 실제 납품월 = M-2
     const fetchedYMs = new Set(
       (dRes.data ?? []).map(d => (d as unknown as DeliveryRawForInvoice).year_month)
     )
-    const hyundaiDeliveryYMs = [
-      ...new Set(
-        (cRes.data ?? [])
-          .filter(c => c.company === '현대제철')
-          .map(c => shiftMonths(c.year_month, -1))
-          .filter(ym => !fetchedYMs.has(ym))
-      ),
-    ]
+    const hyundaiDeliveryYM = shiftMonths(yearMonth, -2)
 
     let extraDeliveries: DeliveryRawForInvoice[] = []
-    if (hyundaiDeliveryYMs.length > 0) {
+    if (commissions.some(c => c.company === '현대제철') && !fetchedYMs.has(hyundaiDeliveryYM)) {
       const edRes = await supabase
         .from('deliveries')
         .select(`
@@ -104,7 +91,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
           product:products(id, name, display_name, vat),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
         `)
-        .in('year_month', hyundaiDeliveryYMs)
+        .eq('year_month', hyundaiDeliveryYM)
         .order('created_at', { ascending: true })
 
       extraDeliveries = ((edRes.data ?? []) as unknown as DeliveryRawForInvoice[])
@@ -131,7 +118,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         initialDeliveries={allDeliveries}
         initialInvoices={(iRes.data ?? []) as unknown as InvoiceRow[]}
         fxRates={(fxRes.data ?? []) as unknown as FxRateRaw[]}
-        initialCommissions={(cRes.data ?? []) as unknown as CommissionForInvoice[]}
+        initialCommissions={commissions}
         products={(pRes.data ?? []) as Array<{ id: string; name: string; display_name: string | null }>}
       />
     )
