@@ -32,8 +32,6 @@ export default function InvoiceTable({
   productOrderMap: Map<string, number>
   onSetPaidDate: (id: string, date: string | null) => void
 }) {
-  const totalAmount = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
-
   // 품목별 그룹화
   // null product_id인 커미션은 delivery_ids[0](커미션 row ID)로 개별 그룹화
   const grouped = new Map<string, InvoiceRow[]>()
@@ -177,22 +175,6 @@ export default function InvoiceTable({
               )
             })}
           </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-gray-300 bg-gray-50">
-              <td colSpan={2} className="px-4 py-2 text-sm font-semibold text-gray-700">합계</td>
-              <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums">
-                {fmtKrw(invoices.reduce((s, inv) => s + Number(inv.supply_amount), 0))}
-              </td>
-              <td className="px-4 py-2 text-right text-sm text-gray-500 tabular-nums">
-                {fmtKrw(invoices.reduce((s, inv) => s + Number(inv.vat_amount), 0))}
-              </td>
-              <td className="px-4 py-2 text-right text-sm font-bold tabular-nums">{fmtKrw(totalAmount)}</td>
-              <td colSpan={2} />
-              <td className="px-4 py-2 text-center text-xs text-gray-400">
-                {invoices.filter(i => i.paid_at).length}/{invoices.length} 지급
-              </td>
-            </tr>
-          </tfoot>
         </table>
       </div>
     </div>
