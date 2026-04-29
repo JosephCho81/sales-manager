@@ -45,13 +45,13 @@ export default function ProductTable({
           </thead>
           <tbody>
             {productRows.map(row => {
-              const isAL35 = row.name.toUpperCase() === 'AL35B'
-              const isAL30 = row.name.toUpperCase() === 'AL30'
-              const bm     = commissionsInPeriod.byMonth[row.deliveryYearMonth]
-              // 현대제철 AL30 커미션 year_month = 납품월 +1 (= 조회월 M-1)
-              const bmNext = commissionsInPeriod.byMonth[shiftMonths(row.deliveryYearMonth, +1)]
-              const dongkukComm = isAL35 ? (bm?.dongkuk ?? null) : null
-              const hyundaiComm = isAL30 ? (bmNext?.hyundai ?? null) : null
+              const isAL35    = row.name.toUpperCase() === 'AL35B'
+              const isHyundai = row.buyer === '현대제철'
+              const bm        = commissionsInPeriod.byMonth[row.deliveryYearMonth]
+              // 현대제철 커미션 year_month = 납품월 +1
+              const bmNext    = commissionsInPeriod.byMonth[shiftMonths(row.deliveryYearMonth, +1)]
+              const dongkukComm  = isAL35    ? (bm?.dongkuk    ?? null) : null
+              const hyundaiComm  = isHyundai ? (bmNext?.hyundai ?? null) : null
               const monthLabel      = row.deliveryYearMonth.slice(5, 7).replace(/^0/, '') + '월분'
               const hyundaiCommLabel = shiftMonths(row.deliveryYearMonth, +1).slice(5, 7).replace(/^0/, '') + '월분'
 

@@ -175,7 +175,7 @@ export function buildAllAnalytics(
   for (const d of deliveries) {
     if (!d.contract) continue
     if (d.product?.name.toUpperCase() === 'AL35B') dongkukDeliveryYMSet.add(d.year_month)
-    if (d.product?.name.toUpperCase() === 'AL30')  hyundaiDeliveryYMSet.add(d.year_month)
+    if (d.product?.buyer === '현대제철')           hyundaiDeliveryYMSet.add(d.year_month)
 
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
