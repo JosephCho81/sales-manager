@@ -47,15 +47,15 @@ export default function DeliveryTable({
         <table className="w-full text-sm">
           <thead>
             <tr>
-              <th className="table-th">입고 날짜</th>
-              <th className="table-th">품목</th>
-              <th className="table-th">납품처</th>
-              <th className="table-th text-right">물량 (톤)</th>
-              <th className="table-th text-right">판매단가</th>
-              <th className="table-th text-right">원가</th>
-              <th className="table-th text-right">판매 합계</th>
-              <th className="table-th">메모</th>
-              <th className="table-th">관리</th>
+              <th className="table-th text-center">입고 날짜</th>
+              <th className="table-th text-center">품목</th>
+              <th className="table-th text-center">납품처</th>
+              <th className="table-th text-center">물량 (톤)</th>
+              <th className="table-th text-center">판매단가</th>
+              <th className="table-th text-center">원가</th>
+              <th className="table-th text-center">판매 합계</th>
+              <th className="table-th text-center">메모</th>
+              <th className="table-th text-center">관리</th>
             </tr>
           </thead>
           <tbody>
@@ -75,40 +75,40 @@ export default function DeliveryTable({
 
               return (
                 <tr key={d.id} className="hover:bg-gray-50">
-                  <td className="table-td font-mono text-xs whitespace-nowrap">
+                  <td className="table-td text-center font-mono text-xs whitespace-nowrap">
                     {d.delivery_date
                       ? <>{d.delivery_date}<br /><span className="text-gray-400">{d.year_month}</span></>
                       : d.year_month
                     }
                   </td>
-                  <td className="table-td whitespace-nowrap">
+                  <td className="table-td text-center whitespace-nowrap">
                     <span className="font-medium">{d.product?.display_name}</span>
                     {isUsd && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1 rounded">USD</span>}
                   </td>
-                  <td className="table-td text-gray-500 text-xs whitespace-nowrap">{d.product?.buyer}</td>
-                  <td className="table-td text-right whitespace-nowrap">
+                  <td className="table-td text-center text-gray-500 text-xs whitespace-nowrap">{d.product?.buyer}</td>
+                  <td className="table-td text-center whitespace-nowrap">
                     {fmtNum(d.quantity_kg / 1000, 3)}
                   </td>
-                  <td className="table-td text-right whitespace-nowrap">
+                  <td className="table-td text-center whitespace-nowrap">
                     {isUsd
                       ? <>{fmtNum(d.contract.sell_price, 2)}<span className="text-gray-400 text-xs">USD</span></>
                       : <>{fmtNum(d.contract.sell_price)}<span className="text-gray-400 text-xs">원</span></>
                     }
                   </td>
-                  <td className="table-td text-right whitespace-nowrap text-gray-600">
+                  <td className="table-td text-center whitespace-nowrap text-gray-600">
                     {isUsd
                       ? <>{fmtNum(d.contract.cost_price, 2)}<span className="text-gray-400 text-xs">USD</span></>
                       : <>{fmtNum(d.contract.cost_price)}<span className="text-gray-400 text-xs">원</span></>
                     }
                   </td>
-                  <td className="table-td text-right font-semibold text-blue-700 whitespace-nowrap">
+                  <td className="table-td text-center font-semibold text-blue-700 whitespace-nowrap">
                     {fmtKrw(sellTotal)}
                     {dep > 0 && (
                       <span className="block text-xs font-normal text-orange-500">감가 -{fmtKrw(dep)}</span>
                     )}
                   </td>
-                  <td className="table-td text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
-                  <td className="table-td whitespace-nowrap">
+                  <td className="table-td text-center text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
+                  <td className="table-td text-center whitespace-nowrap">
                     <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>
                     <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(d.id)}>삭제</button>
                   </td>
