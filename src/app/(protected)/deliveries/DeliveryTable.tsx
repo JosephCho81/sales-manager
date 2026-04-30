@@ -53,7 +53,7 @@ export default function DeliveryTable({
               <th className="table-th text-right">물량 (톤)</th>
               <th className="table-th text-right">판매단가</th>
               <th className="table-th text-right">원가</th>
-              <th className="table-th text-right">합계</th>
+              <th className="table-th text-right">판매 합계</th>
               <th className="table-th">메모</th>
               <th className="table-th">관리</th>
             </tr>
