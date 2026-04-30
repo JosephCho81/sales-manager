@@ -2,6 +2,10 @@
 // 공통 날짜 유틸
 // ────────────────────────────────────────────────────────
 
+function fmtDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function parseYM(ym: string): [number, number] {
   const [y, m] = ym.split('-').map(Number)
   return [y, m]
@@ -17,7 +21,8 @@ export function shiftMonths(ym: string, n: number): string {
 /** YYYY-MM의 마지막 날 (YYYY-MM-DD) */
 export function monthEnd(ym: string): string {
   const [y, m] = parseYM(ym)
-  return new Date(y, m, 0).toISOString().slice(0, 10)
+  const d = new Date(y, m, 0)
+  return fmtDate(d)
 }
 
 /** YYYY-MM의 첫날 (YYYY-MM-DD) */
@@ -32,9 +37,9 @@ export function nthDay(ym: string, day: number): string {
 
 /** 날짜 문자열에 N일 더하기 */
 export function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  const [y, m, dd] = dateStr.split('-').map(Number)
+  const d = new Date(y, m - 1, dd + days)
+  return fmtDate(d)
 }
 
 /** YYYY-MM-DD → YYYY-MM */
@@ -44,7 +49,7 @@ export function toYearMonth(date: string): string {
 
 /** 오늘 날짜 (YYYY-MM-DD) */
 export function getTodayDate(): string {
-  return new Date().toISOString().slice(0, 10)
+  return fmtDate(new Date())
 }
 
 /** 현재 연월 (YYYY-MM) */
