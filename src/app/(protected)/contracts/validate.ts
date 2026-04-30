@@ -22,6 +22,7 @@ export function validateContract(
   const overlapping = existingContracts.filter(c => {
     if (c.product_id !== form.product_id) return false
     if (editId && c.id === editId) return false
+    if (c.cost_price !== parseFloat(form.cost_price)) return false
     return form.start_date < c.end_date && form.end_date > c.start_date
   })
   if (overlapping.length > 0) {
