@@ -41,14 +41,15 @@ export default function InvoicesClient({
   const autoGenRef = useRef(false)
 
   // 커미션 계산서 stale 감지
-  // 올바른 delivery_year_month = M-2 (동국/현대 모두)
-  const expectedCommDeliveryYM = shiftMonths(yearMonth, -2)
+  // delivery_year_month: 동국제강 = M-2, 현대제철 = M-1 (커미션 등록 월)
   const hasCommInvoices = initialInvoices.some(inv => inv.invoice_type === 'commission')
-  const hasStaleComm    = initialInvoices.some(inv =>
-    inv.invoice_type === 'commission' &&
-    inv.delivery_year_month !== null &&
-    inv.delivery_year_month !== expectedCommDeliveryYM
-  )
+  const hasStaleComm    = initialInvoices.some(inv => {
+    if (inv.invoice_type !== 'commission' || inv.delivery_year_month === null) return false
+    const expected = (inv.memo ?? '').includes('현대제철')
+      ? shiftMonths(yearMonth, -1)
+      : shiftMonths(yearMonth, -2)
+    return inv.delivery_year_month !== expected
+  })
   // 커미션 데이터는 있는데 커미션 계산서가 없는 경우도 재생성
   const needsRegen = initialInvoices.length === 0 ||
     hasStaleComm ||

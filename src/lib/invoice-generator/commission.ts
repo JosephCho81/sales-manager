@@ -34,11 +34,7 @@ export function generateCommissionInvoices(
     const basis = monthEnd(c.year_month)
     const due   = nthDay(nextM, 15)
 
-    // 현대제철: 커미션 year_month = 납품월+1 이므로 실제 납품월은 -1
-    // 동국제강: 커미션 year_month = 납품월 (동일)
-    const deliveryYM = c.company === '현대제철'
-      ? shiftMonths(c.year_month, -1)
-      : c.year_month
+    const deliveryYM = c.year_month
 
     // 1. 수취: 화림 → 한국에이원
     result.push({
