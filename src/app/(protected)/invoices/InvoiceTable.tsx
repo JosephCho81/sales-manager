@@ -45,7 +45,7 @@ export default function InvoiceTable({
 
   // 커미션 그룹 순서: 수취 invoice의 memo로 회사 구분 (from_company는 항상 '화림')
   function commGroupOrder(rows: InvoiceRow[]): number {
-    const receipt = rows.find(r => r.to_company === '한국에이원')
+    const receipt = rows.find(r => r.to_company === '(주)한국에이원')
     const memo = receipt?.memo ?? ''
     if (memo.includes('동국제강')) return 900
     if (memo.includes('현대제철')) return 901
@@ -67,7 +67,7 @@ export default function InvoiceTable({
 
   // 커미션 그룹 헤더 라벨 derivation (memo에서 회사명 추출)
   function commGroupLabel(rows: InvoiceRow[]): string {
-    const receipt = rows.find(r => r.to_company === '한국에이원')
+    const receipt = rows.find(r => r.to_company === '(주)한국에이원')
     const memo = receipt?.memo ?? ''
     if (memo.includes('동국제강')) return '동국제강 커미션'
     if (memo.includes('현대제철')) return '현대제철 커미션'

@@ -43,7 +43,7 @@ export function generateCommissionInvoices(
       product_id:          null,
       delivery_ids:        [c.id],
       from_company:        '화림',
-      to_company:          '한국에이원',
+      to_company:          '(주)한국에이원',
       supply_amount:       Math.round(c.commission_amount),
       vat_amount:          0,
       total_amount:        Math.round(c.commission_amount),
@@ -62,7 +62,7 @@ export function generateCommissionInvoices(
         delivery_year_month: deliveryYM,
         product_id:          null,
         delivery_ids:        [c.id],
-        from_company:        '한국에이원',
+        from_company:        '(주)한국에이원',
         to_company:          '금화',
         supply_amount:       geumhwa,
         vat_amount:          0,
@@ -76,15 +76,15 @@ export function generateCommissionInvoices(
       })
     }
 
-    // 3. 라성 1/3
+    // 3. (주)나성 1/3
     if (raseong > 0) {
       result.push({
         year_month:          yearMonth,
         delivery_year_month: deliveryYM,
         product_id:          null,
         delivery_ids:        [c.id],
-        from_company:        '한국에이원',
-        to_company:          '라성',
+        from_company:        '(주)한국에이원',
+        to_company:          '(주)나성',
         supply_amount:       raseong,
         vat_amount:          0,
         total_amount:        raseong,
@@ -93,7 +93,7 @@ export function generateCommissionInvoices(
         payment_due_date:    due,
         is_paid:             false,
         invoice_type:        'commission',
-        memo:                `${label} — 라성 1/3`,
+        memo:                `${label} — (주)나성 1/3`,
       })
     }
   }

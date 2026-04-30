@@ -11,9 +11,9 @@ export default function MarginBarChart({ data }: { data: MonthlyData[] }) {
       {/* 범례 */}
       <div className="flex gap-4 text-xs text-gray-500 mb-3">
         {[
-          { color: 'bg-green-500',  label: '한국에이원' },
+          { color: 'bg-green-500',  label: '(주)한국에이원' },
           { color: 'bg-purple-500', label: '금화' },
-          { color: 'bg-orange-500', label: '라성' },
+          { color: 'bg-orange-500', label: '(주)나성' },
         ].map(({ color, label }) => (
           <span key={label} className="flex items-center gap-1.5">
             <span className={`w-3 h-3 rounded-sm inline-block ${color}`} />
@@ -37,7 +37,7 @@ export default function MarginBarChart({ data }: { data: MonthlyData[] }) {
               <div
                 className="relative flex items-end justify-center gap-0.5 w-full"
                 style={{ height: `${H}px` }}
-                title={`${d.ym}\n총마진: ${fmtKrw(d.totalMargin)}\n한국에이원: ${fmtKrw(d.a1)}\n금화: ${fmtKrw(d.gm)}\n라성: ${fmtKrw(d.rs)}`}
+                title={`${d.ym}\n총마진: ${fmtKrw(d.totalMargin)}\n(주)한국에이원: ${fmtKrw(d.a1)}\n금화: ${fmtKrw(d.gm)}\n(주)나성: ${fmtKrw(d.rs)}`}
               >
                 <div
                   className="absolute bottom-0 left-0 right-0 bg-blue-50 opacity-0 hover:opacity-100 transition-opacity rounded-t-sm"

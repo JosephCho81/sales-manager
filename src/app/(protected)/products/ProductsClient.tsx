@@ -192,7 +192,7 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
               </select>
             </div>
             <div className="col-span-2">
-              <label className="label">거래 체인 (예: 동국제강 → 한국에이원 → 금화 → 화림)</label>
+              <label className="label">거래 체인 (예: 동국제강 → (주)한국에이원 → 금화 → 화림)</label>
               <input
                 className="input"
                 value={form.chain.steps}

@@ -35,7 +35,7 @@ export default function LoginPage() {
         <div className="card p-8">
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold text-gray-900">판매관리 시스템</h1>
-            <p className="mt-1 text-sm text-gray-500">한국에이원 / 금화 / 라성</p>
+            <p className="mt-1 text-sm text-gray-500">(주)한국에이원 / 금화 / (주)나성</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

@@ -138,9 +138,9 @@ export default function AnalyticsClient({
                     <th className="table-th">월</th>
                     <th className="table-th text-right">물량(톤)</th>
                     <th className="table-th text-right">총마진</th>
-                    <th className="table-th text-right text-green-700">한국에이원</th>
+                    <th className="table-th text-right text-green-700">(주)한국에이원</th>
                     <th className="table-th text-right text-purple-700">금화</th>
-                    <th className="table-th text-right text-orange-700">라성</th>
+                    <th className="table-th text-right text-orange-700">(주)나성</th>
                   </tr>
                 </thead>
                 <tbody>

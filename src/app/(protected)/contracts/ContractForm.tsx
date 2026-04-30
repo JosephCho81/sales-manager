@@ -253,9 +253,9 @@ export default function ContractForm({
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-blue-100 grid grid-cols-3 gap-2 text-xs text-gray-600">
-            <div>한국에이원: <span className="font-medium text-green-700">{fmtNum(Math.floor(marginPreview.margin / 3))} 원/톤</span></div>
+            <div>(주)한국에이원: <span className="font-medium text-green-700">{fmtNum(Math.floor(marginPreview.margin / 3))} 원/톤</span></div>
             <div>금화: <span className="font-medium text-purple-700">{fmtNum(Math.floor(marginPreview.margin / 3))} 원/톤</span></div>
-            <div>라성: <span className="font-medium text-orange-700">{fmtNum(marginPreview.margin - Math.floor(marginPreview.margin / 3) * 2)} 원/톤</span></div>
+            <div>(주)나성: <span className="font-medium text-orange-700">{fmtNum(marginPreview.margin - Math.floor(marginPreview.margin / 3) * 2)} 원/톤</span></div>
           </div>
         </div>
       )}

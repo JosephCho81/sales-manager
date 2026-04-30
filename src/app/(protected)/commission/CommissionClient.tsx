@@ -97,7 +97,7 @@ function CommissionSection({
           <div className="mb-3 bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">{error}</div>
         )}
         <p className="text-xs text-gray-500 mb-4">
-          월 마감 후 화림이 통보한 커미션 물량과 단가를 입력하세요. 한국에이원 수령 후 라성·금화에 1/3 배분됩니다.
+          월 마감 후 화림이 통보한 커미션 물량과 단가를 입력하세요. (주)한국에이원 수령 후 (주)나성·금화에 1/3 배분됩니다.
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
           <div>
@@ -135,7 +135,7 @@ function CommissionSection({
           <div className="mb-4 bg-blue-50 border border-blue-200 rounded p-3 text-sm">
             <span className="font-semibold text-blue-800">커미션 총액: {fmtKrw(preview.total)}</span>
             <span className="text-xs text-gray-500 ml-3">
-              한국에이원 {fmtKrw(preview.korea_a1)} / 금화 {fmtKrw(preview.geumhwa)} / 라성 {fmtKrw(preview.raseong)}
+              (주)한국에이원 {fmtKrw(preview.korea_a1)} / 금화 {fmtKrw(preview.geumhwa)} / (주)나성 {fmtKrw(preview.raseong)}
             </span>
           </div>
         )}
@@ -158,9 +158,9 @@ function CommissionSection({
                   <th className="table-th text-right">물량(톤)</th>
                   <th className="table-th text-right">단가(원/톤)</th>
                   <th className="table-th text-right font-semibold">커미션 총액</th>
-                  <th className="table-th text-right text-green-700">한국에이원</th>
+                  <th className="table-th text-right text-green-700">(주)한국에이원</th>
                   <th className="table-th text-right text-purple-700">금화</th>
-                  <th className="table-th text-right text-orange-700">라성</th>
+                  <th className="table-th text-right text-orange-700">(주)나성</th>
                   <th className="table-th">메모</th>
                   <th className="table-th text-center whitespace-nowrap">관리</th>
                 </tr>

@@ -33,7 +33,7 @@ export default function Sidebar() {
       {/* 로고 */}
       <div className="px-4 py-5 border-b border-gray-700">
         <h1 className="text-base font-bold leading-tight">판매관리 시스템</h1>
-        <p className="text-xs text-gray-400 mt-0.5">한국에이원 · 금화 · 라성</p>
+        <p className="text-xs text-gray-400 mt-0.5">(주)한국에이원 · 금화 · (주)나성</p>
       </div>
 
       {/* 네비게이션 */}

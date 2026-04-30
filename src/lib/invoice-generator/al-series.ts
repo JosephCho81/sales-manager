@@ -45,7 +45,7 @@ export function genALSeries(
     // 1. 동국제강→한국에이원 역발행 (매출)
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '동국제강', to: '한국에이원', supply: sellTotal, vat: hasVat,
+      from: '동국제강', to: '(주)한국에이원', supply: sellTotal, vat: hasVat,
       basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: monthEnd(nextM),
       type: 'sales', memo: '동국제강 역발행 — 매출',
     }),
@@ -59,28 +59,28 @@ export function genALSeries(
     // 3. 금화→한국에이원
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '금화', to: '한국에이원',
+      from: '금화', to: '(주)한국에이원',
       supply: isAL35 ? costTotal + main.geumhwa : costTotal,
       vat: hasVat,
       basisDate: monthEnd(nextM), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
       type: 'cost',
       memo: isAL35
-        ? '금화→한국에이원 — 원가+마진1/3 (AL35 매매)'
-        : '금화→한국에이원 원가 — 익월말 기준',
+        ? '금화→(주)한국에이원 — 원가+마진1/3 (AL35 매매)'
+        : '금화→(주)한국에이원 원가 — 익월말 기준',
     }),
     // 4. 한국에이원→금화 커미션 (AL65만)
     ...(!isAL35 ? [makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '한국에이원', to: '금화', supply: main.geumhwa, vat: hasVat,
+      from: '(주)한국에이원', to: '금화', supply: main.geumhwa, vat: hasVat,
       basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
       type: 'commission', memo: `${ymLabel} 마진 — 금화 커미션 1/3`,
     })] : []),
     // 5. 한국에이원→라성 커미션
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '한국에이원', to: '라성', supply: main.raseong, vat: hasVat,
+      from: '(주)한국에이원', to: '(주)나성', supply: main.raseong, vat: hasVat,
       basisDate: nthDay(next2M, 10), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
-      type: 'commission', memo: `${ymLabel} 마진 — 라성 커미션 (나머지)`,
+      type: 'commission', memo: `${ymLabel} 마진 — (주)나성 커미션 (나머지)`,
     }),
   ]
 }

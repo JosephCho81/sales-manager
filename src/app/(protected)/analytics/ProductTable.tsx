@@ -38,9 +38,9 @@ export default function ProductTable({
               <th className="table-th">매출</th>
               <th className="table-th">매입</th>
               <th className="table-th">총마진</th>
-              <th className="table-th text-green-700">한국에이원</th>
+              <th className="table-th text-green-700">(주)한국에이원</th>
               <th className="table-th text-purple-700">금화</th>
-              <th className="table-th text-orange-700">라성</th>
+              <th className="table-th text-orange-700">(주)나성</th>
             </tr>
           </thead>
           <tbody>

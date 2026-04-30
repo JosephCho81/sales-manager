@@ -10,7 +10,7 @@ describe('splitMargin', () => {
     }
   })
 
-  it('라성이 나머지를 가져간다 (1000원 → 333 + 333 + 334)', () => {
+  it('(주)나성이 나머지를 가져간다 (1000원 → 333 + 333 + 334)', () => {
     const { korea_a1, geumhwa, raseong } = splitMargin(1000)
     expect(korea_a1).toBe(333)
     expect(geumhwa).toBe(333)

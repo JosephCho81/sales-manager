@@ -53,7 +53,7 @@ export function genAL30(
     // 현대→한국에이원 역발행 (10일 단위, 익익월말 지급)
     result.push(makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '현대제철', to: '한국에이원', supply: sellTotal, vat: true,
+      from: '현대제철', to: '(주)한국에이원', supply: sellTotal, vat: true,
       basisDate: period.basisDate, deadline: period.basisDate,
       paymentDue: monthEnd(dNext2M),
       type: 'sales',
@@ -66,9 +66,9 @@ export function genAL30(
     result.push(makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
       deliveryIds: deliveries.map(d => d.id),
-      from: '한국에이원', to: '화림', supply: totalCost, vat: true,
+      from: '(주)한국에이원', to: '화림', supply: totalCost, vat: true,
       basisDate: monthEnd(deliveryYM), deadline: nthDay(dNextM, 1), paymentDue: monthEnd(dNext2M),
-      type: 'cost', memo: '한국에이원→화림 당월 합산 — 익월1일 발행, 익익월말 지급',
+      type: 'cost', memo: '(주)한국에이원→화림 당월 합산 — 익월1일 발행, 익익월말 지급',
     }))
   }
 
@@ -78,16 +78,16 @@ export function genAL30(
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
-        from: '한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
+        from: '(주)한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
         basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
         type: 'commission', memo: '금화 커미션 1/3 — 익익월말',
       }),
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
-        from: '한국에이원', to: '라성', supply: totalRaseong, vat: true,
+        from: '(주)한국에이원', to: '(주)나성', supply: totalRaseong, vat: true,
         basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
-        type: 'commission', memo: '라성 커미션 (나머지) — 익익월말',
+        type: 'commission', memo: '(주)나성 커미션 (나머지) — 익익월말',
       }),
     )
   }

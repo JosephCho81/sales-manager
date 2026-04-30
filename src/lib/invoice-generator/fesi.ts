@@ -35,7 +35,7 @@ export function genFeSi(
     // 동국→한국에이원 역발행 (원화)
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '동국제강', to: '한국에이원', supply: sellTotal, vat: true,
+      from: '동국제강', to: '(주)한국에이원', supply: sellTotal, vat: true,
       basisDate: refDate, deadline: refDate, paymentDue: pay10,
       type: 'sales',
       memo: `역발행 BL ${refDate} — 입고후10일 대금`,
@@ -43,7 +43,7 @@ export function genFeSi(
     // EG→한국에이원 (달러 계산서, KRW 환산)
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: 'EG', to: '한국에이원', supply: costKrwTotal, vat: true,
+      from: 'EG', to: '(주)한국에이원', supply: costKrwTotal, vat: true,
       basisDate: refDate, deadline: refDate, paymentDue: pay15,
       type: 'cost',
       memo: `EG 달러계산서 BL ${refDate} | USD ${costUsdTotal.toFixed(2)} × ${rate}원 — 입고후15일 송금`,
@@ -51,16 +51,16 @@ export function genFeSi(
     // 한국에이원→금화 커미션
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '한국에이원', to: '금화', supply: geumhwa, vat: true,
+      from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: true,
       basisDate: pay15, deadline: pay15, paymentDue: pay15,
       type: 'commission', memo: 'EG 지급 완료 후 금화 커미션 1/3',
     }),
     // 한국에이원→라성 커미션
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '한국에이원', to: '라성', supply: raseong, vat: true,
+      from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: true,
       basisDate: pay15, deadline: pay15, paymentDue: pay15,
-      type: 'commission', memo: 'EG 지급 완료 후 라성 커미션 (나머지)',
+      type: 'commission', memo: 'EG 지급 완료 후 (주)나성 커미션 (나머지)',
     }),
   ]
 }
