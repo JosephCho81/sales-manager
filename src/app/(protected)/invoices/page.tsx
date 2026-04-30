@@ -82,7 +82,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     const hyundaiDeliveryYM = shiftMonths(yearMonth, -2)
 
     let extraDeliveries: DeliveryRawForInvoice[] = []
-    if (commissions.some(c => c.company === '현대제철') && !fetchedYMs.has(hyundaiDeliveryYM)) {
+    if (commissions.some(c => c.company === '현대제철')) {
       const edRes = await supabase
         .from('deliveries')
         .select(`

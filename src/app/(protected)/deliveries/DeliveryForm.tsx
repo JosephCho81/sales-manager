@@ -117,12 +117,12 @@ export default function DeliveryForm({
                         </span>
                         {isUsd && <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">USD 원가</span>}
                       </div>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
-                        <span>판매 {isUsd
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+                        <span className="text-gray-500">판매 {isUsd
                           ? `${fmtNum(c.sell_price, 2)} USD/톤${c.reference_exchange_rate ? ` (≈${fmtNum(c.sell_price * c.reference_exchange_rate)}원)` : ''}`
                           : `${fmtNum(c.sell_price)} 원/톤`}
                         </span>
-                        <span>원가 {isUsd
+                        <span className="font-semibold text-orange-600">원가 {isUsd
                           ? `${fmtNum(c.cost_price, 2)} USD/톤${c.reference_exchange_rate ? ` (≈${fmtNum(c.cost_price * c.reference_exchange_rate)}원)` : ''}`
                           : `${fmtNum(c.cost_price)} 원/톤`}
                         </span>

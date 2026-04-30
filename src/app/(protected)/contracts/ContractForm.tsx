@@ -75,6 +75,10 @@ export default function ContractForm({
     if (validationError) { setError(validationError); return }
 
     setSaving(true); setError('')
+    // 같은 품목의 기존 계약에서 invoice_month_offset을 상속
+    const sibling = existingContracts.find(
+      c => c.product_id === form.product_id && c.id !== editContract?.id
+    )
     const payload = {
       product_id: form.product_id,
       start_date: form.start_date,
@@ -85,6 +89,7 @@ export default function ContractForm({
       reference_exchange_rate: isUsd ? parseFloat(form.reference_exchange_rate) : null,
       exchange_rate_basis: isUsd ? (form.exchange_rate_basis || null) : null,
       memo: form.memo || null,
+      invoice_month_offset: sibling?.invoice_month_offset ?? 0,
     }
     const result = await upsertContract(payload, editContract?.id)
     if (result.error) { setError(result.error); setSaving(false); return }

@@ -10,6 +10,7 @@ export interface ContractRow {
   exchange_rate_basis: string | null
   memo: string | null
   created_at: string
+  invoice_month_offset: number
   product: { id: string; name: string; display_name: string; price_unit: string }
 }
 
