@@ -59,27 +59,27 @@ export default function MarginPreview({
             : '마진 계산'}
         </p>
         <div className="space-y-1.5 text-sm">
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">물량</span>
-            <span className="font-medium text-gray-800">{fmtNum(qty, 3)} 톤</span>
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-xs text-gray-500 shrink-0">물량</span>
+            <span className="font-medium text-gray-800 whitespace-nowrap">{fmtNum(qty, 3)} 톤</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">판매금액</span>
-            <span className="font-semibold text-blue-700">{fmtKrw(sellAmt)}</span>
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-xs text-gray-500 shrink-0">판매단가</span>
+            <span className="font-semibold text-blue-700 whitespace-nowrap">{fmtKrw(mainMargin.sell_price_krw)} / 톤</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">원가금액</span>
-            <span className="text-gray-600">{fmtKrw(costAmt)}</span>
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-xs text-gray-500 shrink-0">원가</span>
+            <span className="text-gray-600 whitespace-nowrap">{fmtKrw(mainMargin.cost_price_krw)} / 톤</span>
           </div>
           {dep > 0 && (
-            <div className="flex justify-between items-center text-orange-600">
-              <span className="text-xs">감가</span>
-              <span className="text-sm font-medium">-{fmtKrw(dep)}</span>
+            <div className="flex justify-between items-center gap-4 text-orange-600">
+              <span className="text-xs shrink-0">감가</span>
+              <span className="text-sm font-medium whitespace-nowrap">-{fmtKrw(dep)}</span>
             </div>
           )}
-          <div className="flex justify-between items-center border-t border-gray-200 pt-1.5 mt-1">
-            <span className="text-xs font-semibold text-gray-600">총 마진</span>
-            <span className="font-bold text-blue-700">{fmtKrw(mainMargin.total_margin)}</span>
+          <div className="flex justify-between items-center gap-4 border-t border-gray-200 pt-1.5 mt-1">
+            <span className="text-xs font-semibold text-gray-600 shrink-0">합계</span>
+            <span className="font-bold text-blue-700 whitespace-nowrap">{fmtKrw(mainMargin.total_margin)}</span>
           </div>
         </div>
       </div>
