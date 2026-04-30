@@ -52,6 +52,7 @@ export default function DeliveryTable({
               <th className="table-th">납품처</th>
               <th className="table-th text-right">물량 (톤)</th>
               <th className="table-th text-right">판매단가</th>
+              <th className="table-th text-right">원가</th>
               <th className="table-th text-right">합계</th>
               <th className="table-th">메모</th>
               <th className="table-th">관리</th>
@@ -60,7 +61,7 @@ export default function DeliveryTable({
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="table-td text-center text-gray-400 py-10">
+                <td colSpan={9} className="table-td text-center text-gray-400 py-10">
                   {filterMonth} 입고 데이터가 없습니다.
                 </td>
               </tr>
@@ -92,6 +93,12 @@ export default function DeliveryTable({
                     {isUsd
                       ? <>{fmtNum(d.contract.sell_price, 2)}<span className="text-gray-400 text-xs">USD</span></>
                       : <>{fmtNum(d.contract.sell_price)}<span className="text-gray-400 text-xs">원</span></>
+                    }
+                  </td>
+                  <td className="table-td text-right whitespace-nowrap text-gray-600">
+                    {isUsd
+                      ? <>{fmtNum(d.contract.cost_price, 2)}<span className="text-gray-400 text-xs">USD</span></>
+                      : <>{fmtNum(d.contract.cost_price)}<span className="text-gray-400 text-xs">원</span></>
                     }
                   </td>
                   <td className="table-td text-right font-semibold text-blue-700 whitespace-nowrap">
