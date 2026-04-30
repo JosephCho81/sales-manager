@@ -36,6 +36,9 @@ export function generateCommissionInvoices(
 
     const deliveryYM = c.year_month
 
+    const supplyMain = Math.round(c.commission_amount)
+    const vatMain    = Math.round(supplyMain * 0.1)
+
     // 1. 수취: 화림 → 한국에이원
     result.push({
       year_month:          yearMonth,
@@ -44,9 +47,9 @@ export function generateCommissionInvoices(
       delivery_ids:        [c.id],
       from_company:        '화림',
       to_company:          '(주)한국에이원',
-      supply_amount:       Math.round(c.commission_amount),
-      vat_amount:          0,
-      total_amount:        Math.round(c.commission_amount),
+      supply_amount:       supplyMain,
+      vat_amount:          vatMain,
+      total_amount:        supplyMain + vatMain,
       invoice_basis_date:  basis,
       issue_deadline:      due,
       payment_due_date:    due,
@@ -57,6 +60,7 @@ export function generateCommissionInvoices(
 
     // 2. 금화 1/3
     if (geumhwa > 0) {
+      const vatG = Math.round(geumhwa * 0.1)
       result.push({
         year_month:          yearMonth,
         delivery_year_month: deliveryYM,
@@ -65,8 +69,8 @@ export function generateCommissionInvoices(
         from_company:        '(주)한국에이원',
         to_company:          '금화',
         supply_amount:       geumhwa,
-        vat_amount:          0,
-        total_amount:        geumhwa,
+        vat_amount:          vatG,
+        total_amount:        geumhwa + vatG,
         invoice_basis_date:  basis,
         issue_deadline:      due,
         payment_due_date:    due,
@@ -78,6 +82,7 @@ export function generateCommissionInvoices(
 
     // 3. (주)나성 1/3
     if (raseong > 0) {
+      const vatR = Math.round(raseong * 0.1)
       result.push({
         year_month:          yearMonth,
         delivery_year_month: deliveryYM,
@@ -86,8 +91,8 @@ export function generateCommissionInvoices(
         from_company:        '(주)한국에이원',
         to_company:          '(주)나성',
         supply_amount:       raseong,
-        vat_amount:          0,
-        total_amount:        raseong,
+        vat_amount:          vatR,
+        total_amount:        raseong + vatR,
         invoice_basis_date:  basis,
         issue_deadline:      due,
         payment_due_date:    due,
