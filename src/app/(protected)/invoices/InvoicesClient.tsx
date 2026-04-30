@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toMessage } from '@/lib/error'
 import { fmtKrw } from '@/lib/margin'
+import { shiftMonths } from '@/lib/date'
 import {
   generateInvoices,
   generateCommissionInvoices,
@@ -38,6 +39,20 @@ export default function InvoicesClient({
   const [error,      setError]      = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const autoGenRef = useRef(false)
+
+  // 커미션 계산서 stale 감지
+  // 올바른 delivery_year_month = M-2 (동국/현대 모두)
+  const expectedCommDeliveryYM = shiftMonths(yearMonth, -2)
+  const hasCommInvoices = initialInvoices.some(inv => inv.invoice_type === 'commission')
+  const hasStaleComm    = initialInvoices.some(inv =>
+    inv.invoice_type === 'commission' &&
+    inv.delivery_year_month !== null &&
+    inv.delivery_year_month !== expectedCommDeliveryYM
+  )
+  // 커미션 데이터는 있는데 커미션 계산서가 없는 경우도 재생성
+  const needsRegen = initialInvoices.length === 0 ||
+    hasStaleComm ||
+    (initialCommissions.length > 0 && !hasCommInvoices)
 
   // 품목명 맵 (product_id → display_name)
   // products 전체 목록을 먼저 채워 UUID fallback 방지
@@ -88,14 +103,14 @@ export default function InvoicesClient({
     }
   }, [initialDeliveries, initialCommissions, fxRates, yearMonth])
 
-  // 자동 생성: 데이터는 있는데 계산서가 없을 때
+  // 자동 생성: 데이터는 있는데 계산서가 없거나 커미션 월이 오래된 경우
   useEffect(() => {
-    if (!autoGenRef.current && initialInvoices.length === 0 &&
+    if (!autoGenRef.current && needsRegen &&
         (initialDeliveries.length > 0 || initialCommissions.length > 0)) {
       autoGenRef.current = true
       handleGenerate()
     }
-  }, [handleGenerate, initialInvoices.length, initialDeliveries.length, initialCommissions.length])
+  }, [handleGenerate, needsRegen, initialDeliveries.length, initialCommissions.length])
 
   // 지급완료일 업데이트 (optimistic update)
   async function handleSetPaidDate(id: string, paidDate: string | null) {
