@@ -20,7 +20,7 @@ function formFromDelivery(d: DeliveryRow): FormState {
     delivery_date: d.delivery_date ?? `${d.year_month}-01`,
     product_id: d.product_id,
     contract_id: d.contract_id,
-    quantity_kg: String(d.quantity_kg / 1000),
+    quantity_kg: (d.quantity_kg / 1000).toFixed(3),
     fesi_fx_rate: '',
     depreciation_amount: d.depreciation_amount ? String(d.depreciation_amount) : '',
     memo: d.memo ?? '',
@@ -114,7 +114,7 @@ export function useDeliveryForm({
       invoice_month: shiftMonths(deliveryYearMonth, offset),
       product_id: form.product_id,
       contract_id: form.contract_id,
-      quantity_kg: qty * 1000,
+      quantity_kg: Math.round(qty * 1000),
       depreciation_amount: isCoal && form.depreciation_amount
         ? parseFloat(form.depreciation_amount) : null,
       memo: form.memo || null,
