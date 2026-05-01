@@ -18,7 +18,7 @@ export default async function ProtectedLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="p-6 pb-20 md:pb-6">{children}</div>
+        <div className="p-3 pb-20 md:p-6 md:pb-6">{children}</div>
       </main>
       <BottomNav />
     </div>

@@ -11,7 +11,7 @@ export default function SummaryCards({
   return (
     <>
       <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-1.5">3사 배분 현황</h3>
-      <div className="grid grid-cols-3 gap-3 mb-3 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 items-stretch">
         {/* (주)한국에이원 */}
         <div className="card p-3 flex flex-col">
           <div className="text-sm font-bold text-green-700 uppercase tracking-wider mb-2">(주)한국에이원</div>

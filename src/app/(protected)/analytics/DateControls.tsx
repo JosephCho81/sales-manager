@@ -45,8 +45,8 @@ export default function DateControls({
         ))}
       </div>
 
-      {/* 날짜 입력 + 조회 + 필터 */}
-      <div className="flex items-end gap-2 flex-wrap">
+      {/* 날짜 입력 + 조회 */}
+      <div className="flex items-end gap-2 flex-wrap mb-2">
         {activeMode === 'month' && (
           <input
             type="month"
@@ -89,29 +89,29 @@ export default function DateControls({
         >
           조회
         </button>
+      </div>
 
-        {/* 필터 — 변경 즉시 서버 이동 */}
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <select
-            value={filterProduct}
-            onChange={e => onFilterChange(e.target.value, filterBuyer)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">전체 품목</option>
-            {availableProducts.map(([name, display]) => (
-              <option key={name} value={name}>{display}</option>
-            ))}
-          </select>
-          <select
-            value={filterBuyer}
-            onChange={e => onFilterChange(filterProduct, e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">전체 납품처</option>
-            <option value="동국제강">동국제강</option>
-            <option value="현대제철">현대제철</option>
-          </select>
-        </div>
+      {/* 필터 — 변경 즉시 서버 이동 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <select
+          value={filterProduct}
+          onChange={e => onFilterChange(e.target.value, filterBuyer)}
+          className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">전체 품목</option>
+          {availableProducts.map(([name, display]) => (
+            <option key={name} value={name}>{display}</option>
+          ))}
+        </select>
+        <select
+          value={filterBuyer}
+          onChange={e => onFilterChange(filterProduct, e.target.value)}
+          className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="all">전체 납품처</option>
+          <option value="동국제강">동국제강</option>
+          <option value="현대제철">현대제철</option>
+        </select>
       </div>
     </div>
   )
