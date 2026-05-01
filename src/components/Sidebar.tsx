@@ -29,7 +29,7 @@ export default function Sidebar() {
   // }
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-gray-900 text-white flex flex-col">
+    <aside className="hidden md:flex w-56 flex-shrink-0 bg-gray-900 text-white flex-col">
       {/* 로고 */}
       <div className="px-4 py-5 border-b border-gray-700">
         <h1 className="text-base font-bold leading-tight">판매관리 시스템</h1>

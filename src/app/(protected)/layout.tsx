@@ -2,6 +2,7 @@
 // import { redirect } from 'next/navigation'
 // import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/Sidebar'
+import BottomNav from '@/components/BottomNav'
 
 export default async function ProtectedLayout({
   children,
@@ -17,8 +18,9 @@ export default async function ProtectedLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="p-6">{children}</div>
+        <div className="p-6 pb-20 md:pb-6">{children}</div>
       </main>
+      <BottomNav />
     </div>
   )
 }
