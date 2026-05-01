@@ -55,7 +55,7 @@ export default function ContractsClient({
           <h2 className="text-xl font-bold text-gray-900">낙찰 단가 관리</h2>
           <p className="text-sm text-gray-500 mt-0.5">품목별 입찰 기간 및 납품단가·원가단가 관리</p>
         </div>
-        <button className="btn-primary" onClick={openNew}>+ 단가 등록</button>
+        <button className="btn-primary whitespace-nowrap flex-shrink-0 text-xs px-3 py-1.5 md:text-sm md:px-4 md:py-2" onClick={openNew}>+ 단가 등록</button>
       </div>
 
       {editContract !== undefined && (
