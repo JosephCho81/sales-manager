@@ -34,15 +34,17 @@ const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
     const supabase = createAdminClient()
 
-    // 1) 납품 먼저 조회 (invoice_month 기준)
+    const DELIVERY_SELECT = `
+      id, year_month, invoice_month, product_id,
+      quantity_kg, depreciation_amount,
+      product:products(id, name, display_name, buyer),
+      contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+    `
+
+    // 1) 납품 조회 (invoice_month 기준) — totals·monthlyData·커미션 매칭용
     const dRes = await supabase
       .from('deliveries')
-      .select(`
-        id, year_month, invoice_month, product_id,
-        quantity_kg, depreciation_amount,
-        product:products(id, name, display_name, buyer),
-        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-      `)
+      .select(DELIVERY_SELECT)
       .gte('invoice_month', fromYM)
       .lte('invoice_month', toYM)
       .order('invoice_month')
@@ -50,7 +52,33 @@ const fetchAnalyticsData = unstable_cache(
     if (dRes.error) throw new Error(dRes.error.message)
     const deliveries = (dRes.data ?? []) as unknown as DeliveryForAnalytics[]
 
-    // 2) 커미션은 납품의 실제 year_month(납품월) 범위로 조회
+    // 2) productRows용 확장 조회 (year_month 기준)
+    //    offset+2 계약 건(year_month < invoice_month)의 납품월을 키로,
+    //    같은 납품월의 offset=0 형제 건까지 포함하여 합산한다.
+    //    예) 4월 조회 → 2월분 offset+2 건 발견 → year_month=2026-02 전체 재조회
+    //                → offset=0(2026-02, invoice_month=2026-02)도 같은 버킷에 합산
+    const primaryYMs = [
+      ...new Set(
+        deliveries
+          .filter(d => d.year_month < d.invoice_month)
+          .map(d => d.year_month)
+          .filter(Boolean)
+      ),
+    ]
+    let rowDeliveries: DeliveryForAnalytics[]
+    if (primaryYMs.length > 0) {
+      const rRes = await supabase
+        .from('deliveries')
+        .select(DELIVERY_SELECT)
+        .in('year_month', primaryYMs)
+      rowDeliveries = rRes.error
+        ? deliveries.filter(d => d.year_month < d.invoice_month)
+        : (rRes.data ?? []) as unknown as DeliveryForAnalytics[]
+    } else {
+      rowDeliveries = []
+    }
+
+    // 3) 커미션은 납품의 실제 year_month(납품월) 범위로 조회
     //    invoice_month ≠ year_month이므로 별도 범위 계산 필요
     //    현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
     const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
@@ -67,6 +95,7 @@ const fetchAnalyticsData = unstable_cache(
 
     return {
       deliveries,
+      rowDeliveries,
       commissions: (cRes.data ?? []) as CommissionEntry[],
     }
   },
@@ -99,19 +128,21 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
   const filterBuyer   = params.buyer   ?? 'all'
 
   try {
-    const { deliveries: allDeliveries, commissions } = await fetchAnalyticsData(fromYM, toYM)
+    const { deliveries: allDeliveries, rowDeliveries: allRowDeliveries, commissions } = await fetchAnalyticsData(fromYM, toYM)
 
     // 필터 드롭다운용 품목 목록은 반드시 전체(필터 전) 데이터에서 추출
     const availableProducts = extractAvailableProducts(allDeliveries)
 
     // 서버에서 필터 적용 — 클라이언트에 raw deliveries 전달 불필요
-    const filtered = allDeliveries.filter(d => {
+    const applyFilter = (d: DeliveryForAnalytics) => {
       if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
       if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
       return true
-    })
+    }
+    const filtered    = allDeliveries.filter(applyFilter)
+    const filteredRows = allRowDeliveries.filter(applyFilter)
 
-    const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM)
+    const precomputed = buildAllAnalytics(filtered, filteredRows, commissions, fromYM, toYM)
 
     return (
       <AnalyticsClient
