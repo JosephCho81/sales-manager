@@ -151,20 +151,15 @@ export function extractAvailableProducts(
 }
 
 /**
- * deliveries + rowDeliveries + commissions를 순회하여
+ * deliveries + commissions를 각각 한 번씩만 순회하여
  * totals / productRows / monthlyData / commissionsInPeriod / availableProducts를
  * 한꺼번에 반환한다.
  *
- * deliveries   — invoice_month 기준 필터: totals·monthlyData·커미션 매칭에 사용
- * rowDeliveries — year_month 기준 확장:  productRows 전용.
- *                 offset+2 계약 건의 year_month를 키로 조회하여 offset=0 형제 건까지
- *                 동일 버킷에 합산 → 현대제철처럼 동일 납품을 2개 원가로 나눈 경우 합계 표시
- *
  * page.tsx(서버 컴포넌트)에서 호출 → 클라이언트에 raw 계산 비용을 넘기지 않는다.
+ * 초기 렌더(필터 없음) 시 클라이언트는 이 결과를 그대로 사용한다.
  */
 export function buildAllAnalytics(
   deliveries: DeliveryForAnalytics[],
-  rowDeliveries: DeliveryForAnalytics[],
   commissions: CommissionEntry[],
   fromYM: string,
   toYM: string,
@@ -176,7 +171,7 @@ export function buildAllAnalytics(
   const dongkukDeliveryYMSet = new Set<string>()   // AL35B 납품월 집합 — 동국 커미션 필터용
   const hyundaiDeliveryYMSet = new Set<string>()   // AL30 납품월 집합 — 현대 커미션 필터용
 
-  // ─── 1) deliveries: totals + monthlyMap + 커미션 매칭용 sets ──────────
+  // ─── 1) deliveries 단일 패스 ───────────────────────────
   for (const d of deliveries) {
     if (!d.contract) continue
     if (d.product?.name.toUpperCase() === 'AL35B') dongkukDeliveryYMSet.add(d.year_month)
@@ -187,47 +182,38 @@ export function buildAllAnalytics(
     const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
     const dep    = d.depreciation_amount ?? 0
 
+    // totals
     accDelivery(totals, m, gmSell, dep)
+
+    // productRows
+    if (d.product) {
+      if (!productsSeen.has(d.product.name)) {
+        productsSeen.set(d.product.name, d.product.display_name)
+      }
+      const key = `${d.product_id}_${d.year_month}`
+      const ex  = productMap.get(key)
+      if (ex) {
+        if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
+        if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
+        accDelivery(ex, m, gmSell, dep)
+      } else {
+        const row: ProductRow = {
+          ...zeroTotals(),
+          productId: d.product_id, name: d.product.name,
+          displayName: d.product.display_name, buyer: d.product.buyer,
+          deliveryYearMonth: d.year_month,
+          sellPricePerTon: m.sell_price_krw,
+          costPricePerTon: m.cost_price_krw,
+        }
+        accDelivery(row, m, gmSell, dep)
+        productMap.set(key, row)
+      }
+    }
 
     // monthlyMap (invoice_month 기준 버킷)
     const ma = monthlyMap.get(d.invoice_month) ?? zeroTotals()
     accDelivery(ma, m, gmSell, dep)
     monthlyMap.set(d.invoice_month, ma)
-  }
-
-  // ─── 2) rowDeliveries: productRows ────────────────────────────────────
-  // year_month 기준으로 확장된 납품 건 — offset+2 primary 건의 납품월에 해당하는
-  // 모든 계약(offset=0 포함)이 한 버킷에 합산된다.
-  for (const d of rowDeliveries) {
-    if (!d.contract || !d.product) continue
-    if (!productsSeen.has(d.product.name)) {
-      productsSeen.set(d.product.name, d.product.display_name)
-    }
-
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
-    const isAL35 = d.product.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
-    const dep    = d.depreciation_amount ?? 0
-
-    const key = `${d.product_id}_${d.year_month}`
-    const ex  = productMap.get(key)
-    if (ex) {
-      // 단가 일관성 체크 — 동일 버킷 내 단가 불일치 시 null
-      if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
-      if (ex.costPricePerTon !== null && ex.costPricePerTon !== m.cost_price_krw) ex.costPricePerTon = null
-      accDelivery(ex, m, gmSell, dep)
-    } else {
-      const row: ProductRow = {
-        ...zeroTotals(),
-        productId: d.product_id, name: d.product.name,
-        displayName: d.product.display_name, buyer: d.product.buyer,
-        deliveryYearMonth: d.year_month,
-        sellPricePerTon: m.sell_price_krw,
-        costPricePerTon: m.cost_price_krw,
-      }
-      accDelivery(row, m, gmSell, dep)
-      productMap.set(key, row)
-    }
   }
 
   // ─── 2) commissions 단일 패스 ──────────────────────────
