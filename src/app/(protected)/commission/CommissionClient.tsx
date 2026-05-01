@@ -154,14 +154,14 @@ function CommissionSection({
             <table className="w-full text-sm">
               <thead>
                 <tr>
-                  <th className="table-th">기준 월</th>
-                  <th className="table-th text-right">물량(톤)</th>
-                  <th className="table-th text-right">단가(원/톤)</th>
-                  <th className="table-th text-right font-semibold">커미션 총액</th>
-                  <th className="table-th text-right text-green-700">(주)한국에이원</th>
-                  <th className="table-th text-right text-purple-700">금화</th>
-                  <th className="table-th text-right text-orange-700">(주)나성</th>
-                  <th className="table-th">메모</th>
+                  <th className="table-th whitespace-nowrap">기준 월</th>
+                  <th className="table-th text-right whitespace-nowrap">물량(톤)</th>
+                  <th className="table-th text-right whitespace-nowrap">단가(원/톤)</th>
+                  <th className="table-th text-right font-semibold whitespace-nowrap">커미션 총액</th>
+                  <th className="table-th text-right text-green-700 whitespace-nowrap">(주)한국에이원</th>
+                  <th className="table-th text-right text-purple-700 whitespace-nowrap">금화</th>
+                  <th className="table-th text-right text-orange-700 whitespace-nowrap">(주)나성</th>
+                  <th className="table-th whitespace-nowrap">메모</th>
                   <th className="table-th text-center whitespace-nowrap">관리</th>
                 </tr>
               </thead>
@@ -170,13 +170,13 @@ function CommissionSection({
                   const sp = splitMargin(row.commission_amount)
                   return (
                     <tr key={row.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="table-td font-medium">{row.year_month}</td>
-                      <td className="table-td text-right tabular-nums">{fmtNum(row.quantity_kg / 1000, 3)}</td>
-                      <td className="table-td text-right tabular-nums">{fmtNum(row.price_per_ton)}</td>
-                      <td className="table-td text-right tabular-nums font-semibold text-blue-700">{fmtKrw(row.commission_amount)}</td>
-                      <td className="table-td text-right tabular-nums text-green-600">{fmtKrw(sp.korea_a1)}</td>
-                      <td className="table-td text-right tabular-nums text-purple-600">{fmtKrw(sp.geumhwa)}</td>
-                      <td className="table-td text-right tabular-nums text-orange-600">{fmtKrw(sp.raseong)}</td>
+                      <td className="table-td font-medium whitespace-nowrap">{row.year_month}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.quantity_kg / 1000, 3)}</td>
+                      <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.price_per_ton)}</td>
+                      <td className="table-td text-right tabular-nums font-semibold text-blue-700 whitespace-nowrap">{fmtKrw(row.commission_amount)}</td>
+                      <td className="table-td text-right tabular-nums text-green-600 whitespace-nowrap">{fmtKrw(sp.korea_a1)}</td>
+                      <td className="table-td text-right tabular-nums text-purple-600 whitespace-nowrap">{fmtKrw(sp.geumhwa)}</td>
+                      <td className="table-td text-right tabular-nums text-orange-600 whitespace-nowrap">{fmtKrw(sp.raseong)}</td>
                       <td className="table-td text-xs text-gray-400 max-w-xs truncate">{row.memo ?? ''}</td>
                       <td className="table-td text-center whitespace-nowrap">
                         <button onClick={() => handleDelete(row.id)}
@@ -190,10 +190,10 @@ function CommissionSection({
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold text-sm">
                     <td className="px-4 py-2" colSpan={3}>합계</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-blue-700">{fmtKrw(rowTotals.total)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-green-600">{fmtKrw(rowTotals.a1)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-purple-600">{fmtKrw(rowTotals.gm)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-orange-600">{fmtKrw(rowTotals.rs)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-blue-700 whitespace-nowrap">{fmtKrw(rowTotals.total)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-green-600 whitespace-nowrap">{fmtKrw(rowTotals.a1)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-purple-600 whitespace-nowrap">{fmtKrw(rowTotals.gm)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums text-orange-600 whitespace-nowrap">{fmtKrw(rowTotals.rs)}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>
