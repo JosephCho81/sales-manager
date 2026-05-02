@@ -108,6 +108,10 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
     const filtered = allDeliveries.filter(d => {
       if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
       if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
+      // 현대제철 이중계약: year_month === invoice_month인 AL40/AL30은 즉시청구(offset=0) 건으로
+      // analytics에서 제외 (invoices/page.tsx와 동일한 원칙)
+      const pName = d.product?.name?.toUpperCase() ?? ''
+      if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
       return true
     })
 
