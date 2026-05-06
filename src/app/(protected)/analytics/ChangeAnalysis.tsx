@@ -54,11 +54,11 @@ function DeltaCell({
 function ChangeCard({ ch }: { ch: ProductChange }) {
   return (
     <div className="card overflow-hidden flex flex-col h-full">
-      {/* 상단: 품목명 + 납품처 + 원인 배지 */}
-      <div className="px-3 py-2 flex items-center gap-2 border-b border-gray-100 min-w-0">
+      {/* 상단: 품목명 + 납품처 + 원인 배지 — 모바일에서 배지 줄바꿈 허용 */}
+      <div className="px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-gray-100">
         <span className="text-sm font-bold text-gray-800 shrink-0">{ch.displayName}</span>
         <span className="text-xs text-gray-400 shrink-0">{ch.buyer}</span>
-        <span className={`ml-auto shrink-0 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${causeBadgeClass(ch.causeText)}`}>
+        <span className={`sm:ml-auto shrink-0 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${causeBadgeClass(ch.causeText)}`}>
           {ch.causeText}
         </span>
       </div>
@@ -111,8 +111,9 @@ export default function ChangeAnalysis({
 
   return (
     <div className="mt-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+      {/* 섹션 헤더 — range 모드에서 비교 기간 레이블이 길어지므로 wrap 허용 */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-2">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide shrink-0">
           {SECTION_TITLE}
         </h3>
         <span className="text-xs text-gray-400">
