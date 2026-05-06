@@ -179,7 +179,9 @@ export function buildAllAnalytics(
 
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const gmSell = isAL35
+      ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
+      : 0
     const dep    = d.depreciation_amount ?? 0
 
     // totals
@@ -331,7 +333,9 @@ export function computeMargins(
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const gmSell = isAL35
+      ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
+      : 0
     accDelivery(acc, m, gmSell, d.depreciation_amount ?? 0)
   }
   for (const c of commissions) {
@@ -356,7 +360,9 @@ export function buildProductRows(
 
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const gmSell = isAL35
+      ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
+      : 0
     const dep    = d.depreciation_amount ?? 0
 
     const key = `${d.product_id}_${d.year_month}`
@@ -403,7 +409,9 @@ export function buildMonthlyData(
     if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
     const m      = calcMarginFromContract(d.contract, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
-    const gmSell = isAL35 ? m.cost_price_krw * m.quantity_ton + m.geumhwa : 0
+    const gmSell = isAL35
+      ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
+      : 0
     const ma     = monthlyMap.get(d.invoice_month) ?? zeroTotals()
     accDelivery(ma, m, gmSell, d.depreciation_amount ?? 0)
     monthlyMap.set(d.invoice_month, ma)

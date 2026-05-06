@@ -41,6 +41,20 @@ export function genALSeries(
 
   const { main } = separateALMargins(deliveries)
 
+  // AL35B 전용: 금화→A1 계산서 금액
+  // (원가 + floor(톤당마진/3)) × 톤 방식으로 계산 후 반올림
+  const geumhwaAL35Supply = isAL35
+    ? deliveries.reduce((s, d) => {
+        const cost = d.contract.currency === 'USD' && d.contract.reference_exchange_rate
+          ? d.contract.cost_price * d.contract.reference_exchange_rate
+          : d.contract.cost_price
+        const sell = d.contract.currency === 'USD' && d.contract.reference_exchange_rate
+          ? d.contract.sell_price * d.contract.reference_exchange_rate
+          : d.contract.sell_price
+        return s + (cost + Math.floor((sell - cost) / 3)) * d.quantity_kg / 1000
+      }, 0)
+    : 0
+
   return [
     // 1. 동국제강→한국에이원 역발행 (매출)
     makeInvoice({
@@ -60,7 +74,7 @@ export function genALSeries(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '금화', to: '(주)한국에이원',
-      supply: isAL35 ? costTotal + main.geumhwa : costTotal,
+      supply: isAL35 ? geumhwaAL35Supply : costTotal,
       vat: hasVat,
       basisDate: monthEnd(nextM), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
       type: 'cost',
