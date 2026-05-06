@@ -1,5 +1,5 @@
 import { fmtKrw } from '@/lib/margin'
-import type { MarginTotals, CommissionsInPeriod } from './analytics-compute'
+import type { MarginTotals, CommissionsInPeriod } from './analytics-types'
 
 export default function SummaryCards({
   totals,

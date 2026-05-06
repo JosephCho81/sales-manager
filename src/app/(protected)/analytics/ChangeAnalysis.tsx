@@ -1,5 +1,5 @@
 import { fmtNum } from '@/lib/margin'
-import type { ChangeAnalysisResult, ProductChange } from './analytics-compute'
+import type { ChangeAnalysisResult, ProductChange } from './analytics-types'
 
 const SECTION_TITLE = '특이사항'
 

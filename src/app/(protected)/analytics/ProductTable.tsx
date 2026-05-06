@@ -1,7 +1,7 @@
 import React from 'react'
 import { fmtNum } from '@/lib/margin'
 import { shiftMonths } from '@/lib/date'
-import type { MarginTotals, ProductRow, CommissionsInPeriod } from './analytics-compute'
+import type { MarginTotals, ProductRow, CommissionsInPeriod } from './analytics-types'
 
 export default function ProductTable({
   productRows,

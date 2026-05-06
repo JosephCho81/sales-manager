@@ -1,21 +1,12 @@
-// unstable_cache: Next.js 권장 서버 캐시 API. 이름의 "unstable_"은 역사적 명명으로,
-// 실제로는 프로덕션에서 안정적으로 사용 가능하다.
 import { unstable_cache } from 'next/cache'
 import { toMessage } from '@/lib/error'
 import { shiftMonths } from '@/lib/date'
 import { createAdminClient } from '@/lib/supabase/server'
 import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
-import {
-  buildAllAnalytics,
-  extractAvailableProducts,
-  calcPrevPeriod,
-  buildChangeAnalysis,
-  type DeliveryForAnalytics,
-  type CommissionEntry,
-  type ProductRow,
-  type ChangeAnalysisResult,
-} from './analytics-compute'
+import { buildAllAnalytics, extractAvailableProducts } from './analytics-compute'
+import { calcPrevPeriod, buildChangeAnalysis } from './analytics-change'
+import type { DeliveryForAnalytics, CommissionEntry, ProductRow, ChangeAnalysisResult } from './analytics-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +29,6 @@ const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
     const supabase = createAdminClient()
 
-    // 1) 납품 먼저 조회 (invoice_month 기준)
     const dRes = await supabase
       .from('deliveries')
       .select(`
@@ -54,9 +44,7 @@ const fetchAnalyticsData = unstable_cache(
     if (dRes.error) throw new Error(dRes.error.message)
     const deliveries = (dRes.data ?? []) as unknown as DeliveryForAnalytics[]
 
-    // 2) 커미션은 납품의 실제 year_month(납품월) 범위로 조회
-    //    invoice_month ≠ year_month이므로 별도 범위 계산 필요
-    //    현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
+    // 현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
     const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
     const commFromYM = yms.length ? yms[0]                              : fromYM
     const commToYM   = shiftMonths(yms.length ? yms[yms.length - 1] : toYM, +1)
@@ -77,6 +65,21 @@ const fetchAnalyticsData = unstable_cache(
   ['analytics-data'],
   { revalidate: 120 },
 )
+
+function applyDeliveryFilter(
+  deliveries: DeliveryForAnalytics[],
+  filterProduct: string,
+  filterBuyer: string,
+): DeliveryForAnalytics[] {
+  return deliveries.filter(d => {
+    if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
+    if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
+    // 현대제철 이중계약: year_month === invoice_month인 AL40/AL30은 즉시청구(offset=0) 건 — analytics 제외
+    const pName = d.product?.name?.toUpperCase() ?? ''
+    if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
+    return true
+  })
+}
 
 export default async function AnalyticsPage({ searchParams }: { searchParams: SP }) {
   const params = await searchParams
@@ -102,46 +105,29 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
   const filterProduct = params.product ?? 'all'
   const filterBuyer   = params.buyer   ?? 'all'
 
+  // 이전 기간 범위는 URL params만으로 계산 가능 — 현재 기간 조회와 병렬 처리
+  const { prevFromYM, prevToYM } = calcPrevPeriod(fromYM, toYM, mode)
+
   try {
-    const { deliveries: allDeliveries, commissions } = await fetchAnalyticsData(fromYM, toYM)
+    const [currentData, prevData] = await Promise.all([
+      fetchAnalyticsData(fromYM, toYM),
+      fetchAnalyticsData(prevFromYM, prevToYM).catch(() => null),
+    ])
 
-    // 필터 드롭다운용 품목 목록은 반드시 전체(필터 전) 데이터에서 추출
+    const { deliveries: allDeliveries, commissions } = currentData
+
     const availableProducts = extractAvailableProducts(allDeliveries)
-
-    // 서버에서 필터 적용 — 클라이언트에 raw deliveries 전달 불필요
-    const filtered = allDeliveries.filter(d => {
-      if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
-      if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
-      // 현대제철 이중계약: year_month === invoice_month인 AL40/AL30은 즉시청구(offset=0) 건으로
-      // analytics에서 제외 (invoices/page.tsx와 동일한 원칙)
-      const pName = d.product?.name?.toUpperCase() ?? ''
-      if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
-      return true
-    })
-
+    const filtered = applyDeliveryFilter(allDeliveries, filterProduct, filterBuyer)
     const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM)
 
-    // 이전 기간 데이터 조회 (비교 분석용)
-    const { prevFromYM, prevToYM } = calcPrevPeriod(fromYM, toYM, mode)
     let prevProductRows: ProductRow[] = []
     let hasPrevData = false
-    try {
-      const { deliveries: prevDeliveries, commissions: prevCommissions } =
-        await fetchAnalyticsData(prevFromYM, prevToYM)
-      hasPrevData = prevDeliveries.length > 0
-      if (hasPrevData) {
-        const prevFiltered = prevDeliveries.filter(d => {
-          if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
-          if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
-          const pName = d.product?.name?.toUpperCase() ?? ''
-          if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
-          return true
-        })
-        prevProductRows = buildAllAnalytics(prevFiltered, prevCommissions, prevFromYM, prevToYM).productRows
-      }
-    } catch {
-      hasPrevData = false
+    if (prevData && prevData.deliveries.length > 0) {
+      hasPrevData = true
+      const prevFiltered = applyDeliveryFilter(prevData.deliveries, filterProduct, filterBuyer)
+      prevProductRows = buildAllAnalytics(prevFiltered, prevData.commissions, prevFromYM, prevToYM).productRows
     }
+
     const changeAnalysis: ChangeAnalysisResult = buildChangeAnalysis(
       precomputed.productRows, prevProductRows, hasPrevData, prevFromYM, prevToYM
     )

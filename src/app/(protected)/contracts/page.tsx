@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { supabaseFetch } from '@/lib/supabase/fetch'
 import ContractsClient from './ContractsClient'
 import FetchErrorView from '@/components/FetchErrorView'
+import type { ContractRow } from './types'
+import type { Product } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +23,8 @@ export default async function ContractsPage() {
 
     return (
       <ContractsClient
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        initialContracts={contracts as any[]}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        products={products as any[]}
+        initialContracts={contracts as unknown as ContractRow[]}
+        products={products as unknown as Product[]}
       />
     )
   } catch (e) {

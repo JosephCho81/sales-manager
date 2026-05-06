@@ -1,5 +1,5 @@
 import { fmtKrw } from '@/lib/margin'
-import type { MonthlyData } from './analytics-compute'
+import type { MonthlyData } from './analytics-types'
 
 // ── CSS 기반 막대 차트 (외부 라이브러리 없음) ──
 export default function MarginBarChart({ data }: { data: MonthlyData[] }) {

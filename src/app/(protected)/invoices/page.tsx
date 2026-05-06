@@ -18,11 +18,17 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
   const params    = await searchParams
   const yearMonth = params.month ?? currentYM()
 
+  // 파라미터에서 바로 계산 가능한 값들 — DB 조회 전에 선산
+  const dongkukCommMonth   = shiftMonths(yearMonth, -2)
+  const hyundaiCommMonth   = shiftMonths(yearMonth, -1)
+  const hyundaiDeliveryYM  = shiftMonths(yearMonth, -2)
+
   try {
     const supabase = createAdminClient()
 
-    // 1단계: 입고·계산서·환율·품목 병렬 조회
-    const [dRes, iRes, fxRes, pRes] = await Promise.all([
+    // 6개 쿼리 전부 병렬 처리 (이전: 3단계 순차 왕복)
+    const [dRes, iRes, fxRes, pRes, cRes, edRes] = await Promise.all([
+      // 1) 해당 월 입고 (invoice_month 기준)
       supabase
         .from('deliveries')
         .select(`
@@ -34,76 +40,64 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .eq('invoice_month', yearMonth)
         .order('created_at', { ascending: true }),
 
+      // 2) 계산서 발행 지시
       supabase
         .from('invoice_instructions')
         .select('*')
         .eq('year_month', yearMonth)
         .order('created_at', { ascending: true }),
 
-      // FeSi용 BL 날짜 기준 실제 환율
+      // 3) FeSi용 BL 날짜 기준 환율
       supabase
         .from('fx_rates')
         .select('id, bl_date, product_id, rate_krw_per_usd')
         .gte('bl_date', `${yearMonth}-01`)
         .lte('bl_date', `${yearMonth}-31`),
 
-      // 품목 전체 목록 (product_id → display_name 매핑용)
+      // 4) 품목 전체 목록 (product_id → display_name 매핑용)
       supabase
         .from('products')
         .select('id, name, display_name'),
+
+      // 5) 커미션 조회 — 동국제강=M-2, 현대제철=M-1 고정 오프셋
+      supabase
+        .from('commissions')
+        .select('id, year_month, company, commission_amount, memo')
+        .in('year_month', [dongkukCommMonth, hyundaiCommMonth])
+        .order('created_at', { ascending: true }),
+
+      // 6) 현대제철 M-2 납품 (AL40/AL30 이중계약 extra 처리용)
+      supabase
+        .from('deliveries')
+        .select(`
+          id, year_month, invoice_month, delivery_date, product_id,
+          quantity_kg, depreciation_amount,
+          product:products(id, name, display_name, vat),
+          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+        `)
+        .eq('year_month', hyundaiDeliveryYM)
+        .order('created_at', { ascending: true }),
     ])
 
-    if (dRes.error) throw new Error(`입고 조회 실패: ${dRes.error.message}`)
-    if (iRes.error) throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
+    if (dRes.error)  throw new Error(`입고 조회 실패: ${dRes.error.message}`)
+    if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
 
-    // 2단계: 커미션 조회 — 고정 오프셋
-    // - 동국제강: 커미션 year_month = M-2
-    // - 현대제철: 커미션 year_month = M-1
-    const dongkukCommMonth = shiftMonths(yearMonth, -2)
-    const hyundaiCommMonth = shiftMonths(yearMonth, -1)
-
-    const cRes = await supabase
-      .from('commissions')
-      .select('id, year_month, company, commission_amount, memo')
-      .in('year_month', [dongkukCommMonth, hyundaiCommMonth])
-      .order('created_at', { ascending: true })
-
-    // 회사별 월 매칭 (동국제강=M-2, 현대제철=M-1만 허용)
+    // 커미션: 회사별 월 매칭 검증 (동국제강=M-2, 현대제철=M-1만 허용)
     const commissions = ((cRes.data ?? []) as unknown as CommissionForInvoice[]).filter(c =>
       (c.company === '동국제강' && c.year_month === dongkukCommMonth) ||
       (c.company === '현대제철' && c.year_month === hyundaiCommMonth)
     )
 
-    // 3단계: 현대제철 납품 데이터 보완
-    // AL-40/AL-30 현대제철은 동일 납품에 대해 2개 계약(offset=0, offset=2)을 사용한다.
-    // offset=0 건(year_month === invoice_month)은 M+2 invoice의 extraDeliveries로 포함되어야 하므로
-    // 현재 월 메인 쿼리 결과에서 제외하고, M-2 year_month 전체를 별도 조회하여 합산한다.
-    const hyundaiDeliveryYM = shiftMonths(yearMonth, -2)
-
-    // M-2 year_month의 AL40/AL30 납품 항상 조회 (커미션 존재 여부와 무관)
-    const edRes = await supabase
-      .from('deliveries')
-      .select(`
-        id, year_month, invoice_month, delivery_date, product_id,
-        quantity_kg, depreciation_amount,
-        product:products(id, name, display_name, vat),
-        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-      `)
-      .eq('year_month', hyundaiDeliveryYM)
-      .order('created_at', { ascending: true })
-
+    // 입고 합산 (중복 제거)
+    // offset=0 AL40/AL30 건(year_month === invoice_month)은 M+2 invoice에서 extra로 포함
     const extraDeliveries = ((edRes.data ?? []) as unknown as DeliveryRawForInvoice[])
       .filter(d => {
         const n = d.product?.name?.toUpperCase()
         return (n?.startsWith('AL40') ?? false) || n === 'AL30'
       })
 
-    // 입고 합산 (중복 제거)
-    // offset=0 현대제철 건(year_month === invoice_month)은 M+2 invoice에서 extra로 표시되므로
-    // 현재 월 메인 쿼리에서 제외한다.
     const deliveryMap = new Map<string, DeliveryRawForInvoice>()
     for (const d of (dRes.data ?? []) as unknown as DeliveryRawForInvoice[]) {
-      // offset=0 AL40/AL30 건: year_month = 청구월(yearMonth)인 경우 M+2 invoice에서 extra로 포함됨
       const pName = d.product?.name?.toUpperCase()
       if (d.year_month === yearMonth && ((pName?.startsWith('AL40') ?? false) || pName === 'AL30')) continue
       deliveryMap.set(d.id, d)
