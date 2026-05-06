@@ -53,7 +53,7 @@ function DeltaCell({
 
 function ChangeCard({ ch }: { ch: ProductChange }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-hidden flex flex-col h-full">
       {/* 상단: 품목명 + 납품처 + 원인 배지 */}
       <div className="px-3 py-2 flex items-center gap-2 border-b border-gray-100 min-w-0">
         <span className="text-sm font-bold text-gray-800 shrink-0">{ch.displayName}</span>
@@ -63,13 +63,13 @@ function ChangeCard({ ch }: { ch: ProductChange }) {
         </span>
       </div>
 
-      {/* 하단: 물량 / 마진 2열 */}
-      <div className="px-3 py-2.5 grid grid-cols-2 gap-3">
+      {/* 중단: 물량 / 마진 2열 — flex-1로 빈 공간 채워 카드 높이 통일 */}
+      <div className="px-3 py-2.5 grid grid-cols-2 gap-3 flex-1">
         <DeltaCell label="물량" delta={ch.qtyDelta} pct={ch.qtyPct} />
         <DeltaCell label="마진" delta={ch.marginDelta} pct={ch.marginPct} isKrw />
       </div>
 
-      {/* 단가 변동 — 한 줄 요약 */}
+      {/* 하단: 단가 변동 있을 때만 */}
       {ch.priceChanged && ch.curSellPrice !== null && ch.prevSellPrice !== null && (
         <div className="px-3 pb-2 text-xs text-gray-500 border-t border-gray-50">
           단가: {fmtNum(ch.prevSellPrice, 0)} → {fmtNum(ch.curSellPrice, 0)}원/톤
@@ -99,11 +99,14 @@ export default function ChangeAnalysis({
     mode === 'month' ? '전월 대비' :
     mode === 'year'  ? '전년 동기 대비' :
     '직전 동일 기간 대비'
+  const noChangePrefix =
+    mode === 'month' ? '이번 달 변동 없음' :
+    mode === 'year'  ? '이번 연도 변동 없음' :
+    '이번 기간 변동 없음'
   const prevLabel = prevFromYM === prevToYM ? prevFromYM : `${prevFromYM} ~ ${prevToYM}`
 
   const visible  = changes.filter(ch => ch.causeText !== '변동 없음')
   const noChange = changes.filter(ch => ch.causeText === '변동 없음')
-  // displayName 기준 중복 제거
   const noChangeSummary = [...new Set(noChange.map(ch => ch.displayName))].join(', ')
 
   return (
@@ -144,18 +147,20 @@ export default function ChangeAnalysis({
         </div>
       ) : (
         <>
-          <div className="space-y-2">
+          {/* 2열 그리드 — 모바일은 1열 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {visible.map(ch => (
               <ChangeCard key={`${ch.name}_${ch.buyer}`} ch={ch} />
             ))}
-            {visible.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">변동 사항 없음</p>
-            )}
           </div>
+
+          {visible.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-4">변동 사항 없음</p>
+          )}
 
           {noChange.length > 0 && (
             <p className="text-xs text-gray-400 mt-2 px-1">
-              변동 없음: {noChangeSummary}
+              {noChangePrefix}: {noChangeSummary}
             </p>
           )}
         </>
