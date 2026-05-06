@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { fmtKrw, fmtNum } from '@/lib/margin'
 import { getCurrentYearMonth } from '@/lib/date'
 import { useMemo } from 'react'
-import type { AllAnalytics } from './analytics-compute'
+import type { AllAnalytics, ChangeAnalysisResult } from './analytics-compute'
 import MarginBarChart from './MarginBarChart'
 import DateControls from './DateControls'
 import SummaryCards from './SummaryCards'
 import ProductTable from './ProductTable'
+import ChangeAnalysis from './ChangeAnalysis'
 
 export default function AnalyticsClient({
   fromYM,
@@ -19,6 +20,7 @@ export default function AnalyticsClient({
   filterBuyer,
   availableProducts,
   precomputed,
+  changeAnalysis,
 }: {
   fromYM: string
   toYM: string
@@ -27,6 +29,7 @@ export default function AnalyticsClient({
   filterBuyer: string
   availableProducts: [string, string][]
   precomputed: AllAnalytics
+  changeAnalysis: ChangeAnalysisResult
 }) {
   const router = useRouter()
 
@@ -182,6 +185,9 @@ export default function AnalyticsClient({
         commissionsInPeriod={commissionsInPeriod}
         periodLabel={periodLabel}
       />
+
+      {/* ── 특이사항 (전월/전기간 대비 변동 분석) ── */}
+      <ChangeAnalysis analysis={changeAnalysis} mode={mode} />
     </div>
   )
 }

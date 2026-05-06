@@ -9,8 +9,12 @@ import FetchErrorView from '@/components/FetchErrorView'
 import {
   buildAllAnalytics,
   extractAvailableProducts,
+  calcPrevPeriod,
+  buildChangeAnalysis,
   type DeliveryForAnalytics,
   type CommissionEntry,
+  type ProductRow,
+  type ChangeAnalysisResult,
 } from './analytics-compute'
 
 export const dynamic = 'force-dynamic'
@@ -117,6 +121,31 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
 
     const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM)
 
+    // 이전 기간 데이터 조회 (비교 분석용)
+    const { prevFromYM, prevToYM } = calcPrevPeriod(fromYM, toYM, mode)
+    let prevProductRows: ProductRow[] = []
+    let hasPrevData = false
+    try {
+      const { deliveries: prevDeliveries, commissions: prevCommissions } =
+        await fetchAnalyticsData(prevFromYM, prevToYM)
+      hasPrevData = prevDeliveries.length > 0
+      if (hasPrevData) {
+        const prevFiltered = prevDeliveries.filter(d => {
+          if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
+          if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
+          const pName = d.product?.name?.toUpperCase() ?? ''
+          if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
+          return true
+        })
+        prevProductRows = buildAllAnalytics(prevFiltered, prevCommissions, prevFromYM, prevToYM).productRows
+      }
+    } catch {
+      hasPrevData = false
+    }
+    const changeAnalysis: ChangeAnalysisResult = buildChangeAnalysis(
+      precomputed.productRows, prevProductRows, hasPrevData, prevFromYM, prevToYM
+    )
+
     return (
       <AnalyticsClient
         fromYM={fromYM}
@@ -126,6 +155,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
         filterBuyer={filterBuyer}
         availableProducts={availableProducts}
         precomputed={precomputed}
+        changeAnalysis={changeAnalysis}
       />
     )
   } catch (e) {
