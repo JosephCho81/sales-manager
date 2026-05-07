@@ -11,6 +11,13 @@ function splitExpense(total: number) {
   return { korea_a1: base, raseong: base, geumhwa: total - base * 2 }
 }
 
+function sortRows(rows: Expense[]): Expense[] {
+  return [...rows].sort((a, b) => {
+    if (a.is_settled !== b.is_settled) return a.is_settled ? 1 : -1
+    return b.date.localeCompare(a.date)
+  })
+}
+
 export default function ExpensesClient({ initialRows }: { initialRows: Expense[] }) {
   const today = new Date().toLocaleDateString('sv-SE') // YYYY-MM-DD
   const [rows, setRows] = useState<Expense[]>(initialRows)
@@ -41,7 +48,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
       })
       if (result.error) throw new Error(result.error)
       if (result.data) {
-        setRows(prev => [result.data!, ...prev])
+        setRows(prev => sortRows([result.data!, ...prev]))
         setForm(f => ({ ...f, description: '', amount: '', note: '' }))
       }
     } catch (e) {
@@ -56,7 +63,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
       const result = await toggleSettled(row.id, !row.is_settled)
       if (result.error) throw new Error(result.error)
       if (result.data) {
-        setRows(prev => prev.map(r => r.id === row.id ? result.data! : r))
+        setRows(prev => sortRows(prev.map(r => r.id === row.id ? result.data! : r)))
       }
     } catch (e) {
       setError(toMessage(e))
@@ -82,21 +89,21 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
       </div>
 
       {/* 미정산 합계 카드 */}
-      <div className="card p-5 mb-6 border-2 border-amber-100 bg-amber-50">
+      <div className="card p-4 sm:p-5 mb-6 border-2 border-amber-100 bg-amber-50">
         <p className="text-xs text-gray-500 mb-1">미정산 합계</p>
         <p className="text-2xl font-bold text-amber-700 mb-4">{fmtKrw(unsettledTotal)}</p>
-        <div className="grid grid-cols-3 gap-3 text-center text-sm">
-          <div className="bg-white rounded-lg p-3 border border-amber-200">
-            <p className="text-xs text-gray-500 mb-1">(주)한국에이원</p>
-            <p className="font-semibold text-green-700 tabular-nums">{fmtKrw(split.korea_a1)}</p>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 text-center text-sm">
+          <div className="bg-white rounded-lg p-2 sm:p-3 border border-amber-200">
+            <p className="text-[10px] sm:text-xs text-gray-500 mb-1 whitespace-nowrap">(주)한국에이원</p>
+            <p className="font-semibold text-green-700 tabular-nums text-xs sm:text-sm">{fmtKrw(split.korea_a1)}</p>
           </div>
-          <div className="bg-white rounded-lg p-3 border border-amber-200">
-            <p className="text-xs text-gray-500 mb-1">(주)나성</p>
-            <p className="font-semibold text-orange-700 tabular-nums">{fmtKrw(split.raseong)}</p>
+          <div className="bg-white rounded-lg p-2 sm:p-3 border border-amber-200">
+            <p className="text-[10px] sm:text-xs text-gray-500 mb-1 whitespace-nowrap">(주)나성</p>
+            <p className="font-semibold text-orange-700 tabular-nums text-xs sm:text-sm">{fmtKrw(split.raseong)}</p>
           </div>
-          <div className="bg-white rounded-lg p-3 border border-amber-200">
-            <p className="text-xs text-gray-500 mb-1">금화</p>
-            <p className="font-semibold text-purple-700 tabular-nums">{fmtKrw(split.geumhwa)}</p>
+          <div className="bg-white rounded-lg p-2 sm:p-3 border border-amber-200">
+            <p className="text-[10px] sm:text-xs text-gray-500 mb-1 whitespace-nowrap">금화</p>
+            <p className="font-semibold text-purple-700 tabular-nums text-xs sm:text-sm">{fmtKrw(split.geumhwa)}</p>
           </div>
         </div>
       </div>
@@ -162,70 +169,106 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
       {rows.length === 0 ? (
         <div className="card px-4 py-8 text-center text-sm text-gray-400">등록된 비용 항목이 없습니다.</div>
       ) : (
-        <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="table-th whitespace-nowrap">날짜</th>
-                  <th className="table-th whitespace-nowrap">내역</th>
-                  <th className="table-th text-right whitespace-nowrap">금액</th>
-                  <th className="table-th whitespace-nowrap">비고</th>
-                  <th className="table-th text-center whitespace-nowrap">상태</th>
-                  <th className="table-th text-center whitespace-nowrap">관리</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr
-                    key={row.id}
-                    className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : 'hover:bg-gray-50'}`}
+        <>
+          {/* 모바일 카드 목록 */}
+          <div className="sm:hidden flex flex-col gap-2">
+            {rows.map(row => (
+              <div
+                key={row.id}
+                className={`card p-3 ${row.is_settled ? 'opacity-40' : ''}`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-xs text-gray-500 tabular-nums ${row.is_settled ? 'line-through' : ''}`}>{row.date}</span>
+                  {row.is_settled ? (
+                    <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">정산완료</span>
+                  ) : (
+                    <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">미정산</span>
+                  )}
+                </div>
+                <p className={`text-sm font-medium text-gray-900 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{row.description}</p>
+                <p className={`text-sm font-semibold tabular-nums text-gray-800 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{fmtKrw(row.amount)}</p>
+                {row.note && <p className="text-xs text-gray-400 mb-2">{row.note}</p>}
+                <div className="flex gap-3 border-t border-gray-100 pt-2 mt-1">
+                  <button
+                    onClick={() => handleToggle(row)}
+                    className={`text-xs ${row.is_settled ? 'text-blue-400 hover:text-blue-600' : 'text-green-500 hover:text-green-700'}`}
                   >
-                    <td className="table-td whitespace-nowrap">
-                      <span className={row.is_settled ? 'line-through' : ''}>{row.date}</span>
-                    </td>
-                    <td className="table-td">
-                      <span className={row.is_settled ? 'line-through' : ''}>{row.description}</span>
-                    </td>
-                    <td className="table-td text-right tabular-nums font-semibold whitespace-nowrap">
-                      <span className={row.is_settled ? 'line-through' : ''}>{fmtKrw(row.amount)}</span>
-                    </td>
-                    <td className="table-td text-xs text-gray-400 max-w-xs truncate">{row.note ?? ''}</td>
-                    <td className="table-td text-center whitespace-nowrap">
-                      {row.is_settled ? (
-                        <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">
-                          정산완료
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
-                          미정산
-                        </span>
-                      )}
-                    </td>
-                    <td className="table-td text-center whitespace-nowrap">
-                      <button
-                        onClick={() => handleToggle(row)}
-                        className={`text-xs mr-3 ${
-                          row.is_settled
-                            ? 'text-blue-400 hover:text-blue-600'
-                            : 'text-green-500 hover:text-green-700'
-                        }`}
-                      >
-                        {row.is_settled ? '미정산으로' : '정산완료'}
-                      </button>
-                      <button
-                        onClick={() => handleDelete(row.id)}
-                        className="text-xs text-red-400 hover:text-red-600"
-                      >
-                        삭제
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    {row.is_settled ? '미정산으로' : '정산완료'}
+                  </button>
+                  <button onClick={() => handleDelete(row.id)} className="text-xs text-red-400 hover:text-red-600">
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+
+          {/* 데스크톱 테이블 */}
+          <div className="hidden sm:block card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="table-th text-center whitespace-nowrap">날짜</th>
+                    <th className="table-th text-center whitespace-nowrap">내역</th>
+                    <th className="table-th text-center whitespace-nowrap">금액</th>
+                    <th className="table-th text-center whitespace-nowrap">비고</th>
+                    <th className="table-th text-center whitespace-nowrap">상태</th>
+                    <th className="table-th text-center whitespace-nowrap">관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr
+                      key={row.id}
+                      className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : 'hover:bg-gray-50'}`}
+                    >
+                      <td className="table-td text-center whitespace-nowrap">
+                        <span className={row.is_settled ? 'line-through' : ''}>{row.date}</span>
+                      </td>
+                      <td className="table-td text-center">
+                        <span className={row.is_settled ? 'line-through' : ''}>{row.description}</span>
+                      </td>
+                      <td className="table-td text-center tabular-nums font-semibold whitespace-nowrap">
+                        <span className={row.is_settled ? 'line-through' : ''}>{fmtKrw(row.amount)}</span>
+                      </td>
+                      <td className="table-td text-center text-xs text-gray-400 max-w-xs truncate">{row.note ?? ''}</td>
+                      <td className="table-td text-center whitespace-nowrap">
+                        {row.is_settled ? (
+                          <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">
+                            정산완료
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
+                            미정산
+                          </span>
+                        )}
+                      </td>
+                      <td className="table-td text-center whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggle(row)}
+                          className={`text-xs mr-3 ${
+                            row.is_settled
+                              ? 'text-blue-400 hover:text-blue-600'
+                              : 'text-green-500 hover:text-green-700'
+                          }`}
+                        >
+                          {row.is_settled ? '미정산으로' : '정산완료'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(row.id)}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >
+                          삭제
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
