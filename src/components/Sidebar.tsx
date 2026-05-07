@@ -13,6 +13,7 @@ const navItems = [
   { href: '/commission',  label: '커미션 관리',       icon: '💰' },
   { href: '/invoices',    label: '지급 일정 관리',    icon: '🧾' },
   { href: '/products',    label: '품목 설정',         icon: '⚙️' },
+  { href: '/expenses',    label: '비용 정산',         icon: '🧮' },
 ]
 
 // [로그인 비활성화] 추후 활성화 시 { userEmail }: { userEmail: string } 복원

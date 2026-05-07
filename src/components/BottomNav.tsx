@@ -8,6 +8,7 @@ const tabs = [
   { href: '/deliveries', label: '납품',   icon: '📦' },
   { href: '/commission', label: '커미션', icon: '💰' },
   { href: '/contracts',  label: '계약',   icon: '📋' },
+  { href: '/expenses',   label: '비용',   icon: '🧮' },
 ]
 
 export default function BottomNav() {
