@@ -15,7 +15,8 @@ export default async function ExpensesPage() {
     const { data, error } = await supabase
       .from('expenses')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('is_settled', { ascending: true })
+      .order('date', { ascending: false })
     if (error) fetchError = error.message
     else rows = (data ?? []) as Expense[]
   } catch (e) {
