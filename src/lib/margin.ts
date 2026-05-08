@@ -34,6 +34,7 @@ export interface ContractForMargin {
   cost_price: number
   currency: string             // 'KRW' | 'USD'
   reference_exchange_rate?: number | null
+  depreciation?: number | null // 감가(원/톤) — 마진에서 차감
 }
 
 export function calcMarginFromContract(
@@ -61,8 +62,11 @@ export function calcMarginFromContract(
     cost_price_krw = contract.cost_price
   }
 
-  const result = calcMargin(sell_price_krw, cost_price_krw, quantityKg)
-  return { ...result, sell_price_krw, cost_price_krw, exchange_rate_used }
+  const dep = contract.depreciation ?? 0
+  const quantity_ton = quantityKg / 1000
+  const total_margin = Math.round((sell_price_krw - cost_price_krw - dep) * quantity_ton)
+  const { korea_a1, geumhwa, raseong } = splitMargin(total_margin)
+  return { quantity_ton, sell_price: sell_price_krw, cost_price: cost_price_krw, total_margin, korea_a1, geumhwa, raseong, sell_price_krw, cost_price_krw, exchange_rate_used }
 }
 
 // ────────────────────────────────────────────────────────

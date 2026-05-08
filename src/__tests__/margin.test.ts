@@ -123,3 +123,69 @@ describe('calcMarginFromContract', () => {
     expect(korea_a1 + geumhwa + raseong).toBe(total_margin)
   })
 })
+
+// ── calcMarginFromContract — USD 환율 상세 ──────────────────
+describe('calcMarginFromContract — USD 환율 상세', () => {
+  it('유효한 환율 → sell_price_krw / cost_price_krw / exchange_rate_used 정확성', () => {
+    const contract = { sell_price: 800, cost_price: 650, currency: 'USD', reference_exchange_rate: 1350 }
+    const result = calcMarginFromContract(contract, 5_000) // 5톤
+    expect(result.exchange_rate_used).toBe(1350)
+    expect(result.sell_price_krw).toBe(800 * 1350)
+    expect(result.cost_price_krw).toBe(650 * 1350)
+    expect(result.total_margin).toBe(Math.round((800 - 650) * 1350 * 5))
+    expect(result.korea_a1 + result.geumhwa + result.raseong).toBe(result.total_margin)
+  })
+
+  it('null 환율 → 에러 메시지에 "참고환율" 포함', () => {
+    const contract = { sell_price: 800, cost_price: 650, currency: 'USD', reference_exchange_rate: null }
+    expect(() => calcMarginFromContract(contract, 5_000)).toThrow('참고환율')
+  })
+
+  it('환율 0 → 에러 메시지에 "참고환율" 포함 (rate <= 0 조건)', () => {
+    const contract = { sell_price: 800, cost_price: 650, currency: 'USD', reference_exchange_rate: 0 }
+    expect(() => calcMarginFromContract(contract, 5_000)).toThrow('참고환율')
+  })
+
+  it('음수 환율 → 에러 throw (rate <= 0 조건으로 처리)', () => {
+    const contract = { sell_price: 800, cost_price: 650, currency: 'USD', reference_exchange_rate: -1000 }
+    expect(() => calcMarginFromContract(contract, 5_000)).toThrow()
+  })
+})
+
+// ── calcMarginFromContract — 감가상각(depreciation) ─────────
+describe('calcMarginFromContract — 감가상각(depreciation)', () => {
+  const base = { sell_price: 2_000_000, cost_price: 1_700_000, currency: 'KRW', reference_exchange_rate: null as null }
+  // 기준: 10톤, 마진 300,000원/톤 = 3,000,000원
+
+  it('감가상각 있는 계약 → 마진에 반영됨', () => {
+    // depreciation 10,000원/톤 → (300,000 − 10,000) × 10 = 2,900,000원
+    const contract = { ...base, depreciation: 10_000 }
+    const result = calcMarginFromContract(contract, 10_000)
+    expect(result.total_margin).toBe(2_900_000)
+  })
+
+  it('감가상각 0 → 감가상각 없는 계약과 동일 결과', () => {
+    const withZero = { ...base, depreciation: 0 }
+    const r1 = calcMarginFromContract(base, 10_000)
+    const r2 = calcMarginFromContract(withZero, 10_000)
+    expect(r1.total_margin).toBe(r2.total_margin)
+  })
+
+  it('음수 감가상각 → 마진 증가', () => {
+    // depreciation -5,000원/톤 → (300,000 − (−5,000)) × 10 = 305,000 × 10 = 3,050,000원
+    const contract = { ...base, depreciation: -5_000 }
+    const result = calcMarginFromContract(contract, 10_000)
+    expect(result.total_margin).toBe(3_050_000)
+  })
+
+  it('감가상각 적용 — 3사 배분이 splitMargin(total_margin)과 일치', () => {
+    // calcMarginFromContract 내부 배분이 splitMargin 직접 호출 결과와 동일해야 함
+    const contract = { ...base, depreciation: 10_000 }
+    const { total_margin, korea_a1, geumhwa, raseong } = calcMarginFromContract(contract, 10_000)
+    expect(total_margin).toBe(2_900_000)
+    const { korea_a1: a1, geumhwa: gm, raseong: rs } = splitMargin(total_margin)
+    expect(korea_a1).toBe(a1)
+    expect(geumhwa).toBe(gm)
+    expect(raseong).toBe(rs)
+  })
+})
