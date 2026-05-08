@@ -14,7 +14,9 @@ export function validateContract(
   if (!form.start_date || !form.end_date) return '낙찰 기간을 입력하세요.'
   if (form.start_date >= form.end_date) return '종료일은 시작일보다 이후여야 합니다.'
   if (!form.sell_price || isNaN(parseFloat(form.sell_price))) return '판매단가를 입력하세요.'
+  if (parseFloat(form.sell_price) <= 0) return '판매단가는 0보다 커야 합니다.'
   if (!form.cost_price || isNaN(parseFloat(form.cost_price))) return '원가단가를 입력하세요.'
+  if (parseFloat(form.cost_price) <= 0) return '원가단가는 0보다 커야 합니다.'
   if (isUsd && (!form.reference_exchange_rate || isNaN(parseFloat(form.reference_exchange_rate)))) {
     return 'FeSi 품목은 참고 환율을 입력해야 합니다.'
   }
