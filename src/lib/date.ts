@@ -125,22 +125,14 @@ function isKoreanHoliday(dateStr: string): boolean {
   return (VARIABLE_HOLIDAYS[year] ?? []).includes(dateStr)
 }
 
-/** YYYY-MM의 n번째 워킹데이 (월~금, 한국 공휴일 제외) */
-export function nthWorkingDay(ym: string, n: number): string {
+/** YYYY-MM의 day일이 워킹데이이면 그대로, 토/일/공휴일이면 다음 워킹데이 반환 */
+export function workingDayOnOrAfter(ym: string, day: number): string {
   const [y, m] = parseYM(ym)
-  let count = 0
-  let lastFound = ''
-  const d = new Date(y, m - 1, 1)
-  while (d.getMonth() === m - 1) {
+  const d = new Date(y, m - 1, day)
+  while (true) {
     const dow = d.getDay()
     const ds  = fmtDate(d)
-    if (dow !== 0 && dow !== 6 && !isKoreanHoliday(ds)) {
-      count++
-      lastFound = ds
-      if (count === n) return ds
-    }
+    if (dow !== 0 && dow !== 6 && !isKoreanHoliday(ds)) return ds
     d.setDate(d.getDate() + 1)
   }
-  // n이 해당 월의 워킹데이 수보다 크면 마지막 워킹데이 반환
-  return lastFound
 }
