@@ -6,10 +6,10 @@
  *   2. 한국에이원 → 금화     : 1/3 배분
  *   3. 한국에이원 → 라성     : 1/3 배분 (한국에이원 1/3 보유 — 계산서 없음)
  *
- * 날짜: 당월말 기준, 익월 15일 지급
+ * 날짜: 조회월(m) 10번째 워킹데이 기준, 동일일 지급
  */
 import { splitMargin } from '@/lib/margin'
-import { monthEnd, nthDay, shiftMonths } from '@/lib/date'
+import { nthWorkingDay } from '@/lib/date'
 import type { InvoiceToCreate } from './types'
 
 export type CommissionForInvoice = {
@@ -28,11 +28,12 @@ export function generateCommissionInvoices(
 
   for (const c of commissions) {
     const { geumhwa, raseong } = splitMargin(c.commission_amount)
-    const nextM = shiftMonths(c.year_month, 1)
+    // 발행기준일/지급예정일: 조회월(m) 10번째 워킹데이 (토/일/한국 공휴일 제외)
+    const workingDay10 = nthWorkingDay(yearMonth, 10)
     // 회사명을 항상 포함 — commGroupLabel이 memo에서 회사명을 감지하므로
     const label = `${c.year_month.replace('-', '년 ')}월 ${c.company} 커미션${c.memo ? ' — ' + c.memo : ''}`
-    const basis = monthEnd(c.year_month)
-    const due   = nthDay(nextM, 15)
+    const basis = workingDay10
+    const due   = workingDay10
 
     const deliveryYM = c.year_month
 
