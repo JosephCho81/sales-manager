@@ -6,10 +6,11 @@
  *   2. 한국에이원 → 금화     : 1/3 배분
  *   3. 한국에이원 → 라성     : 1/3 배분 (한국에이원 1/3 보유 — 계산서 없음)
  *
- * 날짜: 조회월(m) 10번째 워킹데이 기준, 동일일 지급
+ * 날짜 (화림→한국에이원 수취): 동국제강=(m-1)월 3일/6일, 현대제철=m월 3일/6일 (워킹데이 기준)
+ * 날짜 (금화·나성 배분): 조회월(m) 10일 기준
  */
 import { splitMargin } from '@/lib/margin'
-import { workingDayOnOrAfter } from '@/lib/date'
+import { workingDayOnOrAfter, shiftMonths } from '@/lib/date'
 import type { InvoiceToCreate } from './types'
 
 export type CommissionForInvoice = {
@@ -28,12 +29,16 @@ export function generateCommissionInvoices(
 
   for (const c of commissions) {
     const { geumhwa, raseong } = splitMargin(c.commission_amount)
-    // 발행기준일/지급예정일: 조회월(m) 10일, 휴일이면 다음 워킹데이
-    const workingDay10 = workingDayOnOrAfter(yearMonth, 10)
     // 회사명을 항상 포함 — commGroupLabel이 memo에서 회사명을 감지하므로
     const label = `${c.year_month.replace('-', '년 ')}월 ${c.company} 커미션${c.memo ? ' — ' + c.memo : ''}`
-    const basis = workingDay10
-    const due   = workingDay10
+
+    // 화림→한국에이원 수취 invoice: 동국제강=전월(m-1) 3일/6일, 현대제철=조회월(m) 3일/6일
+    const basisYM   = c.company === '동국제강' ? shiftMonths(yearMonth, -1) : yearMonth
+    const basisMain = workingDayOnOrAfter(basisYM, 3)
+    const dueMain   = workingDayOnOrAfter(basisYM, 6)
+
+    // 금화·나성 배분 invoice: 기존 조회월(m) 10일 유지
+    const workingDay10 = workingDayOnOrAfter(yearMonth, 10)
 
     const deliveryYM = c.year_month
 
@@ -51,9 +56,9 @@ export function generateCommissionInvoices(
       supply_amount:       supplyMain,
       vat_amount:          vatMain,
       total_amount:        supplyMain + vatMain,
-      invoice_basis_date:  basis,
-      issue_deadline:      due,
-      payment_due_date:    due,
+      invoice_basis_date:  basisMain,
+      issue_deadline:      dueMain,
+      payment_due_date:    dueMain,
       is_paid:             false,
       invoice_type:        'commission',
       memo:                `${label} 수취`,
@@ -72,9 +77,9 @@ export function generateCommissionInvoices(
         supply_amount:       geumhwa,
         vat_amount:          vatG,
         total_amount:        geumhwa + vatG,
-        invoice_basis_date:  basis,
-        issue_deadline:      due,
-        payment_due_date:    due,
+        invoice_basis_date:  workingDay10,
+        issue_deadline:      workingDay10,
+        payment_due_date:    workingDay10,
         is_paid:             false,
         invoice_type:        'commission',
         memo:                `${label} — 금화 1/3`,
@@ -94,9 +99,9 @@ export function generateCommissionInvoices(
         supply_amount:       raseong,
         vat_amount:          vatR,
         total_amount:        raseong + vatR,
-        invoice_basis_date:  basis,
-        issue_deadline:      due,
-        payment_due_date:    due,
+        invoice_basis_date:  workingDay10,
+        issue_deadline:      workingDay10,
+        payment_due_date:    workingDay10,
         is_paid:             false,
         invoice_type:        'commission',
         memo:                `${label} — (주)나성 1/3`,
