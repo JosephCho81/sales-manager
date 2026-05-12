@@ -28,7 +28,7 @@ export default function BottomNav() {
               }`}
             >
               <span className="text-xl leading-none">{tab.icon}</span>
-              {tab.label}
+              <span className="whitespace-nowrap">{tab.label}</span>
             </Link>
           )
         })}
