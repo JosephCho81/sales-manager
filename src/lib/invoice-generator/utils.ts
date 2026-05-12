@@ -23,7 +23,7 @@ export function makeInvoice(p: {
   memo: string
 }): InvoiceToCreate {
   const supply = Math.round(p.supply)
-  const vatAmt = p.vat ? Math.round(supply * 0.1) : 0
+  const vatAmt = p.vat ? Math.floor(supply * 0.1) : 0
   return {
     year_month: p.yearMonth,
     delivery_year_month: p.deliveryYearMonth,

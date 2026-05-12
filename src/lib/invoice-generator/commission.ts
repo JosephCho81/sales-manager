@@ -43,7 +43,7 @@ export function generateCommissionInvoices(
     const deliveryYM = c.year_month
 
     const supplyMain = Math.round(c.commission_amount)
-    const vatMain    = Math.round(supplyMain * 0.1)
+    const vatMain    = Math.floor(supplyMain * 0.1)
 
     // 1. 수취: 화림 → 한국에이원
     result.push({
@@ -66,7 +66,7 @@ export function generateCommissionInvoices(
 
     // 2. 금화 1/3
     if (geumhwa > 0) {
-      const vatG = Math.round(geumhwa * 0.1)
+      const vatG = Math.floor(geumhwa * 0.1)
       result.push({
         year_month:          yearMonth,
         delivery_year_month: deliveryYM,
@@ -88,7 +88,7 @@ export function generateCommissionInvoices(
 
     // 3. (주)나성 1/3
     if (raseong > 0) {
-      const vatR = Math.round(raseong * 0.1)
+      const vatR = Math.floor(raseong * 0.1)
       result.push({
         year_month:          yearMonth,
         delivery_year_month: deliveryYM,
