@@ -205,23 +205,32 @@ export default function InvoicesClient({
       <div className="card mb-6 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="w-24 px-3 py-2" />
-              {['매입 계산서', '매출 계산서', '커미션 수령', '커미션 지급'].map(label => (
-                <th key={label} className="px-4 py-2 text-xs font-semibold text-gray-600 text-center border-l border-gray-200">{label}</th>
+            <tr>
+              <th className="w-28 bg-gray-50 border-b border-gray-200" />
+              {[
+                { label: '매입 계산서', cls: 'bg-orange-50 text-orange-700' },
+                { label: '매출 계산서', cls: 'bg-blue-50 text-blue-700'     },
+                { label: '커미션 수령', cls: 'bg-purple-50 text-purple-700' },
+                { label: '커미션 지급', cls: 'bg-violet-50 text-violet-700' },
+              ].map(col => (
+                <th key={col.label} className={`px-4 py-3 text-sm font-bold text-center border-b border-l border-gray-200 ${col.cls}`}>
+                  {col.label}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {[
-              { label: '전체 금액',   labelColor: 'text-gray-500',  totalColor: 'text-gray-900',  stats: [costStats.all,    salesStats.all,    commRecvStats.all,    commPayStats.all]    },
-              { label: '미지급 잔액', labelColor: 'text-red-500',   totalColor: 'text-red-600',   stats: [costStats.unpaid, salesStats.unpaid, commRecvStats.unpaid, commPayStats.unpaid] },
-              { label: '지급 완료',   labelColor: 'text-green-600', totalColor: 'text-green-600', stats: [costStats.paid,   salesStats.paid,   commRecvStats.paid,   commPayStats.paid]   },
+              { label: '전체 금액',   accent: 'border-l-gray-400',  labelCls: 'text-gray-700',  totalColor: 'text-gray-900',  stats: [costStats.all,    salesStats.all,    commRecvStats.all,    commPayStats.all]    },
+              { label: '미지급 잔액', accent: 'border-l-red-400',   labelCls: 'text-red-600',   totalColor: 'text-red-600',   stats: [costStats.unpaid, salesStats.unpaid, commRecvStats.unpaid, commPayStats.unpaid] },
+              { label: '지급 완료',   accent: 'border-l-green-500', labelCls: 'text-green-700', totalColor: 'text-green-700', stats: [costStats.paid,   salesStats.paid,   commRecvStats.paid,   commPayStats.paid]   },
             ].map(row => (
               <tr key={row.label} className="border-t border-gray-200">
-                <td className={`px-3 py-3 bg-gray-50 text-xs font-medium whitespace-nowrap ${row.labelColor}`}>{row.label}</td>
+                <td className={`pl-3 pr-4 py-3 bg-gray-50 text-sm font-bold whitespace-nowrap border-l-4 ${row.accent} ${row.labelCls}`}>
+                  {row.label}
+                </td>
                 {row.stats.map((gs, i) => (
-                  <td key={i} className="px-4 py-2.5 border-l border-gray-200 align-top">
+                  <td key={i} className="px-4 py-3 border-l border-gray-200 align-top">
                     <div className="flex justify-between gap-4 text-xs text-gray-500">
                       <span>공급가액</span>
                       <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.supply)}</span>
@@ -230,7 +239,7 @@ export default function InvoicesClient({
                       <span>부가세</span>
                       <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.vat)}</span>
                     </div>
-                    <div className={`flex justify-between gap-4 text-sm font-bold mt-1 ${row.totalColor}`}>
+                    <div className={`flex justify-between gap-4 text-sm font-bold mt-1.5 ${row.totalColor}`}>
                       <span>합계</span>
                       <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.total)}</span>
                     </div>
