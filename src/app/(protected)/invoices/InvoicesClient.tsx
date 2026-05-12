@@ -18,6 +18,43 @@ import {
 import { replaceInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 
+type GS = { supply: number; vat: number; total: number; count: number }
+function sumG(rows: InvoiceRow[]): GS {
+  return {
+    supply: rows.reduce((s, r) => s + Number(r.supply_amount), 0),
+    vat:    rows.reduce((s, r) => s + Number(r.vat_amount), 0),
+    total:  rows.reduce((s, r) => s + Number(r.total_amount), 0),
+    count:  rows.length,
+  }
+}
+function splitPaid(rows: InvoiceRow[]) {
+  return {
+    all:    sumG(rows),
+    unpaid: sumG(rows.filter(r => !r.paid_at)),
+    paid:   sumG(rows.filter(r =>  r.paid_at)),
+  }
+}
+
+function SummaryCell({ gs, totalColor }: { gs: GS; totalColor: string }) {
+  return (
+    <div className="card p-3">
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>공급가액</span>
+        <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.supply)}</span>
+      </div>
+      <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+        <span>부가세</span>
+        <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.vat)}</span>
+      </div>
+      <div className={`flex justify-between text-sm font-bold mt-1 ${totalColor}`}>
+        <span>합계</span>
+        <span className="tabular-nums whitespace-nowrap">{fmtKrw(gs.total)}</span>
+      </div>
+      <p className="text-xs text-gray-400 mt-0.5 text-right">{gs.count}건</p>
+    </div>
+  )
+}
+
 export default function InvoicesClient({
   yearMonth,
   initialDeliveries,
@@ -139,9 +176,10 @@ export default function InvoicesClient({
   }
 
   // 집계
-  const totalAmount  = invoices.reduce((s, inv) => s + Number(inv.total_amount), 0)
-  const unpaidAmount = invoices.filter(inv => !inv.paid_at).reduce((s, inv) => s + Number(inv.total_amount), 0)
-  const paidAmount   = invoices.filter(inv =>  inv.paid_at).reduce((s, inv) => s + Number(inv.total_amount), 0)
+  const costStats     = splitPaid(invoices.filter(i => i.invoice_type === 'cost'))
+  const salesStats    = splitPaid(invoices.filter(i => i.invoice_type === 'sales'))
+  const commRecvStats = splitPaid(invoices.filter(i => i.invoice_type === 'commission' && i.from_company === '화림'))
+  const commPayStats  = splitPaid(invoices.filter(i => i.invoice_type === 'commission' && i.from_company !== '화림'))
 
   return (
     <div>
@@ -185,22 +223,26 @@ export default function InvoicesClient({
       )}
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="card p-4">
-          <p className="text-xs text-gray-500 font-medium">전체 계산서 금액</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{fmtKrw(totalAmount)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{invoices.length}건</p>
+      <div className="mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-2 pl-20">
+          {['매입 계산서', '매출 계산서', '커미션 수령', '커미션 지급'].map(label => (
+            <p key={label} className="text-xs font-semibold text-center text-gray-500">{label}</p>
+          ))}
         </div>
-        <div className="card p-4">
-          <p className="text-xs text-gray-500 font-medium">미지급 잔액</p>
-          <p className="text-xl font-bold text-red-600 mt-1">{fmtKrw(unpaidAmount)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{invoices.filter(i => !i.paid_at).length}건</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs text-gray-500 font-medium">지급 완료</p>
-          <p className="text-xl font-bold text-green-600 mt-1">{fmtKrw(paidAmount)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{invoices.filter(i => i.paid_at).length}건</p>
-        </div>
+        {[
+          { label: '전체 금액',   labelColor: 'text-gray-500',  totalColor: 'text-gray-900',  stats: [costStats.all,    salesStats.all,    commRecvStats.all,    commPayStats.all]    },
+          { label: '미지급 잔액', labelColor: 'text-red-500',   totalColor: 'text-red-600',   stats: [costStats.unpaid, salesStats.unpaid, commRecvStats.unpaid, commPayStats.unpaid] },
+          { label: '지급 완료',   labelColor: 'text-green-600', totalColor: 'text-green-600', stats: [costStats.paid,   salesStats.paid,   commRecvStats.paid,   commPayStats.paid]   },
+        ].map(row => (
+          <div key={row.label} className="flex gap-3 items-start mb-3">
+            <p className={`text-xs font-medium w-20 pt-3 shrink-0 ${row.labelColor}`}>{row.label}</p>
+            <div className="grid grid-cols-4 gap-3 flex-1">
+              {row.stats.map((gs, i) => (
+                <SummaryCell key={i} gs={gs} totalColor={row.totalColor} />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* 계산서 목록 */}
