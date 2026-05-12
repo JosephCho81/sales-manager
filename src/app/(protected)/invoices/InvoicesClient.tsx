@@ -205,7 +205,7 @@ export default function InvoicesClient({
       {/* 요약 카드 */}
       <div className="card mb-6 overflow-hidden">
         <div className="overflow-x-auto">
-        <p className="md:hidden text-xs text-gray-400 px-3 pt-2 -mb-1">부가세 별도</p>
+        <p className="md:hidden text-xs text-gray-400 px-3 pt-2 pb-2">부가세 별도</p>
         <table className="w-full text-sm">
           <thead>
             <tr>
