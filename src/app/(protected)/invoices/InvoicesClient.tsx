@@ -234,7 +234,7 @@ export default function InvoicesClient({
                   <span className="md:hidden">{row.shortLabel}</span>
                 </td>
                 {row.stats.map((gs, i) => (
-                  <td key={i} className="px-2 py-2 md:px-4 md:py-3 border-l border-gray-200">
+                  <td key={i} className="px-2 py-2 md:px-4 md:py-3 border-l border-gray-200 text-left">
                     <span className="md:hidden tabular-nums text-sm font-semibold whitespace-nowrap">
                       {fmtKrw(gs.supply)}
                     </span>
