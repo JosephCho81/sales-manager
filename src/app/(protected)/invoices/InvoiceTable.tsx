@@ -75,7 +75,7 @@ export default function InvoiceTable({
   }
 
   return (
-    <div className="card overflow-hidden">
+    <div className="hidden md:block card overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <tbody>

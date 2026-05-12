@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 
 const tabs = [
   { href: '/analytics',  label: '분석',   icon: '📊' },
-  { href: '/deliveries', label: '납품',   icon: '📦' },
+  { href: '/invoices',   label: '지급일정', icon: '🧾' },
   { href: '/commission', label: '커미션', icon: '💰' },
   { href: '/contracts',  label: '계약',   icon: '📋' },
   { href: '/expenses',   label: '비용',   icon: '🧮' },

@@ -17,6 +17,7 @@ import {
 } from '@/lib/invoice-generator'
 import { replaceInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
+import InvoiceCardList from './InvoiceCardList'
 
 type GS = { supply: number; vat: number; total: number }
 function sumG(rows: InvoiceRow[]): GS {
@@ -203,7 +204,8 @@ export default function InvoicesClient({
 
       {/* 요약 카드 */}
       <div className="card mb-6 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[36rem]">
           <thead>
             <tr>
               <th className="w-28 bg-gray-50 border-b border-gray-200" />
@@ -249,6 +251,7 @@ export default function InvoicesClient({
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 계산서 목록 */}
@@ -261,12 +264,19 @@ export default function InvoicesClient({
           </p>
         </div>
       ) : (
-        <InvoiceTable
-          invoices={invoices}
-          productMap={productMap}
-          productOrderMap={productOrderMap}
-          onSetPaidDate={handleSetPaidDate}
-        />
+        <>
+          <InvoiceTable
+            invoices={invoices}
+            productMap={productMap}
+            productOrderMap={productOrderMap}
+            onSetPaidDate={handleSetPaidDate}
+          />
+          <InvoiceCardList
+            invoices={invoices}
+            productMap={productMap}
+            productOrderMap={productOrderMap}
+          />
+        </>
       )}
     </div>
   )
