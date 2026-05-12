@@ -10,7 +10,7 @@
  *
  * 날짜 기준: 선택월(ym)이 아닌 배송월(deliveryYM)
  */
-import { shiftMonths, monthEnd, nthDay } from '@/lib/date'
+import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
 import { makeInvoice, separateALMargins } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -26,6 +26,13 @@ export function genALSeries(
   const nextM      = shiftMonths(deliveryYM, 1)
   const next2M     = shiftMonths(deliveryYM, 2)
   const ymLabel    = deliveryYM.replace('-', '년 ') + '월'
+
+  // 워킹데이 보정: 발행기준일/지급예정일이 휴일이면 다음 근무일로
+  const wBasisM  = workingDayFrom(monthEnd(deliveryYM))
+  const wDue1N   = workingDayOnOrAfter(nextM, 1)
+  const wEndN    = workingDayFrom(monthEnd(nextM))
+  const wDue1N2  = workingDayOnOrAfter(next2M, 1)
+  const wDue10N2 = workingDayOnOrAfter(next2M, 10)
 
   const sellTotal = deliveries.reduce(
     (s, d) => s + d.contract.sell_price * d.quantity_kg / 1000,
@@ -60,14 +67,14 @@ export function genALSeries(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '동국제강', to: '(주)한국에이원', supply: sellTotal, vat: hasVat,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: monthEnd(nextM),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wEndN,
       type: 'sales', memo: '동국제강 역발행 — 매출',
     }),
     // 2. 화림→금화 원가
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '화림', to: '금화', supply: costTotal, vat: hasVat,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: nthDay(next2M, 1),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue1N2,
       type: 'cost', memo: '화림 원가 — 당월말 기준, 익월1일 발행 (익익월1일 대금)',
     }),
     // 3. 금화→한국에이원
@@ -76,7 +83,7 @@ export function genALSeries(
       from: '금화', to: '(주)한국에이원',
       supply: isAL35 ? geumhwaAL35Supply : costTotal,
       vat: hasVat,
-      basisDate: monthEnd(nextM), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
+      basisDate: wEndN, deadline: wDue1N2, paymentDue: wDue1N2,
       type: 'cost',
       memo: isAL35
         ? '금화→(주)한국에이원 — 원가+마진1/3 (AL35 매매)'
@@ -86,14 +93,14 @@ export function genALSeries(
     ...(!isAL35 ? [makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '금화', supply: main.geumhwa, vat: hasVat,
-      basisDate: nthDay(next2M, 1), deadline: nthDay(next2M, 1), paymentDue: nthDay(next2M, 1),
+      basisDate: wDue1N2, deadline: wDue1N2, paymentDue: wDue1N2,
       type: 'commission', memo: `${ymLabel} 마진 — 금화 커미션 1/3`,
     })] : []),
     // 5. 한국에이원→라성 커미션
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '(주)나성', supply: main.raseong, vat: hasVat,
-      basisDate: nthDay(next2M, 10), deadline: nthDay(next2M, 10), paymentDue: nthDay(next2M, 10),
+      basisDate: wDue10N2, deadline: wDue10N2, paymentDue: wDue10N2,
       type: 'commission', memo: `${ymLabel} 마진 — (주)나성 커미션 (나머지)`,
     }),
   ]

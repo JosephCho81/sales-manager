@@ -136,3 +136,15 @@ export function workingDayOnOrAfter(ym: string, day: number): string {
     d.setDate(d.getDate() + 1)
   }
 }
+
+/** YYYY-MM-DD가 워킹데이이면 그대로, 토/일/공휴일이면 다음 워킹데이 반환 */
+export function workingDayFrom(dateStr: string): string {
+  const [y, m, day] = dateStr.split('-').map(Number)
+  const d = new Date(y, m - 1, day)
+  while (true) {
+    const dow = d.getDay()
+    const ds  = fmtDate(d)
+    if (dow !== 0 && dow !== 6 && !isKoreanHoliday(ds)) return ds
+    d.setDate(d.getDate() + 1)
+  }
+}

@@ -8,7 +8,7 @@
  *
  * 환율 우선순위: BL 날짜 기준 실제 환율 → 계약 참고 환율
  */
-import { nthDay, addDays } from '@/lib/date'
+import { nthDay, addDays, workingDayFrom } from '@/lib/date'
 import { makeInvoice, calcCombinedMargin } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -20,8 +20,8 @@ export function genFeSi(
   const deliveryYM = delivery.year_month
   const ids        = [delivery.id]
   const refDate    = delivery.delivery_date ?? nthDay(ym, 15)
-  const pay10      = addDays(refDate, 10)
-  const pay15      = addDays(refDate, 15)
+  const pay10      = workingDayFrom(addDays(refDate, 10))
+  const pay15      = workingDayFrom(addDays(refDate, 15))
 
   const rate         = delivery.fx_rate ?? delivery.contract.reference_exchange_rate ?? 1
   const sellUsdTotal = delivery.contract.sell_price * delivery.quantity_kg / 1000

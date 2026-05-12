@@ -10,7 +10,7 @@
  * 커미션: 익월15일 (공통)
  */
 import { splitMargin } from '@/lib/margin'
-import { shiftMonths, monthEnd, nthDay } from '@/lib/date'
+import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
 import { makeInvoice } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -33,29 +33,35 @@ export function genSoggae(
   )
   const { geumhwa, raseong } = splitMargin(Math.round(sellTotal - costTotal))
 
+  // 워킹데이 보정
+  const wBasisM = workingDayFrom(monthEnd(deliveryYM))
+  const wDue1N  = workingDayOnOrAfter(nextM, 1)
+  const wDue10N = workingDayOnOrAfter(nextM, 10)
+  const wDue15N = workingDayOnOrAfter(nextM, 15)
+
   return [
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '동국제강', to: '(주)한국에이원', supply: sellTotal, vat: false,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: nthDay(nextM, 10),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'sales', memo: '동국제강 역발행 — 매출 (VAT없음)',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '렘코', supply: costTotal, vat: false,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: nthDay(nextM, 10),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'cost', memo: '렘코 원가 (VAT없음)',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: false,
-      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
+      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: false,
-      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
+      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '(주)나성 커미션 (나머지)',
     }),
   ]
@@ -80,29 +86,35 @@ export function genBuntan(
   )
   const { geumhwa, raseong } = splitMargin(Math.round(sellTotal - costTotal))
 
+  // 워킹데이 보정
+  const wBasisM = workingDayFrom(monthEnd(deliveryYM))
+  const wDue1N  = workingDayOnOrAfter(nextM, 1)
+  const wDue10N = workingDayOnOrAfter(nextM, 10)
+  const wDue15N = workingDayOnOrAfter(nextM, 15)
+
   return [
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '렘코', to: '(주)한국에이원', supply: sellTotal, vat: true,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: nthDay(nextM, 10),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'sales', memo: '렘코 역발행 — 매출 (VAT10%), 익월1일 동시 발행',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '동창', supply: costTotal, vat: true,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(nextM, 1), paymentDue: nthDay(nextM, 10),
+      basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'cost', memo: '(주)한국에이원→동창 — 매입 (VAT10%), 익월1일 동시 발행',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: true,
-      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
+      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: true,
-      basisDate: nthDay(nextM, 15), deadline: nthDay(nextM, 15), paymentDue: nthDay(nextM, 15),
+      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '(주)나성 커미션 (나머지)',
     }),
   ]

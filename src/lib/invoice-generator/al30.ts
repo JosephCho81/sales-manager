@@ -8,7 +8,7 @@
  *
  * 날짜 기준: 납품월(deliveryYM)
  */
-import { shiftMonths, monthEnd, nthDay } from '@/lib/date'
+import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
 import { makeInvoice, calcCombinedMargin } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -21,11 +21,19 @@ export function genAL30(
   const dNextM     = shiftMonths(deliveryYM, 1)
   const dNext2M    = shiftMonths(deliveryYM, 2)
 
+  // 워킹데이 보정
+  const wB10    = workingDayOnOrAfter(deliveryYM, 10)
+  const wB20    = workingDayOnOrAfter(deliveryYM, 20)
+  const wBEnd   = workingDayFrom(monthEnd(deliveryYM))
+  const wDue1N  = workingDayOnOrAfter(dNextM, 1)
+  const wEnd2M  = workingDayFrom(monthEnd(dNext2M))
+  const wB1N2   = workingDayOnOrAfter(dNext2M, 1)
+
   // 10일 단위 3구간 분류
   const periods: Array<{ label: string; days: DeliveryForInvoice[]; basisDate: string }> = [
-    { label: '1~10일',    days: [], basisDate: nthDay(deliveryYM, 10) },
-    { label: '11~20일',   days: [], basisDate: nthDay(deliveryYM, 20) },
-    { label: '21일~말일', days: [], basisDate: monthEnd(deliveryYM)   },
+    { label: '1~10일',    days: [], basisDate: wB10  },
+    { label: '11~20일',   days: [], basisDate: wB20  },
+    { label: '21일~말일', days: [], basisDate: wBEnd },
   ]
   for (const d of deliveries) {
     const day = d.delivery_date ? parseInt(d.delivery_date.slice(8, 10)) : 15
@@ -55,9 +63,9 @@ export function genAL30(
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '현대제철', to: '(주)한국에이원', supply: sellTotal, vat: true,
       basisDate: period.basisDate, deadline: period.basisDate,
-      paymentDue: monthEnd(dNext2M),
+      paymentDue: wEnd2M,
       type: 'sales',
-      memo: `현대제철 역발행 ${period.label} — 익익월말 지급 ${monthEnd(dNext2M)}`,
+      memo: `현대제철 역발행 ${period.label} — 익익월말 지급 ${wEnd2M}`,
     }))
   }
 
@@ -67,7 +75,7 @@ export function genAL30(
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
       deliveryIds: deliveries.map(d => d.id),
       from: '(주)한국에이원', to: '화림', supply: totalCost, vat: true,
-      basisDate: monthEnd(deliveryYM), deadline: nthDay(dNextM, 1), paymentDue: monthEnd(dNext2M),
+      basisDate: wBEnd, deadline: wDue1N, paymentDue: wEnd2M,
       type: 'cost', memo: '(주)한국에이원→화림 당월 합산 — 익월1일 발행, 익익월말 지급',
     }))
   }
@@ -79,14 +87,14 @@ export function genAL30(
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
         from: '(주)한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
-        basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
+        basisDate: wB1N2, deadline: wEnd2M, paymentDue: wEnd2M,
         type: 'commission', memo: '금화 커미션 1/3 — 익익월말',
       }),
       makeInvoice({
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
         from: '(주)한국에이원', to: '(주)나성', supply: totalRaseong, vat: true,
-        basisDate: nthDay(dNext2M, 1), deadline: monthEnd(dNext2M), paymentDue: monthEnd(dNext2M),
+        basisDate: wB1N2, deadline: wEnd2M, paymentDue: wEnd2M,
         type: 'commission', memo: '(주)나성 커미션 (나머지) — 익익월말',
       }),
     )
