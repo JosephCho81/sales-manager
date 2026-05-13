@@ -18,10 +18,16 @@ export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]
   const paidMap = new Map<string, string | null>()
   for (const ex of (existing ?? [])) {
     const dids = ex.delivery_ids as string[] | null
-    const key = ex.invoice_type === 'commission' && dids?.[0]
+    // product_id === null: commissions 테이블 기반 (동국/현대) → 커미션 레코드 ID 키
+    // product_id !== null: 납품 기반 커미션 (소괴탄/분탄 등) → 상품 기반 키 (안정적)
+    const stableKey = ex.invoice_type === 'commission' && ex.product_id === null && dids?.[0]
       ? `c:${dids[0]}:${ex.to_company}`
       : `d:${ex.product_id}:${ex.from_company}:${ex.to_company}:${ex.invoice_type}`
-    paidMap.set(key, ex.paid_at)
+    paidMap.set(stableKey, ex.paid_at)
+    // 구 형식(delivery_ids[0] 기반) 키도 저장해 첫 재생성 때 유실 방지
+    if (ex.invoice_type === 'commission' && ex.product_id !== null && dids?.[0]) {
+      paidMap.set(`c:${dids[0]}:${ex.to_company}`, ex.paid_at)
+    }
   }
 
   const { error: delErr } = await supabase
@@ -41,7 +47,7 @@ export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]
     type Row = { id: string; delivery_ids: string[] | null; product_id: string | null; from_company: string; to_company: string; invoice_type: string | null }
     await Promise.all(
       (data as Row[]).flatMap(row => {
-        const key = row.invoice_type === 'commission' && row.delivery_ids?.[0]
+        const key = row.invoice_type === 'commission' && row.product_id === null && row.delivery_ids?.[0]
           ? `c:${row.delivery_ids[0]}:${row.to_company}`
           : `d:${row.product_id}:${row.from_company}:${row.to_company}:${row.invoice_type}`
         if (!paidMap.has(key)) return []

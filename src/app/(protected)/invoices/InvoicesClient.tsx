@@ -61,7 +61,8 @@ export default function InvoicesClient({
   // delivery_year_month: 동국제강 = M-2, 현대제철 = M-1 (커미션 등록 월)
   const hasCommInvoices = initialInvoices.some(inv => inv.invoice_type === 'commission')
   const hasStaleComm    = initialInvoices.some(inv => {
-    if (inv.invoice_type !== 'commission' || inv.delivery_year_month === null) return false
+    // product_id != null = 소괴탄/분탄 등 납품 기반 커미션 → stale 체크 대상 아님
+    if (inv.invoice_type !== 'commission' || inv.delivery_year_month === null || inv.product_id !== null) return false
     const expected = (inv.memo ?? '').includes('현대제철')
       ? shiftMonths(yearMonth, -1)
       : shiftMonths(yearMonth, -2)
