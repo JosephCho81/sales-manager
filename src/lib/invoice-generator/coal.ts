@@ -4,7 +4,7 @@
  * 감가(depreciation_amount) 반영:
  *   청구금액 = quantity_kg × 단가 / 1000 − depreciation_amount(원)
  *
- * 소괴탄: 동국→한국에이원 역발행 (VAT 없음), 익월1일 발행, 익월10일 대금
+ * 소괴탄: 동국→한국에이원 역발행 (VAT 없음), 익월1일 발행, 익월10일 대금; 커미션은 VAT 10%
  * 분탄:  동창→한국에이원→렘코 (VAT 10%), 익월1일 동시 발행, 익월10일 대금
  *        (동국제강 없음. 매입처=동창, 매출처=렘코 역발행)
  * 커미션: 익월15일 (공통)
@@ -54,13 +54,13 @@ export function genSoggae(
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: false,
+      from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: true,
       basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: false,
+      from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: true,
       basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
       type: 'commission', memo: '(주)나성 커미션 (나머지)',
     }),
