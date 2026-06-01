@@ -24,6 +24,16 @@
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;
   }
+  /* 숫자 입력 스피너(증감 화살표) 제거 — 휠/화살표 오입력 방지 */
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
   .card {
     @apply bg-white rounded-lg border border-gray-200 shadow-sm;
   }

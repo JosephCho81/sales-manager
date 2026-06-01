@@ -6,6 +6,12 @@ import { toYearMonth } from '@/lib/date'
 import type { ProductRow, ContractRow, DeliveryRow } from './types'
 import MarginPreview from './MarginPreview'
 
+// 휠 스크롤·화살표 키로 type=number 값이 미세 증감(step)되는 오입력 차단
+const blockWheel = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur()
+const blockArrowKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault()
+}
+
 export default function DeliveryForm({
   products,
   contracts,
@@ -153,8 +159,9 @@ export default function DeliveryForm({
               <label className="label">기본 물량 (톤) *<span className="text-gray-400 font-normal ml-1">— 소수점 3자리</span></label>
               <div className="relative">
                 <input
-                  type="number" className="input pr-10" value={form.quantity_kg}
+                  type="number" className="input pr-10 no-spinner" value={form.quantity_kg}
                   onChange={e => setForm(f => ({ ...f, quantity_kg: e.target.value }))}
+                  onWheel={blockWheel} onKeyDown={blockArrowKeys}
                   placeholder="예: 50.000" step="0.001" min="0" autoFocus
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">톤</span>
@@ -183,8 +190,9 @@ export default function DeliveryForm({
                     </label>
                     <div className="relative">
                       <input
-                        type="number" className="input pr-16" value={form.fesi_fx_rate}
+                        type="number" className="input pr-16 no-spinner" value={form.fesi_fx_rate}
                         onChange={e => setForm(f => ({ ...f, fesi_fx_rate: e.target.value }))}
+                        onWheel={blockWheel} onKeyDown={blockArrowKeys}
                         placeholder={selectedContract?.reference_exchange_rate
                           ? `참고: ${fmtNum(selectedContract.reference_exchange_rate)}` : '예: 1,380'}
                         step="1"
@@ -234,8 +242,9 @@ export default function DeliveryForm({
               <label className="label">감가 금액 (원)</label>
               <div className="relative">
                 <input
-                  type="number" className="input pr-10" value={form.depreciation_amount}
+                  type="number" className="input pr-10 no-spinner" value={form.depreciation_amount}
                   onChange={e => setForm(f => ({ ...f, depreciation_amount: e.target.value }))}
+                  onWheel={blockWheel} onKeyDown={blockArrowKeys}
                   placeholder="예: 50000" step="1" min="0"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">원</span>
