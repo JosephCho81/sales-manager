@@ -58,10 +58,17 @@ describe('makeInvoice', () => {
     expect(inv.total_amount).toBe(1001)
   })
 
-  it('VAT 10% — floor(supply × 0.1), total = supply + vat', () => {
+  it('VAT 10% — round(supply × 0.1), total = supply + vat', () => {
     const inv = makeInvoice({ ...INVOICE_BASE, supply: 1_000_000, vat: true })
     expect(inv.vat_amount).toBe(100_000)
     expect(inv.total_amount).toBe(1_100_000)
+  })
+
+  it('VAT 10% — 원 단위 미만 반올림 (동국 입금액과 일치)', () => {
+    // 39,729,716 × 0.1 = 3,972,971.6 → 반올림 3,972,972 → 총액 43,702,688
+    const inv = makeInvoice({ ...INVOICE_BASE, supply: 39_729_716, vat: true })
+    expect(inv.vat_amount).toBe(3_972_972)
+    expect(inv.total_amount).toBe(43_702_688)
   })
 
   it('VAT 없음 — vat_amount: 0, total = supply', () => {
@@ -111,8 +118,13 @@ describe('genSoggae', () => {
     expect(genSoggae([d], '2024-02')).toHaveLength(4)
   })
 
-  it('VAT 없음 — 4장 전부 vat_amount: 0', () => {
-    expect(genSoggae([d], '2024-02').every(i => i.vat_amount === 0)).toBe(true)
+  it('VAT — 매출·원가 0, 커미션 2장은 10% (소괴탄 커미션 VAT 적용)', () => {
+    const [sales, cost, gm, rs] = genSoggae([d], '2024-02')
+    expect(sales.vat_amount).toBe(0)
+    expect(cost.vat_amount).toBe(0)
+    // 66,666 × 0.1 = 6,666.6 → 반올림 6,667 / 66,668 × 0.1 = 6,666.8 → 6,667
+    expect(gm.vat_amount).toBe(6_667)
+    expect(rs.vat_amount).toBe(6_667)
   })
 
   it('from/to 순서 — 동국역발행(매출) / 렘코(원가) / 금화(커미션) / 나성(커미션)', () => {
