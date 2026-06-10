@@ -7,4 +7,5 @@ export type { Currency, DeliveryProduct, DeliveryContract, Contract } from './co
 export type { Delivery, FxRate } from './delivery'
 export type { MarginResult } from './margin'
 export type { Database } from './database'
-export type { Expense } from './expense'
+export type { Expense, ExpensePayer } from './expense'
+export { EXPENSE_PAYERS, EXPENSE_PAYER_LABELS } from './expense'
