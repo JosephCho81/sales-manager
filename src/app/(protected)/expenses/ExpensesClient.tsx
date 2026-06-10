@@ -14,7 +14,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
   const {
     rows, form, setForm,
     saving, error,
-    unsettledTotal, settlement,
+    unsettledTotal, settlement, transfers, unassignedTotal,
     detailPayer, setDetailPayer, detailRows,
     handleSave, handleToggle, handlePayerChange, handleDelete,
   } = useExpenses(initialRows)
@@ -76,6 +76,34 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
             )
           })}
         </div>
+
+        {/* 업체 간 송금 안내 */}
+        {(transfers.length > 0 || unassignedTotal > 0) && (
+          <div className="mt-3 bg-white rounded-lg border border-amber-200 p-3">
+            <p className="text-xs font-semibold text-gray-700 mb-2">정산 송금</p>
+            {transfers.length === 0 ? (
+              <p className="text-xs text-gray-400 py-1 text-center">업체 간 송금할 내역이 없습니다.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {transfers.map((t, idx) => (
+                  <li key={idx} className="flex items-center justify-between py-1.5 text-xs">
+                    <span className="text-gray-700">
+                      <span className="font-medium text-red-600">{PAYER_FULL_LABELS[t.from]}</span>
+                      <span className="mx-1.5 text-gray-400">→</span>
+                      <span className="font-medium text-blue-600">{PAYER_FULL_LABELS[t.to]}</span>
+                    </span>
+                    <span className="font-semibold tabular-nums text-gray-800">{fmtKrw(t.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {unassignedTotal > 0 && (
+              <p className="text-[11px] text-amber-600 mt-2 pt-2 border-t border-gray-100">
+                지불 업체 미지정 {fmtKrw(unassignedTotal)}은 송금 계산에서 제외됩니다. 목록에서 지불 업체를 지정해 주세요.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 업체별 지불 세부 내역 */}
         {detailPayer && (

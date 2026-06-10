@@ -26,6 +26,12 @@ export interface PayerSettlement {
   net: number
 }
 
+export interface Transfer {
+  from: ExpensePayer
+  to: ExpensePayer
+  amount: number
+}
+
 interface ExpensesReturn {
   rows: Expense[]
   form: ExpensesForm
@@ -34,6 +40,8 @@ interface ExpensesReturn {
   error: string | null
   unsettledTotal: number
   settlement: Record<ExpensePayer, PayerSettlement>
+  transfers: Transfer[]
+  unassignedTotal: number
   detailPayer: ExpensePayer | null
   setDetailPayer: Dispatch<SetStateAction<ExpensePayer | null>>
   detailRows: Expense[]
@@ -68,6 +76,33 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
       EXPENSE_PAYERS.map(p => [p, { share: share[p], paid: paid[p], net: share[p] - paid[p] }])
     ) as Record<ExpensePayer, PayerSettlement>
   }, [unsettledTotal, unsettledRows])
+
+  const unassignedTotal = useMemo(
+    () => unsettledRows.filter(r => !r.payer).reduce((s, r) => s + r.amount, 0),
+    [unsettledRows]
+  )
+
+  // 낼 금액(net>0) 업체가 받을 금액(net<0) 업체에게 송금 — 그리디 매칭.
+  // 지불 업체 미지정분만큼 낼 금액 합이 받을 금액 합보다 클 수 있으며, 그 잔여분은 송금 대상이 없어 제외된다.
+  const transfers = useMemo(() => {
+    const debtors = EXPENSE_PAYERS
+      .filter(p => settlement[p].net > 0)
+      .map(p => ({ p, amt: settlement[p].net }))
+    const creditors = EXPENSE_PAYERS
+      .filter(p => settlement[p].net < 0)
+      .map(p => ({ p, amt: -settlement[p].net }))
+    const result: Transfer[] = []
+    let i = 0, j = 0
+    while (i < debtors.length && j < creditors.length) {
+      const amount = Math.min(debtors[i].amt, creditors[j].amt)
+      if (amount > 0) result.push({ from: debtors[i].p, to: creditors[j].p, amount })
+      debtors[i].amt -= amount
+      creditors[j].amt -= amount
+      if (debtors[i].amt === 0) i++
+      if (creditors[j].amt === 0) j++
+    }
+    return result
+  }, [settlement])
 
   const detailRows = useMemo(
     () => (detailPayer ? unsettledRows.filter(r => r.payer === detailPayer) : []),
@@ -139,7 +174,7 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
 
   return {
     rows, form, setForm, saving, error,
-    unsettledTotal, settlement,
+    unsettledTotal, settlement, transfers, unassignedTotal,
     detailPayer, setDetailPayer, detailRows,
     handleSave, handleToggle, handlePayerChange, handleDelete,
   }
