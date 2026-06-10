@@ -2,7 +2,7 @@
 
 import { useState, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { toMessage } from '@/lib/error'
-import { insertExpense, toggleSettled, updatePayer, deleteExpense } from './actions'
+import { insertExpense, toggleSettled, updateExpense, updatePayer, deleteExpense } from './actions'
 import { EXPENSE_PAYERS, type Expense, type ExpensePayer } from '@/types'
 
 function splitExpense(total: number) {
@@ -18,6 +18,7 @@ function sortRows(rows: Expense[]): Expense[] {
 }
 
 type ExpensesForm = { date: string; description: string; amount: string; payer: '' | ExpensePayer; note: string }
+type EditForm = { date: string; description: string; amount: string; note: string }
 
 export interface PayerSettlement {
   share: number
@@ -45,6 +46,11 @@ interface ExpensesReturn {
   detailPayer: ExpensePayer | null
   setDetailPayer: Dispatch<SetStateAction<ExpensePayer | null>>
   detailRows: Expense[]
+  editingId: string | null
+  editForm: EditForm
+  setEditForm: Dispatch<SetStateAction<EditForm>>
+  startEdit: (row: Expense) => void
+  handleUpdate: () => Promise<void>
   handleSave: () => Promise<void>
   handleToggle: (row: Expense) => Promise<void>
   handlePayerChange: (row: Expense, payer: ExpensePayer | null) => Promise<void>
@@ -58,6 +64,8 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [detailPayer, setDetailPayer] = useState<ExpensePayer | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<EditForm>({ date: '', description: '', amount: '', note: '' })
 
   const unsettledRows = useMemo(() => rows.filter(r => !r.is_settled), [rows])
 
@@ -137,12 +145,44 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
     }
   }
 
+  function startEdit(row: Expense) {
+    if (row.is_settled || editingId === row.id) return
+    setEditingId(row.id)
+    setEditForm({ date: row.date, description: row.description, amount: String(row.amount), note: row.note ?? '' })
+  }
+
+  async function handleUpdate() {
+    if (!editingId) return
+    if (!editForm.date) { setError('날짜를 입력하세요.'); return }
+    if (!editForm.description.trim()) { setError('내역을 입력하세요.'); return }
+    const amount = parseInt(editForm.amount, 10)
+    if (!amount || amount <= 0) { setError('금액을 올바르게 입력하세요.'); return }
+
+    setError(null)
+    try {
+      const result = await updateExpense(editingId, {
+        date: editForm.date,
+        description: editForm.description.trim(),
+        amount,
+        note: editForm.note.trim() || null,
+      })
+      if (result.error) throw new Error(result.error)
+      if (result.data) {
+        setRows(prev => sortRows(prev.map(r => r.id === editingId ? result.data! : r)))
+        setEditingId(null)
+      }
+    } catch (e) {
+      setError(toMessage(e))
+    }
+  }
+
   async function handleToggle(row: Expense) {
     try {
       const result = await toggleSettled(row.id, !row.is_settled)
       if (result.error) throw new Error(result.error)
       if (result.data) {
         setRows(prev => sortRows(prev.map(r => r.id === row.id ? result.data! : r)))
+        if (row.id === editingId) setEditingId(null)
       }
     } catch (e) {
       setError(toMessage(e))
@@ -167,6 +207,7 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
       const result = await deleteExpense(id)
       if (result.error) throw new Error(result.error)
       setRows(prev => prev.filter(r => r.id !== id))
+      if (id === editingId) setEditingId(null)
     } catch (e) {
       setError(toMessage(e))
     }
@@ -176,6 +217,7 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
     rows, form, setForm, saving, error,
     unsettledTotal, settlement, transfers, unassignedTotal,
     detailPayer, setDetailPayer, detailRows,
+    editingId, editForm, setEditForm, startEdit, handleUpdate,
     handleSave, handleToggle, handlePayerChange, handleDelete,
   }
 }

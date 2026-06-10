@@ -35,6 +35,24 @@ export async function toggleSettled(id: string, isSettled: boolean) {
   return { data: data as Expense }
 }
 
+export async function updateExpense(id: string, payload: {
+  date: string
+  description: string
+  amount: number
+  note: string | null
+}) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('expenses')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .single()
+  if (error) return { error: error.message }
+  revalidatePath('/expenses')
+  return { data: data as Expense }
+}
+
 export async function updatePayer(id: string, payer: ExpensePayer | null) {
   const supabase = createAdminClient()
   const { data, error } = await supabase

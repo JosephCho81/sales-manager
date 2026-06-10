@@ -16,6 +16,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
     saving, error,
     unsettledTotal, settlement, transfers, unassignedTotal,
     detailPayer, setDetailPayer, detailRows,
+    editingId, editForm, setEditForm, startEdit, handleUpdate,
     handleSave, handleToggle, handlePayerChange, handleDelete,
   } = useExpenses(initialRows)
 
@@ -27,6 +28,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
         className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white text-gray-700"
         value={row.payer ?? ''}
         disabled={row.is_settled}
+        onClick={e => e.stopPropagation()}
         onChange={e => handlePayerChange(row, (e.target.value || null) as ExpensePayer | null)}
       >
         <option value="">미지정</option>
@@ -220,39 +222,93 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
         <>
           {/* 모바일 카드 목록 */}
           <div className="sm:hidden flex flex-col gap-2">
-            {rows.map(row => (
-              <div
-                key={row.id}
-                className={`card p-3 ${row.is_settled ? 'opacity-40' : ''}`}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className={`text-xs text-gray-500 tabular-nums ${row.is_settled ? 'line-through' : ''}`}>{row.date}</span>
-                  {row.is_settled ? (
-                    <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">정산완료</span>
+            {rows.map(row => {
+              const editing = editingId === row.id
+              return (
+                <div
+                  key={row.id}
+                  onClick={() => startEdit(row)}
+                  className={`card p-3 ${row.is_settled ? 'opacity-40' : ''} ${editing ? 'ring-1 ring-blue-300 bg-blue-50' : ''}`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    {editing ? (
+                      <input
+                        type="date"
+                        className="input text-xs py-1 w-32"
+                        value={editForm.date}
+                        onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                      />
+                    ) : (
+                      <span className={`text-xs text-gray-500 tabular-nums ${row.is_settled ? 'line-through' : ''}`}>{row.date}</span>
+                    )}
+                    {row.is_settled ? (
+                      <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full whitespace-nowrap">정산완료</span>
+                    ) : (
+                      <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full whitespace-nowrap">미정산</span>
+                    )}
+                  </div>
+                  {editing ? (
+                    <>
+                      <input
+                        type="text"
+                        className="input text-xs py-1 w-full mb-1"
+                        value={editForm.description}
+                        onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="내역"
+                      />
+                      <input
+                        type="number"
+                        className="input text-xs py-1 w-full mb-1"
+                        value={editForm.amount}
+                        onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                        min="0"
+                        step="1"
+                        placeholder="금액 (원)"
+                      />
+                      <input
+                        type="text"
+                        className="input text-xs py-1 w-full mb-1"
+                        value={editForm.note}
+                        onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
+                        placeholder="비고 (선택)"
+                      />
+                    </>
                   ) : (
-                    <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">미정산</span>
+                    <>
+                      <p className={`text-sm font-medium text-gray-900 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{row.description}</p>
+                      <p className={`text-sm font-semibold tabular-nums text-gray-800 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{fmtKrw(row.amount)}</p>
+                      {row.note && <p className="text-xs text-gray-400 mb-2">{row.note}</p>}
+                    </>
                   )}
-                </div>
-                <p className={`text-sm font-medium text-gray-900 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{row.description}</p>
-                <p className={`text-sm font-semibold tabular-nums text-gray-800 mb-1 ${row.is_settled ? 'line-through' : ''}`}>{fmtKrw(row.amount)}</p>
-                {row.note && <p className="text-xs text-gray-400 mb-2">{row.note}</p>}
-                <div className="flex items-center gap-3 border-t border-gray-100 pt-2 mt-1">
-                  <button
-                    onClick={() => handleToggle(row)}
-                    className={`text-xs ${row.is_settled ? 'text-blue-400 hover:text-blue-600' : 'text-green-500 hover:text-green-700'}`}
-                  >
-                    {row.is_settled ? '미정산으로' : '정산완료'}
-                  </button>
-                  <button onClick={() => handleDelete(row.id)} className="text-xs text-red-400 hover:text-red-600">
-                    삭제
-                  </button>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    <span className="text-[10px] text-gray-400">지불</span>
-                    {renderPayerSelect(row)}
+                  <div className="flex items-center gap-3 border-t border-gray-100 pt-2 mt-1">
+                    <button
+                      onClick={e => { e.stopPropagation(); handleToggle(row) }}
+                      className={`text-xs whitespace-nowrap ${row.is_settled ? 'text-blue-400 hover:text-blue-600' : 'text-green-500 hover:text-green-700'}`}
+                    >
+                      {row.is_settled ? '미정산으로' : '정산완료'}
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDelete(row.id) }}
+                      className="text-xs whitespace-nowrap text-red-400 hover:text-red-600"
+                    >
+                      삭제
+                    </button>
+                    {editing && (
+                      <button
+                        onClick={e => { e.stopPropagation(); handleUpdate() }}
+                        className="text-xs whitespace-nowrap font-semibold text-blue-600 hover:text-blue-800"
+                      >
+                        수정완료
+                      </button>
+                    )}
+                    <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="text-[10px] text-gray-400">지불</span>
+                      {renderPayerSelect(row)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* 데스크톱 테이블 */}
@@ -271,55 +327,108 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => (
-                    <tr
-                      key={row.id}
-                      className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : 'hover:bg-gray-50'}`}
-                    >
-                      <td className="table-td text-center whitespace-nowrap">
-                        <span className={row.is_settled ? 'line-through' : ''}>{row.date}</span>
-                      </td>
-                      <td className="table-td text-center">
-                        <span className={row.is_settled ? 'line-through' : ''}>{row.description}</span>
-                      </td>
-                      <td className="table-td text-center tabular-nums font-semibold whitespace-nowrap">
-                        <span className={row.is_settled ? 'line-through' : ''}>{fmtKrw(row.amount)}</span>
-                      </td>
-                      <td className="table-td text-center text-xs text-gray-400 max-w-xs truncate">{row.note ?? ''}</td>
-                      <td className="table-td text-center whitespace-nowrap">
-                        {row.is_settled ? (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">
-                            정산완료
-                          </span>
-                        ) : (
-                          <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
-                            미정산
-                          </span>
-                        )}
-                      </td>
-                      <td className="table-td text-center whitespace-nowrap">
-                        <button
-                          onClick={() => handleToggle(row)}
-                          className={`text-xs mr-3 ${
-                            row.is_settled
-                              ? 'text-blue-400 hover:text-blue-600'
-                              : 'text-green-500 hover:text-green-700'
-                          }`}
-                        >
-                          {row.is_settled ? '미정산으로' : '정산완료'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(row.id)}
-                          className="text-xs text-red-400 hover:text-red-600"
-                        >
-                          삭제
-                        </button>
-                      </td>
-                      <td className="table-td text-center whitespace-nowrap">
-                        {renderPayerSelect(row)}
-                      </td>
-                    </tr>
-                  ))}
+                  {rows.map(row => {
+                    const editing = editingId === row.id
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => startEdit(row)}
+                        className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : 'hover:bg-gray-50 cursor-pointer'} ${editing ? 'bg-blue-50' : ''}`}
+                      >
+                        <td className="table-td text-center whitespace-nowrap">
+                          {editing ? (
+                            <input
+                              type="date"
+                              className="input text-xs py-1 w-32"
+                              value={editForm.date}
+                              onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))}
+                            />
+                          ) : (
+                            <span className={row.is_settled ? 'line-through' : ''}>{row.date}</span>
+                          )}
+                        </td>
+                        <td className="table-td text-center">
+                          {editing ? (
+                            <input
+                              type="text"
+                              className="input text-xs py-1 min-w-[8rem]"
+                              value={editForm.description}
+                              onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                            />
+                          ) : (
+                            <span className={row.is_settled ? 'line-through' : ''}>{row.description}</span>
+                          )}
+                        </td>
+                        <td className="table-td text-center tabular-nums font-semibold whitespace-nowrap">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="input text-xs py-1 w-28"
+                              value={editForm.amount}
+                              onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                              min="0"
+                              step="1"
+                            />
+                          ) : (
+                            <span className={row.is_settled ? 'line-through' : ''}>{fmtKrw(row.amount)}</span>
+                          )}
+                        </td>
+                        <td className="table-td text-center text-xs text-gray-400 max-w-xs truncate">
+                          {editing ? (
+                            <input
+                              type="text"
+                              className="input text-xs py-1 min-w-[6rem]"
+                              value={editForm.note}
+                              onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))}
+                              placeholder="비고"
+                            />
+                          ) : (
+                            row.note ?? ''
+                          )}
+                        </td>
+                        <td className="table-td text-center whitespace-nowrap">
+                          {row.is_settled ? (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-gray-200 text-gray-500 rounded-full">
+                              정산완료
+                            </span>
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded-full">
+                              미정산
+                            </span>
+                          )}
+                        </td>
+                        <td className="table-td text-center whitespace-nowrap">
+                          <button
+                            onClick={e => { e.stopPropagation(); handleToggle(row) }}
+                            className={`text-xs mr-3 ${
+                              row.is_settled
+                                ? 'text-blue-400 hover:text-blue-600'
+                                : 'text-green-500 hover:text-green-700'
+                            }`}
+                          >
+                            {row.is_settled ? '미정산으로' : '정산완료'}
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(row.id) }}
+                            className={`text-xs text-red-400 hover:text-red-600${editing ? ' mr-3' : ''}`}
+                          >
+                            삭제
+                          </button>
+                          {editing && (
+                            <button
+                              onClick={e => { e.stopPropagation(); handleUpdate() }}
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800"
+                            >
+                              수정완료
+                            </button>
+                          )}
+                        </td>
+                        <td className="table-td text-center whitespace-nowrap">
+                          {renderPayerSelect(row)}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
