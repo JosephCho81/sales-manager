@@ -71,6 +71,13 @@ describe('makeInvoice', () => {
     expect(inv.total_amount).toBe(43_702_688)
   })
 
+  it('VAT 10% — 동창은 절사(버림) (동창 세금계산서와 일치)', () => {
+    // 441,049,237 × 0.1 = 44,104,923.7 → 동창 절사 44,104,923 (반올림이면 ...924)
+    const inv = makeInvoice({ ...INVOICE_BASE, from: '(주)한국에이원', to: '동창', supply: 441_049_237, vat: true })
+    expect(inv.vat_amount).toBe(44_104_923)
+    expect(inv.total_amount).toBe(485_154_160)
+  })
+
   it('VAT 없음 — vat_amount: 0, total = supply', () => {
     const inv = makeInvoice({ ...INVOICE_BASE, supply: 1_000_000, vat: false })
     expect(inv.vat_amount).toBe(0)

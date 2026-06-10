@@ -7,6 +7,18 @@
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
 import type { DeliveryForInvoice, InvoiceToCreate, InvoiceType } from './types'
 
+/**
+ * 거래처별 부가세 원단위 미만 처리 관례 (실제 세금계산서와 1원 일치).
+ * 기본은 반올림(동국제강 입금액 기준). 동창은 절사(버림).
+ */
+const VAT_FLOOR_COMPANIES = new Set(['동창'])
+
+function calcVat(supply: number, counterparty: string): number {
+  return VAT_FLOOR_COMPANIES.has(counterparty)
+    ? Math.floor(supply * 0.1)
+    : Math.round(supply * 0.1)
+}
+
 export function makeInvoice(p: {
   yearMonth: string
   deliveryYearMonth: string
@@ -23,7 +35,9 @@ export function makeInvoice(p: {
   memo: string
 }): InvoiceToCreate {
   const supply = Math.round(p.supply)
-  const vatAmt = p.vat ? Math.round(supply * 0.1) : 0
+  // 상대 거래처(한국에이원이 아닌 쪽) 기준으로 부가세 끝자리 처리 분기
+  const counterparty = p.from === '(주)한국에이원' ? p.to : p.from
+  const vatAmt = p.vat ? calcVat(supply, counterparty) : 0
   return {
     year_month: p.yearMonth,
     delivery_year_month: p.deliveryYearMonth,
