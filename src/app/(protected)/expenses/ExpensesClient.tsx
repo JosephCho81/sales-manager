@@ -63,16 +63,24 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
                   selected ? 'border-amber-500 ring-1 ring-amber-400' : 'border-amber-200 hover:border-amber-400'
                 }`}
               >
-                <p className="text-[10px] sm:text-xs text-gray-500 mb-1 whitespace-nowrap">{PAYER_FULL_LABELS[p]}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">{PAYER_FULL_LABELS[p]}</p>
                 {s.net > 0 ? (
-                  <p className="font-semibold text-red-600 tabular-nums text-xs sm:text-sm whitespace-nowrap">낼 금액 {fmtKrw(s.net)}</p>
+                  <>
+                    <p className="text-[10px] sm:text-xs text-red-600">낼 금액</p>
+                    <p className="font-semibold text-red-600 tabular-nums text-xs sm:text-sm break-all leading-tight">{fmtKrw(s.net)}</p>
+                  </>
                 ) : s.net < 0 ? (
-                  <p className="font-semibold text-blue-600 tabular-nums text-xs sm:text-sm whitespace-nowrap">받을 금액 {fmtKrw(-s.net)}</p>
+                  <>
+                    <p className="text-[10px] sm:text-xs text-blue-600">받을 금액</p>
+                    <p className="font-semibold text-blue-600 tabular-nums text-xs sm:text-sm break-all leading-tight">{fmtKrw(-s.net)}</p>
+                  </>
                 ) : (
                   <p className="font-semibold text-gray-500 tabular-nums text-xs sm:text-sm">0원</p>
                 )}
-                <p className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">
-                  1/3 부담 {fmtKrw(s.share)} · 지불 {fmtKrw(s.paid)}
+                <p className="text-[10px] text-gray-400 mt-1 leading-tight">
+                  1/3 부담 {fmtKrw(s.share)}
+                  <br />
+                  지불 {fmtKrw(s.paid)}
                 </p>
               </button>
             )
