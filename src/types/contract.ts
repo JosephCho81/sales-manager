@@ -31,5 +31,9 @@ export interface Contract {
   reference_exchange_rate: number | null
   memo: string | null
   created_at: string
+  revision_reason?: string | null
+  revised_at?: string | null
+  supersedes_contract_id?: string | null
+  updated_at?: string | null
   product?: DeliveryProduct | null
 }

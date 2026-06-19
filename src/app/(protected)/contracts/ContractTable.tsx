@@ -25,6 +25,7 @@ export default function ContractTable({
   filterProductId,
   onFilterChange,
   onEdit,
+  onRevise,
   onDeleted,
 }: {
   contracts: ContractRow[]
@@ -32,6 +33,7 @@ export default function ContractTable({
   filterProductId: string
   onFilterChange: (id: string) => void
   onEdit: (c: ContractRow) => void
+  onRevise: (c: ContractRow) => void
   onDeleted: (id: string) => void
 }) {
   const filtered = filterProductId
@@ -98,6 +100,17 @@ export default function ContractTable({
                   <td className="table-td text-gray-600 whitespace-nowrap">
                     {c.start_date.slice(0, 10)} ~<br />
                     <span className="text-gray-500">{c.end_date.slice(0, 10)}</span>
+                    {c.supersedes_contract_id && (
+                      <div className="mt-1">
+                        <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">개정됨</span>
+                        {c.revision_reason && (
+                          <div className="text-xs text-gray-400 whitespace-normal max-w-[160px]">
+                            {c.revision_reason}
+                            {c.revised_at && ` (${c.revised_at.slice(0, 10)})`}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="table-td text-right whitespace-nowrap">
                     {usd ? (
@@ -138,6 +151,9 @@ export default function ContractTable({
                   <td className="table-td text-xs text-gray-400 max-w-[120px] truncate">{c.memo ?? '—'}</td>
                   <td className="table-td whitespace-nowrap">
                     <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(c)}>수정</button>
+                    {today <= c.end_date && (
+                      <button className="text-xs text-amber-600 hover:underline mr-2" onClick={() => onRevise(c)}>개정</button>
+                    )}
                     <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(c.id)}>삭제</button>
                   </td>
                 </tr>

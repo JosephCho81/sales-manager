@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import ContractForm from './ContractForm'
+import ReviseContractForm from './ReviseContractForm'
 import ContractTable from './ContractTable'
 import type { Product } from '@/types'
 import type { ContractRow } from './types'
@@ -23,14 +24,23 @@ export default function ContractsClient({
   const [filterProductId, setFilterProductId] = useState('')
   const [editContract, setEditContract] = useState<ContractRow | null | undefined>(undefined)
   // undefined = form hidden, null = new, ContractRow = editing
+  const [reviseContract, setReviseContract] = useState<ContractRow | null>(null)
 
   function openNew() {
+    setReviseContract(null)
     setEditContract(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function openEdit(c: ContractRow) {
+    setReviseContract(null)
     setEditContract(c)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function openRevise(c: ContractRow) {
+    setEditContract(undefined)
+    setReviseContract(c)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -45,6 +55,15 @@ export default function ContractsClient({
         : [saved, ...prev]
     )
     setEditContract(undefined)
+  }
+
+  function handleRevised(newRow: ContractRow, originalRow: ContractRow) {
+    // 잘린 원본 교체 + 새 행 prepend
+    setContracts(prev => [
+      newRow,
+      ...prev.map(c => c.id === originalRow.id ? originalRow : c),
+    ])
+    setReviseContract(null)
   }
 
   return (
@@ -68,12 +87,21 @@ export default function ContractsClient({
         />
       )}
 
+      {reviseContract && (
+        <ReviseContractForm
+          contract={reviseContract}
+          onClose={() => setReviseContract(null)}
+          onRevised={handleRevised}
+        />
+      )}
+
       <ContractTable
         contracts={contracts}
         products={products}
         filterProductId={filterProductId}
         onFilterChange={setFilterProductId}
         onEdit={openEdit}
+        onRevise={openRevise}
         onDeleted={id => setContracts(prev => prev.filter(c => c.id !== id))}
       />
     </div>

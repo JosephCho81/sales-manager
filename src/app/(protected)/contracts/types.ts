@@ -11,6 +11,10 @@ export interface ContractRow {
   memo: string | null
   created_at: string
   invoice_month_offset: number
+  revision_reason: string | null
+  revised_at: string | null
+  supersedes_contract_id: string | null
+  updated_at: string | null
   product: { id: string; name: string; display_name: string; price_unit: string }
 }
 
