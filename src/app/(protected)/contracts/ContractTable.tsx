@@ -98,8 +98,7 @@ export default function ContractTable({
                     {usd && <span className="ml-1 text-xs bg-blue-100 text-blue-600 px-1 rounded">USD</span>}
                   </td>
                   <td className="table-td text-gray-600 whitespace-nowrap">
-                    {c.start_date.slice(0, 10)} ~<br />
-                    <span className="text-gray-500">{c.end_date.slice(0, 10)}</span>
+                    {c.start_date.slice(0, 10)} ~ <span className="text-gray-500">{c.end_date.slice(0, 10)}</span>
                     {c.supersedes_contract_id && (
                       <div className="mt-1">
                         <span className="text-xs bg-amber-100 text-amber-700 px-1 rounded">개정됨</span>
