@@ -68,10 +68,14 @@ export default function DeliveryTable({
             )}
             {filtered.map(d => {
               if (!d.contract) return null
-              const main = calcMarginFromContract(d.contract, d.quantity_kg)
+              const isUsd = d.contract.currency === 'USD'
+              // FeSi: 입고 시 입력한 실제 환율(fx_rate)이 있으면 계약 참고환율보다 우선
+              const contractForCalc = isUsd && d.fx_rate
+                ? { ...d.contract, reference_exchange_rate: d.fx_rate }
+                : d.contract
+              const main = calcMarginFromContract(contractForCalc, d.quantity_kg)
               const dep      = d.depreciation_amount ?? 0
               const sellTotal = main.sell_price_krw * main.quantity_ton - dep
-              const isUsd = d.contract.currency === 'USD'
 
               return (
                 <tr key={d.id} className="hover:bg-gray-50">

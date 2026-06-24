@@ -21,7 +21,7 @@ function formFromDelivery(d: DeliveryRow): FormState {
     product_id: d.product_id,
     contract_id: d.contract_id,
     quantity_kg: (d.quantity_kg / 1000).toFixed(3),
-    fesi_fx_rate: '',
+    fesi_fx_rate: d.fx_rate ? String(d.fx_rate) : '',
     depreciation_amount: d.depreciation_amount ? String(d.depreciation_amount) : '',
     memo: d.memo ?? '',
   }
@@ -120,15 +120,20 @@ export function useDeliveryForm({
       memo: form.memo || null,
     }
 
+    let savedFxRate: number | null = null
     if (isFeSi && form.fesi_fx_rate) {
       const rate = parseFloat(form.fesi_fx_rate)
-      if (rate > 0) await upsertFxRate(form.product_id, form.delivery_date, rate)
+      if (rate > 0) {
+        const fxResult = await upsertFxRate(form.product_id, form.delivery_date, rate)
+        if (fxResult.error) { setError(`환율 저장 실패: ${fxResult.error}`); setSaving(false); return }
+        savedFxRate = rate
+      }
     }
 
     const result = await upsertDelivery(payload, editDelivery?.id)
     if (result.error) { setError(result.error); setSaving(false); return }
 
-    onSaved(result.data as unknown as DeliveryRow)
+    onSaved({ ...(result.data as unknown as DeliveryRow), fx_rate: savedFxRate })
   }
 
   return {

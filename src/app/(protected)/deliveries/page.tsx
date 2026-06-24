@@ -14,7 +14,7 @@ export default async function DeliveriesPage() {
 
   try {
     const supabase = createAdminClient()
-    const [pResult, cResult, dResult] = await Promise.all([
+    const [pResult, cResult, dResult, fxResult] = await Promise.all([
       supabase
         .from('products')
         .select('id, name, display_name, buyer, price_unit, is_active')
@@ -36,15 +36,27 @@ export default async function DeliveriesPage() {
         .order('year_month', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(200),
+      // FeSi 실제 환율 (product_id + BL날짜 = delivery_date 로 매칭)
+      supabase
+        .from('fx_rates')
+        .select('product_id, bl_date, rate_krw_per_usd'),
     ])
 
     if (pResult.error) fetchError = `품목: ${pResult.error.message}`
     else if (cResult.error) fetchError = `계약: ${cResult.error.message}`
     else if (dResult.error) fetchError = `입고: ${dResult.error.message}`
+    else if (fxResult.error) fetchError = `환율: ${fxResult.error.message}`
     else {
       products   = (pResult.data  ?? []) as unknown as ProductRow[]
       contracts  = (cResult.data  ?? []) as unknown as ContractRow[]
-      deliveries = (dResult.data  ?? []) as unknown as DeliveryRow[]
+      const fxMap = new Map<string, number>()
+      for (const r of (fxResult.data ?? []) as Array<{ product_id: string; bl_date: string; rate_krw_per_usd: number }>) {
+        fxMap.set(`${r.product_id}:${r.bl_date}`, Number(r.rate_krw_per_usd))
+      }
+      deliveries = ((dResult.data ?? []) as unknown as DeliveryRow[]).map(d => ({
+        ...d,
+        fx_rate: d.delivery_date ? (fxMap.get(`${d.product_id}:${d.delivery_date}`) ?? null) : null,
+      }))
     }
   } catch (e) {
     fetchError = toMessage(e)
