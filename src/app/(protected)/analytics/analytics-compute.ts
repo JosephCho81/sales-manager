@@ -85,7 +85,11 @@ export function buildAllAnalytics(
     if (d.product?.name.toUpperCase() === 'AL35B') dongkukDeliveryYMSet.add(d.year_month)
     if (d.product?.buyer === '현대제철')           hyundaiDeliveryYMSet.add(d.year_month)
 
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    // FeSi: 입고 시 입력한 실제 환율(fx_rate)이 있으면 계약 참고환율보다 우선
+    const contractForCalc = d.contract.currency === 'USD' && d.fx_rate
+      ? { ...d.contract, reference_exchange_rate: d.fx_rate }
+      : d.contract
+    const m      = calcMarginFromContract(contractForCalc, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35
       ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton

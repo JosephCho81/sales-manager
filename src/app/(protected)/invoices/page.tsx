@@ -48,11 +48,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .order('created_at', { ascending: true }),
 
       // 3) FeSi용 BL 날짜 기준 환율
+      //    상한은 다음 달 1일 미만 — '${yearMonth}-31'은 30일까지인 달에서
+      //    잘못된 날짜(22008)로 쿼리가 실패하던 버그 수정
       supabase
         .from('fx_rates')
         .select('id, bl_date, product_id, rate_krw_per_usd')
         .gte('bl_date', `${yearMonth}-01`)
-        .lte('bl_date', `${yearMonth}-31`),
+        .lt('bl_date', `${shiftMonths(yearMonth, 1)}-01`),
 
       // 4) 품목 전체 목록 (product_id → display_name 매핑용)
       supabase
@@ -81,6 +83,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
 
     if (dRes.error)  throw new Error(`입고 조회 실패: ${dRes.error.message}`)
     if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
+    if (fxRes.error) throw new Error(`환율 조회 실패: ${fxRes.error.message}`)
 
     // 커미션: 회사별 월 매칭 검증 (동국제강=M-2, 현대제철=M-1만 허용)
     const commissions = ((cRes.data ?? []) as unknown as CommissionForInvoice[]).filter(c =>

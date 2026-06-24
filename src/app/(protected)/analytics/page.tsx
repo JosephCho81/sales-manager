@@ -29,20 +29,33 @@ const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
     const supabase = createAdminClient()
 
-    const dRes = await supabase
-      .from('deliveries')
-      .select(`
-        id, year_month, invoice_month, product_id,
-        quantity_kg, depreciation_amount,
-        product:products(id, name, display_name, buyer),
-        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-      `)
-      .gte('invoice_month', fromYM)
-      .lte('invoice_month', toYM)
-      .order('invoice_month')
+    const [dRes, fxRes] = await Promise.all([
+      supabase
+        .from('deliveries')
+        .select(`
+          id, year_month, invoice_month, delivery_date, product_id,
+          quantity_kg, depreciation_amount,
+          product:products(id, name, display_name, buyer),
+          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+        `)
+        .gte('invoice_month', fromYM)
+        .lte('invoice_month', toYM)
+        .order('invoice_month'),
+      // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
+      supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
+    ])
 
-    if (dRes.error) throw new Error(dRes.error.message)
-    const deliveries = (dRes.data ?? []) as unknown as DeliveryForAnalytics[]
+    if (dRes.error)  throw new Error(dRes.error.message)
+    if (fxRes.error) throw new Error(fxRes.error.message)
+
+    const fxMap = new Map<string, number>()
+    for (const r of (fxRes.data ?? []) as Array<{ product_id: string; bl_date: string; rate_krw_per_usd: number }>) {
+      fxMap.set(`${r.product_id}:${r.bl_date}`, Number(r.rate_krw_per_usd))
+    }
+    const deliveries = ((dRes.data ?? []) as unknown as DeliveryForAnalytics[]).map(d => ({
+      ...d,
+      fx_rate: d.delivery_date ? (fxMap.get(`${d.product_id}:${d.delivery_date}`) ?? null) : null,
+    }))
 
     // 현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
     const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()

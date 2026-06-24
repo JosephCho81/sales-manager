@@ -7,9 +7,12 @@ export type DeliveryForAnalytics = {
   id: string
   year_month: string
   invoice_month: string
+  delivery_date: string | null
   product_id: string
   quantity_kg: number
   depreciation_amount: number | null
+  /** FeSi 입고 시 입력한 실제 환율 (product_id + delivery_date 매칭). 없으면 계약 참고환율 */
+  fx_rate?: number | null
   product: { id: string; name: string; display_name: string; buyer: string } | null
   contract: {
     sell_price: number; cost_price: number
