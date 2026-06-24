@@ -37,7 +37,10 @@ export function computeMargins(
   for (const d of deliveries) {
     if (!d.contract) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const contractForCalc = d.contract.currency === 'USD' && d.fx_rate
+      ? { ...d.contract, reference_exchange_rate: d.fx_rate }
+      : d.contract
+    const m      = calcMarginFromContract(contractForCalc, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35
       ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
@@ -63,7 +66,10 @@ export function buildProductRows(
   for (const d of deliveries) {
     if (!d.contract || !d.product) continue
     if (fromYM && (d.invoice_month < fromYM || d.invoice_month > toYM!)) continue
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const contractForCalc = d.contract.currency === 'USD' && d.fx_rate
+      ? { ...d.contract, reference_exchange_rate: d.fx_rate }
+      : d.contract
+    const m      = calcMarginFromContract(contractForCalc, d.quantity_kg)
     const isAL35 = d.product.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35
       ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
@@ -104,7 +110,10 @@ export function buildMonthlyData(
   const monthlyMap = new Map<string, MarginTotals>()
   for (const d of deliveries) {
     if (!d.contract || d.invoice_month < fromYM || d.invoice_month > toYM) continue
-    const m      = calcMarginFromContract(d.contract, d.quantity_kg)
+    const contractForCalc = d.contract.currency === 'USD' && d.fx_rate
+      ? { ...d.contract, reference_exchange_rate: d.fx_rate }
+      : d.contract
+    const m      = calcMarginFromContract(contractForCalc, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
     const gmSell = isAL35
       ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton

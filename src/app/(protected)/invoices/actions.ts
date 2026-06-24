@@ -9,11 +9,13 @@ export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]
   // 재생성 전 지급 완료 기록 보존
   // 커미션 계산서: delivery_ids[0](커미션 레코드 ID) + to_company
   // 납품 계산서:   product_id + from_company + to_company + invoice_type
-  const { data: existing } = await supabase
+  // 조회 실패를 무시하면 기존 지급완료 기록이 재생성 시 통째로 유실됨 — 명시적 중단
+  const { data: existing, error: exErr } = await supabase
     .from('invoice_instructions')
     .select('delivery_ids, product_id, from_company, to_company, invoice_type, paid_at')
     .eq('year_month', yearMonth)
     .eq('is_paid', true)
+  if (exErr) return { error: `기존 지급완료 기록 조회 실패: ${exErr.message}` }
 
   const paidMap = new Map<string, string | null>()
   for (const ex of (existing ?? [])) {

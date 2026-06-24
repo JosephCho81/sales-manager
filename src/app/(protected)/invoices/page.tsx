@@ -84,6 +84,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     if (dRes.error)  throw new Error(`입고 조회 실패: ${dRes.error.message}`)
     if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
     if (fxRes.error) throw new Error(`환율 조회 실패: ${fxRes.error.message}`)
+    // 아래 3개도 실패 시 조용히 빈 배열로 폴백하면 커미션/이중계약/품목명이 누락됨 — 명시적 throw
+    if (cRes.error)  throw new Error(`커미션 조회 실패: ${cRes.error.message}`)
+    if (edRes.error) throw new Error(`추가 입고 조회 실패: ${edRes.error.message}`)
+    if (pRes.error)  throw new Error(`품목 조회 실패: ${pRes.error.message}`)
 
     // 커미션: 회사별 월 매칭 검증 (동국제강=M-2, 현대제철=M-1만 허용)
     const commissions = ((cRes.data ?? []) as unknown as CommissionForInvoice[]).filter(c =>
