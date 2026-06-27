@@ -87,9 +87,10 @@ function applyDeliveryFilter(
   return deliveries.filter(d => {
     if (filterProduct !== 'all' && d.product?.name  !== filterProduct) return false
     if (filterBuyer   !== 'all' && d.product?.buyer !== filterBuyer)   return false
-    // 현대제철 이중계약: year_month === invoice_month인 AL40/AL30은 즉시청구(offset=0) 건 — analytics 제외
+    // 현대제철 AL40 이중계약: year_month === invoice_month인 건은 즉시청구(offset=0) 중복분 — analytics 제외
+    // (이연청구 offset=2 짝이 invoice_month=납품월+2로 집계됨). AL30은 단일 계약(offset=2)이라 제외 대상 아님
     const pName = d.product?.name?.toUpperCase() ?? ''
-    if (d.year_month === d.invoice_month && (pName.startsWith('AL40') || pName === 'AL30')) return false
+    if (d.year_month === d.invoice_month && pName.startsWith('AL40')) return false
     return true
   })
 }
