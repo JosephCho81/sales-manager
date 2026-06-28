@@ -10,6 +10,7 @@ function makeDelivery(overrides: Partial<DeliveryForAnalytics> = {}): DeliveryFo
     id: 'd1',
     year_month: '2024-01',
     invoice_month: '2024-01',
+    delivery_date: null,
     product_id: 'prod-1',
     quantity_kg: 10_000, // 10톤
     depreciation_amount: null,

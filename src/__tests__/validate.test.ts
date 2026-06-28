@@ -32,6 +32,10 @@ function makeExisting(overrides: Partial<ContractRow> = {}): ContractRow {
     memo: null,
     created_at: '2024-01-01T00:00:00Z',
     invoice_month_offset: 0,
+    revision_reason: null,
+    revised_at: null,
+    supersedes_contract_id: null,
+    updated_at: null,
     product: { id: 'prod-1', name: 'AL35B', display_name: 'AL35B', price_unit: 'KRW_TON' },
     ...overrides,
   }
