@@ -3,12 +3,14 @@
 import { useState, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { toMessage } from '@/lib/error'
 import { insertExpense, toggleSettled, updateExpense, updatePayer, deleteExpense } from './actions'
-import { EXPENSE_PAYERS, type Expense, type ExpensePayer } from '@/types'
+import { type Expense, type ExpensePayer } from '@/types'
+import {
+  computeSettlement, computeUnassignedTotal, computeTransfers,
+  validateExpenseInput, validateExpenseEdit,
+  type PayerSettlement, type Transfer,
+} from './expense-settlement'
 
-function splitExpense(total: number) {
-  const base = Math.floor(total / 3)
-  return { korea_a1: base, raseong: base, geumhwa: total - base * 2 }
-}
+export type { PayerSettlement, Transfer }
 
 function sortRows(rows: Expense[]): Expense[] {
   return [...rows].sort((a, b) => {
@@ -18,20 +20,7 @@ function sortRows(rows: Expense[]): Expense[] {
 }
 
 type ExpensesForm = { date: string; description: string; amount: string; payer: '' | ExpensePayer; note: string }
-type EditForm = { date: string; description: string; amount: string; note: string }
-
-export interface PayerSettlement {
-  share: number
-  paid: number
-  /** share - paid: 양수면 더 내야 할 금액, 음수면 돌려받을 금액 */
-  net: number
-}
-
-export interface Transfer {
-  from: ExpensePayer
-  to: ExpensePayer
-  amount: number
-}
+export type EditForm = { date: string; description: string; amount: string; note: string }
 
 interface ExpensesReturn {
   rows: Expense[]
@@ -74,43 +63,11 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
     [unsettledRows]
   )
 
-  const settlement = useMemo(() => {
-    const share = splitExpense(unsettledTotal)
-    const paid: Record<ExpensePayer, number> = { korea_a1: 0, raseong: 0, geumhwa: 0 }
-    for (const r of unsettledRows) {
-      if (r.payer) paid[r.payer] += r.amount
-    }
-    return Object.fromEntries(
-      EXPENSE_PAYERS.map(p => [p, { share: share[p], paid: paid[p], net: share[p] - paid[p] }])
-    ) as Record<ExpensePayer, PayerSettlement>
-  }, [unsettledTotal, unsettledRows])
+  const settlement = useMemo(() => computeSettlement(unsettledRows), [unsettledRows])
 
-  const unassignedTotal = useMemo(
-    () => unsettledRows.filter(r => !r.payer).reduce((s, r) => s + r.amount, 0),
-    [unsettledRows]
-  )
+  const unassignedTotal = useMemo(() => computeUnassignedTotal(unsettledRows), [unsettledRows])
 
-  // 낼 금액(net>0) 업체가 받을 금액(net<0) 업체에게 송금 — 그리디 매칭.
-  // 지불 업체 미지정분만큼 낼 금액 합이 받을 금액 합보다 클 수 있으며, 그 잔여분은 송금 대상이 없어 제외된다.
-  const transfers = useMemo(() => {
-    const debtors = EXPENSE_PAYERS
-      .filter(p => settlement[p].net > 0)
-      .map(p => ({ p, amt: settlement[p].net }))
-    const creditors = EXPENSE_PAYERS
-      .filter(p => settlement[p].net < 0)
-      .map(p => ({ p, amt: -settlement[p].net }))
-    const result: Transfer[] = []
-    let i = 0, j = 0
-    while (i < debtors.length && j < creditors.length) {
-      const amount = Math.min(debtors[i].amt, creditors[j].amt)
-      if (amount > 0) result.push({ from: debtors[i].p, to: creditors[j].p, amount })
-      debtors[i].amt -= amount
-      creditors[j].amt -= amount
-      if (debtors[i].amt === 0) i++
-      if (creditors[j].amt === 0) j++
-    }
-    return result
-  }, [settlement])
+  const transfers = useMemo(() => computeTransfers(settlement), [settlement])
 
   const detailRows = useMemo(
     () => (detailPayer ? unsettledRows.filter(r => r.payer === detailPayer) : []),
@@ -118,20 +75,14 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
   )
 
   async function handleSave() {
-    if (!form.date) { setError('날짜를 입력하세요.'); return }
-    if (!form.description.trim()) { setError('내역을 입력하세요.'); return }
-    const amount = parseInt(form.amount, 10)
-    if (!amount || amount <= 0) { setError('금액을 올바르게 입력하세요.'); return }
-    if (!form.payer) { setError('지불 업체를 선택하세요.'); return }
+    const v = validateExpenseInput(form.date, form.description, form.amount, form.payer)
+    if (!v.ok) { setError(v.error); return }
 
     setSaving(true); setError(null)
     try {
       const result = await insertExpense({
-        date: form.date,
-        description: form.description.trim(),
-        amount,
+        ...v.payload,
         note: form.note.trim() || null,
-        payer: form.payer,
       })
       if (result.error) throw new Error(result.error)
       if (result.data) {
@@ -153,17 +104,13 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
 
   async function handleUpdate() {
     if (!editingId) return
-    if (!editForm.date) { setError('날짜를 입력하세요.'); return }
-    if (!editForm.description.trim()) { setError('내역을 입력하세요.'); return }
-    const amount = parseInt(editForm.amount, 10)
-    if (!amount || amount <= 0) { setError('금액을 올바르게 입력하세요.'); return }
+    const v = validateExpenseEdit(editForm.date, editForm.description, editForm.amount)
+    if (!v.ok) { setError(v.error); return }
 
     setError(null)
     try {
       const result = await updateExpense(editingId, {
-        date: editForm.date,
-        description: editForm.description.trim(),
-        amount,
+        ...v.payload,
         note: editForm.note.trim() || null,
       })
       if (result.error) throw new Error(result.error)
