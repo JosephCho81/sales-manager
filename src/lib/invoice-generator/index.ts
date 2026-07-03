@@ -19,6 +19,7 @@ export type { DeliveryRawForInvoice, FxRateRaw } from './mapper'
 export { mapDeliveries } from './mapper'
 export type { CommissionForInvoice } from './commission'
 export { generateCommissionInvoices } from './commission'
+export { needsInvoiceRegen } from './regen-check'
 
 // 지급일정 표시 순서: AL35B → 소괴탄 → 분탄 → AL40 → AL30 → FeSi
 // AL40 제품명은 DB에서 'AL40고품위알믹스'로 저장됨 — startsWith('AL40')로 비교

@@ -4,18 +4,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toMessage } from '@/lib/error'
 import { fmtKrw } from '@/lib/margin'
-import { shiftMonths } from '@/lib/date'
 import {
-  generateInvoices,
-  generateCommissionInvoices,
-  mapDeliveries,
+  needsInvoiceRegen,
   PRODUCT_ORDER,
   type DeliveryRawForInvoice,
-  type FxRateRaw,
   type InvoiceRow,
   type CommissionForInvoice,
 } from '@/lib/invoice-generator'
-import { replaceInvoices, updatePaidDate } from './actions'
+import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 import InvoiceCardList from './InvoiceCardList'
 
@@ -39,14 +35,12 @@ export default function InvoicesClient({
   yearMonth,
   initialDeliveries,
   initialInvoices,
-  fxRates,
   initialCommissions,
   products,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
-  fxRates: FxRateRaw[]
   initialCommissions: CommissionForInvoice[]
   products: Array<{ id: string; name: string; display_name: string | null }>
 }) {
@@ -57,21 +51,12 @@ export default function InvoicesClient({
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const autoGenRef = useRef(false)
 
-  // 커미션 계산서 stale 감지
-  // delivery_year_month: 동국제강 = M-2, 현대제철 = M-1 (커미션 등록 월)
-  const hasCommInvoices = initialInvoices.some(inv => inv.invoice_type === 'commission')
-  const hasStaleComm    = initialInvoices.some(inv => {
-    // product_id != null = 소괴탄/분탄 등 납품 기반 커미션 → stale 체크 대상 아님
-    if (inv.invoice_type !== 'commission' || inv.delivery_year_month === null || inv.product_id !== null) return false
-    const expected = (inv.memo ?? '').includes('현대제철')
-      ? shiftMonths(yearMonth, -1)
-      : shiftMonths(yearMonth, -2)
-    return inv.delivery_year_month !== expected
-  })
-  // 커미션 데이터는 있는데 커미션 계산서가 없는 경우도 재생성
-  const needsRegen = initialInvoices.length === 0 ||
-    hasStaleComm ||
-    (initialCommissions.length > 0 && !hasCommInvoices)
+  // 재생성 필요 감지: 계산서 없음 / 커미션 월 stale / 등록된 커미션의 계산서 누락
+  const needsRegen = needsInvoiceRegen(
+    initialInvoices,
+    initialCommissions.map(c => c.id),
+    yearMonth,
+  )
 
   // 품목명 맵 (product_id → display_name)
   // products 전체 목록을 먼저 채워 UUID fallback 방지
@@ -91,27 +76,12 @@ export default function InvoicesClient({
     }
   }
 
-  // 계산서 생성
+  // 계산서 생성 — 서버가 입고·커미션을 fresh 조회해 생성 (stale props 방지)
   const handleGenerate = useCallback(async () => {
     setGenerating(true)
     setError(null)
     try {
-      const mapped = mapDeliveries(initialDeliveries, fxRates)
-      if (mapped.length === 0 && initialCommissions.length === 0) {
-        setError('이 달에 입고 데이터가 없거나 계약 정보가 없습니다.')
-        return
-      }
-
-      const generated = [
-        ...generateInvoices(mapped, yearMonth),
-        ...generateCommissionInvoices(initialCommissions, yearMonth),
-      ]
-      if (generated.length === 0) {
-        setError('생성된 계산서가 없습니다. 등록된 품목 타입을 확인하세요.')
-        return
-      }
-
-      const result = await replaceInvoices(yearMonth, generated)
+      const result = await regenerateInvoices(yearMonth)
       if (result.error) throw new Error(result.error)
 
       setInvoices((result.data ?? []) as unknown as InvoiceRow[])
@@ -120,7 +90,7 @@ export default function InvoicesClient({
     } finally {
       setGenerating(false)
     }
-  }, [initialDeliveries, initialCommissions, fxRates, yearMonth])
+  }, [yearMonth])
 
   // 자동 생성: 데이터는 있는데 계산서가 없거나 커미션 월이 오래된 경우
   useEffect(() => {
