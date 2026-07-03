@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 import type { Expense, ExpensePayer } from '@/types'
 
 export async function insertExpense(payload: {
@@ -11,6 +13,9 @@ export async function insertExpense(payload: {
   note: string | null
   payer: ExpensePayer
 }) {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('expenses')
@@ -18,11 +23,15 @@ export async function insertExpense(payload: {
     .select('*')
     .single()
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'expenses', rowId: data.id, action: 'insert', after: data })
   revalidatePath('/expenses')
   return { data: data as Expense }
 }
 
 export async function toggleSettled(id: string, isSettled: boolean) {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('expenses')
@@ -31,6 +40,7 @@ export async function toggleSettled(id: string, isSettled: boolean) {
     .select('*')
     .single()
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'expenses', rowId: id, action: 'update', after: data })
   revalidatePath('/expenses')
   return { data: data as Expense }
 }
@@ -41,6 +51,9 @@ export async function updateExpense(id: string, payload: {
   amount: number
   note: string | null
 }) {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('expenses')
@@ -49,11 +62,15 @@ export async function updateExpense(id: string, payload: {
     .select('*')
     .single()
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'expenses', rowId: id, action: 'update', after: data })
   revalidatePath('/expenses')
   return { data: data as Expense }
 }
 
 export async function updatePayer(id: string, payer: ExpensePayer | null) {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('expenses')
@@ -62,14 +79,20 @@ export async function updatePayer(id: string, payer: ExpensePayer | null) {
     .select('*')
     .single()
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'expenses', rowId: id, action: 'update', after: data })
   revalidatePath('/expenses')
   return { data: data as Expense }
 }
 
 export async function deleteExpense(id: string) {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
+  const { data: before } = await supabase.from('expenses').select('*').eq('id', id).single()
   const { error } = await supabase.from('expenses').delete().eq('id', id)
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'expenses', rowId: id, action: 'delete', before })
   revalidatePath('/expenses')
   return { success: true }
 }

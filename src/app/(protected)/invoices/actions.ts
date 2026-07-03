@@ -1,9 +1,14 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { requireOwner } from '@/lib/auth'
+import { logAudit } from '@/lib/audit'
 import type { InvoiceToCreate } from '@/lib/invoice-generator'
 
 export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]) {
+  const auth = await requireOwner()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
 
   // 재생성 전 지급 완료 기록 보존
@@ -43,6 +48,7 @@ export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]
     .insert(rows)
     .select('*')
   if (insErr) return { error: insErr.message }
+  await logAudit(auth.user, { table: 'invoice_instructions', rowId: yearMonth, action: 'update', after: { year_month: yearMonth, count: rows.length } })
 
   // paid_at 복원
   if (paidMap.size > 0 && data) {
@@ -73,6 +79,9 @@ export async function replaceInvoices(yearMonth: string, rows: InvoiceToCreate[]
 }
 
 export async function updatePaidDate(id: string, paidDate: string | null) {
+  const auth = await requireOwner()
+  if ('error' in auth) return { error: auth.error }
+
   const supabase = createAdminClient()
 
   const { error } = await supabase
@@ -80,6 +89,7 @@ export async function updatePaidDate(id: string, paidDate: string | null) {
     .update({ is_paid: paidDate !== null, paid_at: paidDate })
     .eq('id', id)
   if (error) return { error: error.message }
+  await logAudit(auth.user, { table: 'invoice_instructions', rowId: id, action: 'update', after: { is_paid: paidDate !== null, paid_at: paidDate } })
 
   return { success: true }
 }
