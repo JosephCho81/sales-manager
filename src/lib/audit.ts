@@ -18,7 +18,8 @@ type AuditEntry = {
 export async function logAudit(actor: User, entry: AuditEntry): Promise<void> {
   try {
     const admin = createAdminClient()
-    await admin.from('audit_log').insert({
+    // supabase insert는 실패해도 throw하지 않고 error를 반환 — 확인 안 하면 완전 침묵
+    const { error } = await admin.from('audit_log').insert({
       actor_email: actor.email ?? null,
       actor_id: actor.id,
       table_name: entry.table,
@@ -27,6 +28,7 @@ export async function logAudit(actor: User, entry: AuditEntry): Promise<void> {
       before: entry.before ?? null,
       after: entry.after ?? null,
     })
+    if (error) console.error('[audit_log] 기록 실패:', error.message)
   } catch (e) {
     console.error('[audit_log] 기록 실패:', e)
   }
