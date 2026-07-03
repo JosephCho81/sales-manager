@@ -161,12 +161,23 @@ export default function InvoiceTable({
                           {inv.payment_due_date ?? '—'}
                         </td>
                         <td className="table-td text-center">
-                          <input
-                            type="date"
-                            value={inv.paid_at ? inv.paid_at.slice(0, 10) : ''}
-                            onChange={e => onSetPaidDate(inv.id, e.target.value || null)}
-                            className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          />
+                          <div className="flex items-center justify-center gap-1">
+                            <input
+                              type="date"
+                              value={inv.paid_at ? inv.paid_at.slice(0, 10) : ''}
+                              onChange={e => onSetPaidDate(inv.id, e.target.value || null)}
+                              className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            {inv.paid_at && (
+                              <button
+                                onClick={() => onSetPaidDate(inv.id, null)}
+                                title="지급완료 취소"
+                                className="shrink-0 px-1 text-xs text-gray-400 hover:text-red-500"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
