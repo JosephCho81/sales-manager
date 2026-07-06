@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toMessage } from '@/lib/error'
 import { fmtKrw } from '@/lib/margin'
+import { shiftMonths } from '@/lib/date'
+import type { MonthlyDepreciation } from '@/types'
 import {
   needsInvoiceRegen,
   PRODUCT_ORDER,
@@ -14,6 +16,7 @@ import {
 import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 import InvoiceCardList from './InvoiceCardList'
+import DepreciationPanel from './DepreciationPanel'
 
 type GS = { supply: number; vat: number; total: number }
 function sumG(rows: InvoiceRow[]): GS {
@@ -37,12 +40,14 @@ export default function InvoicesClient({
   initialInvoices,
   initialCommissions,
   products,
+  initialMonthlyDeps,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
   initialCommissions: CommissionForInvoice[]
   products: Array<{ id: string; name: string; display_name: string | null }>
+  initialMonthlyDeps: MonthlyDepreciation[]
 }) {
   const router        = useRouter()
   const [invoices,   setInvoices]   = useState<InvoiceRow[]>(initialInvoices)
@@ -50,6 +55,10 @@ export default function InvoicesClient({
   const [error,      setError]      = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const autoGenRef = useRef(false)
+
+  // 감가 저장 등 router.refresh() 후 서버에서 재생성된 계산서를 state에 반영
+  // (key={yearMonth}는 월 변경 시에만 리마운트되므로 effect로 동기화)
+  useEffect(() => { setInvoices(initialInvoices) }, [initialInvoices])
 
   // 재생성 필요 감지: 계산서 없음 / 커미션 월 stale / 등록된 커미션의 계산서 누락
   const needsRegen = needsInvoiceRegen(
@@ -231,6 +240,20 @@ export default function InvoicesClient({
         </table>
         </div>
       </div>
+
+      {/* 분탄 감가 정산 — 렘코 미수 추적 */}
+      {(() => {
+        const buntan = products.find(p => p.name.toUpperCase() === 'BUNTAN')
+        if (!buntan) return null
+        return (
+          <DepreciationPanel
+            productId={buntan.id}
+            productLabel={buntan.display_name ?? '분탄'}
+            deps={initialMonthlyDeps.filter(d => d.product_id === buntan.id)}
+            defaultYearMonth={shiftMonths(yearMonth, -1)}
+          />
+        )
+      })()}
 
       {/* 계산서 목록 */}
       {invoices.length === 0 && !generating ? (

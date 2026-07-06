@@ -27,9 +27,13 @@ const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'AL40고품위알�
 
 export { PRODUCT_ORDER }
 
+/** 월별 감가 입력 — year_month는 납품월 기준 */
+export type MonthlyDepInput = { product_id: string; year_month: string; amount: number }
+
 export function generateInvoices(
   deliveries: DeliveryForInvoice[],
   yearMonth: string,
+  monthlyDeps: MonthlyDepInput[] = [],
 ): InvoiceToCreate[] {
   if (deliveries.length === 0) return []
 
@@ -53,7 +57,11 @@ export function generateInvoices(
     } else if (name === 'SOGGAE') {
       result.push(...genSoggae(group, yearMonth))
     } else if (name === 'BUNTAN') {
-      result.push(...genBuntan(group, yearMonth))
+      // genBuntan은 group[0].year_month를 납품월로 사용 — 감가도 동일 기준 매칭
+      const dep = monthlyDeps
+        .filter(md => md.product_id === group[0].product_id && md.year_month === group[0].year_month)
+        .reduce((s, md) => s + Number(md.amount), 0)
+      result.push(...genBuntan(group, yearMonth, dep))
     } else if (name.startsWith('AL40') || name === 'AL30') {
       result.push(...genAL30(group, yearMonth))
     } else if (name === 'FESI75' || name === 'FESI60') {

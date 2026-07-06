@@ -37,7 +37,7 @@ export async function regenerateInvoices(
   }
 
   const rows = [
-    ...generateInvoices(mapped, yearMonth),
+    ...generateInvoices(mapped, yearMonth, inputs.monthlyDeps),
     ...generateCommissionInvoices(inputs.commissions, yearMonth),
   ]
   if (rows.length === 0) {

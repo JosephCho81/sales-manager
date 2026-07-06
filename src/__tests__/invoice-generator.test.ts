@@ -203,6 +203,39 @@ describe('genBuntan', () => {
     expect(sales.supply_amount).toBe(1_950_000)
     expect(cost.supply_amount).toBe(1_750_000)
   })
+
+  describe('월별 감가 (렘코 미수 — 2026-07 상장 대응)', () => {
+    // sell 200_000 × 10톤 = 2_000_000 / cost 180_000 × 10톤 = 1_800_000
+    it('매출(렘코) 계산서만 차감, 매입(동창)은 총액', () => {
+      const [sales, cost] = genBuntan([d], '2024-02', 100_000)
+      expect(sales.supply_amount).toBe(1_900_000)
+      expect(cost.supply_amount).toBe(1_800_000)
+    })
+
+    it('커미션은 월별 감가 제외한 총액 기준 (과소지급 방지)', () => {
+      const withDep = genBuntan([d], '2024-02', 100_000)
+      const noDep   = genBuntan([d], '2024-02')
+      expect(withDep[2].supply_amount).toBe(noDep[2].supply_amount)
+      expect(withDep[3].supply_amount).toBe(noDep[3].supply_amount)
+    })
+
+    it('monthlyDep 미전달 — 기존 금액 불변 (과거 월 회귀)', () => {
+      const [sales, cost] = genBuntan([d], '2024-02')
+      expect(sales.supply_amount).toBe(2_000_000)
+      expect(cost.supply_amount).toBe(1_800_000)
+    })
+
+    it('건별 감가(과거 데이터)와 월별 감가 동시 존재 시 각각 반영', () => {
+      const legacy = makeDelivery({
+        product_name: 'BUNTAN',
+        depreciation_amount: 50_000,
+        contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const [sales, cost] = genBuntan([legacy], '2024-02', 100_000)
+      expect(sales.supply_amount).toBe(1_850_000) // 2M − 50k(건별) − 100k(월별)
+      expect(cost.supply_amount).toBe(1_750_000)  // 1.8M − 50k(건별)만
+    })
+  })
 })
 
 // ── genFeSi ───────────────────────────────────────────────
@@ -439,5 +472,33 @@ describe('generateInvoices', () => {
     const d = makeDelivery({ product_name: 'UNKNOWN_PRODUCT' })
     expect(() => generateInvoices([d], '2024-02')).not.toThrow()
     expect(generateInvoices([d], '2024-02')).toHaveLength(0)
+  })
+})
+
+// ── generateInvoices 월별 감가 라우팅 ─────────────────────
+describe('generateInvoices 월별 감가 라우팅', () => {
+  it('BUNTAN 그룹의 product_id+납품월에 매칭되는 감가만 전달', () => {
+    const d = makeDelivery({
+      product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-07',
+      contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const invoices = generateInvoices([d], '2026-08', [
+      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
+      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999 }, // 다른 달 — 무시
+      { product_id: 'other',  year_month: '2026-07', amount: 999_999 }, // 다른 품목 — 무시
+    ])
+    const sales = invoices.find(i => i.invoice_type === 'sales')!
+    expect(sales.supply_amount).toBe(1_900_000)
+    const cost = invoices.find(i => i.invoice_type === 'cost')!
+    expect(cost.supply_amount).toBe(1_800_000)
+  })
+
+  it('monthlyDeps 미전달 — 기존 동작 불변', () => {
+    const d = makeDelivery({
+      product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-07',
+      contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const sales = generateInvoices([d], '2026-08').find(i => i.invoice_type === 'sales')!
+    expect(sales.supply_amount).toBe(2_000_000)
   })
 })

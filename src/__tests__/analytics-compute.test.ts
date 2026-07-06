@@ -195,3 +195,38 @@ describe('buildAllAnalytics', () => {
     expect(result.totals.commissionTotal).toBe(0)
   })
 })
+
+// ── buildAllAnalytics 월별 감가 (분탄 렘코 미수) ──────────
+describe('buildAllAnalytics 월별 감가 (분탄 렘코 미수)', () => {
+  const buntanDelivery = makeDelivery({
+    id: 'b1', year_month: '2026-07', invoice_month: '2026-08', delivery_date: '2026-07-15',
+    product_id: 'prod-b',
+    product: { id: 'prod-b', name: 'BUNTAN', display_name: '분탄', buyer: '렘코' },
+    contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+  })
+
+  it('매출만 차감, 매입·마진 불변, depreciationKrw 기록', () => {
+    const out = buildAllAnalytics([buntanDelivery], [], '2026-08', '2026-08',
+      [{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000 }])
+    expect(out.totals.sellKrw).toBe(1_900_000)     // 2_000_000 − 100_000
+    expect(out.totals.costKrw).toBe(1_800_000)     // 총액
+    expect(out.totals.totalMargin).toBe(200_000)   // 불변
+    expect(out.productRows[0].depreciationKrw).toBe(100_000)
+    const aug = out.monthlyData.find(m => m.ym === '2026-08')!
+    expect(aug.sellKrw).toBe(1_900_000)
+  })
+
+  it('매칭되지 않는 감가(다른 품목/월)는 미적용', () => {
+    const out = buildAllAnalytics([buntanDelivery], [], '2026-08', '2026-08', [
+      { product_id: 'other',  year_month: '2026-07', amount: 999_999 },
+      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999 },
+    ])
+    expect(out.totals.sellKrw).toBe(2_000_000)
+    expect(out.productRows[0].depreciationKrw).toBe(0)
+  })
+
+  it('monthlyDeps 미전달 — 기존 동작 불변', () => {
+    const out = buildAllAnalytics([buntanDelivery], [], '2026-08', '2026-08')
+    expect(out.totals.sellKrw).toBe(2_000_000)
+  })
+})

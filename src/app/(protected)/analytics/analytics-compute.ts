@@ -7,7 +7,7 @@
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
 import { shiftMonths } from '@/lib/date'
 import type {
-  DeliveryForAnalytics, CommissionEntry,
+  DeliveryForAnalytics, CommissionEntry, MonthlyDepForAnalytics,
   MarginTotals, ProductRow, MonthlyData,
   CommissionsInPeriod, AllAnalytics,
 } from './analytics-types'
@@ -71,9 +71,11 @@ export function buildAllAnalytics(
   commissions: CommissionEntry[],
   fromYM: string,
   toYM: string,
+  monthlyDeps: MonthlyDepForAnalytics[] = [],
 ): AllAnalytics {
   const totals       = zeroTotals()
   const productMap   = new Map<string, ProductRow>()
+  const keyToInvoiceMonth = new Map<string, string>()
   const monthlyMap   = new Map<string, MarginTotals>()
   const productsSeen = new Map<string, string>()
   const dongkukDeliveryYMSet = new Set<string>()
@@ -103,6 +105,7 @@ export function buildAllAnalytics(
         productsSeen.set(d.product.name, d.product.display_name)
       }
       const key = `${d.product_id}_${d.year_month}`
+      keyToInvoiceMonth.set(key, d.invoice_month)
       const ex  = productMap.get(key)
       if (ex) {
         if (ex.sellPricePerTon !== null && ex.sellPricePerTon !== m.sell_price_krw) ex.sellPricePerTon = null
@@ -116,6 +119,7 @@ export function buildAllAnalytics(
           deliveryYearMonth: d.year_month,
           sellPricePerTon: m.sell_price_krw,
           costPricePerTon: m.cost_price_krw,
+          depreciationKrw: 0,
         }
         accDelivery(row, m, gmSell, dep)
         productMap.set(key, row)
@@ -125,6 +129,20 @@ export function buildAllAnalytics(
     const ma = monthlyMap.get(d.invoice_month) ?? zeroTotals()
     accDelivery(ma, m, gmSell, dep)
     monthlyMap.set(d.invoice_month, ma)
+  }
+
+  // ─── 1.5) 월별 감가 (분탄 렘코 미수) — 매출만 차감, 마진 불변 ───
+  for (const md of monthlyDeps) {
+    const key = `${md.product_id}_${md.year_month}`
+    const row = productMap.get(key)
+    if (!row) continue // 필터로 제외됐거나 해당 납품 없음
+    const amt = Number(md.amount)
+    row.sellKrw         -= amt
+    row.depreciationKrw += amt
+    totals.sellKrw      -= amt
+    const im = keyToInvoiceMonth.get(key)
+    const ma = im ? monthlyMap.get(im) : undefined
+    if (ma) ma.sellKrw -= amt
   }
 
   // ─── 2) commissions 단일 패스 ───────────────────────────

@@ -7,6 +7,8 @@
  * 소괴탄: 동국→한국에이원 역발행 (VAT 없음), 익월1일 발행, 익월10일 대금; 커미션은 VAT 10%
  * 분탄:  동창→한국에이원→렘코 (VAT 10%), 익월1일 동시 발행, 익월10일 대금
  *        (동국제강 없음. 매입처=동창, 매출처=렘코 역발행)
+ *        월별 감가(monthlyDep)는 렘코 매출 계산서만 차감 — 렘코 미수, 계약 종료 후 일괄 회수.
+ *        동창 매입·커미션은 총액 기준 유지.
  * 커미션: 익월15일 (공통)
  */
 import { splitMargin } from '@/lib/margin'
@@ -70,6 +72,8 @@ export function genSoggae(
 export function genBuntan(
   deliveries: DeliveryForInvoice[],
   ym: string,
+  /** 해당 납품월의 월별 감가(원). 렘코 매출 계산서에서만 차감 — 동창 매입·커미션은 총액 기준 */
+  monthlyDep: number = 0,
 ): InvoiceToCreate[] {
   const pid        = deliveries[0].product_id
   const deliveryYM = deliveries[0].year_month
@@ -95,9 +99,12 @@ export function genBuntan(
   return [
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '렘코', to: '(주)한국에이원', supply: sellTotal, vat: true,
+      from: '렘코', to: '(주)한국에이원', supply: sellTotal - monthlyDep, vat: true,
       basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
-      type: 'sales', memo: '렘코 역발행 — 매출 (VAT10%), 익월1일 동시 발행',
+      type: 'sales',
+      memo: monthlyDep > 0
+        ? `렘코 역발행 — 매출 (VAT10%), 월감가 ${monthlyDep.toLocaleString('ko-KR')}원 차감`
+        : '렘코 역발행 — 매출 (VAT10%), 익월1일 동시 발행',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,

@@ -30,7 +30,7 @@ export default function DeliveryForm({
   const {
     form, setForm,
     saving, error,
-    selectedProduct, isFeSi, isCoal, formYearMonth,
+    selectedProduct, isFeSi, isCoal, isSoggae, formYearMonth,
     availableContracts, selectedContract, contractForPreview, mainMargin,
     handleSave,
   } = useDeliveryForm({ products, contracts, editDelivery, defaultYearMonth, onSaved })
@@ -231,8 +231,8 @@ export default function DeliveryForm({
         </div>
       )}
 
-      {/* 감가 — 소괴탄/분탄 전용 */}
-      {isCoal && form.contract_id && (
+      {/* 감가 — 소괴탄은 건별 입력. 분탄은 월별 감가(지급 일정 페이지)로 이동, 과거 건별 데이터 수정 시에만 노출 */}
+      {(isSoggae || (isCoal && form.depreciation_amount !== '')) && form.contract_id && (
         <div className="mb-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
             감가 (선택) <span className="font-normal normal-case text-gray-400">— 동국제강 지정 감가금액</span>
@@ -259,6 +259,13 @@ export default function DeliveryForm({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 분탄 — 건별 감가 대신 월별 감가 안내 */}
+      {isCoal && !isSoggae && form.depreciation_amount === '' && form.contract_id && (
+        <p className="mb-5 text-xs text-gray-400">
+          분탄 감가는 지급 일정 페이지의 &ldquo;감가 정산&rdquo; 패널에서 월별로 입력합니다.
+        </p>
       )}
 
       {/* 마진 미리보기 */}

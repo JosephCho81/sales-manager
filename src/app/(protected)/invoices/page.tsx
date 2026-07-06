@@ -4,6 +4,7 @@ import FetchErrorView from '@/components/FetchErrorView'
 import InvoicesClient from './InvoicesClient'
 import { fetchInvoiceInputs } from './invoice-data'
 import { type InvoiceRow } from '@/lib/invoice-generator'
+import type { MonthlyDepreciation } from '@/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
   try {
     const supabase = createAdminClient()
 
-    const [inputs, iRes, pRes] = await Promise.all([
+    const [inputs, iRes, pRes, mdRes] = await Promise.all([
       // 입고·환율·커미션 — 재생성 액션과 동일한 조회 경로 공유
       fetchInvoiceInputs(yearMonth),
 
@@ -36,10 +37,17 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       supabase
         .from('products')
         .select('id, name, display_name'),
+
+      // 월별 감가 (분탄 렘코 미수) — 전체 이력 (테이블 소형)
+      supabase
+        .from('monthly_depreciations')
+        .select('*')
+        .order('year_month', { ascending: true }),
     ])
 
-    if (iRes.error) throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
-    if (pRes.error) throw new Error(`품목 조회 실패: ${pRes.error.message}`)
+    if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
+    if (pRes.error)  throw new Error(`품목 조회 실패: ${pRes.error.message}`)
+    if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
 
     return (
       <InvoicesClient
@@ -49,6 +57,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         initialInvoices={(iRes.data ?? []) as unknown as InvoiceRow[]}
         initialCommissions={inputs.commissions}
         products={(pRes.data ?? []) as Array<{ id: string; name: string; display_name: string | null }>}
+        initialMonthlyDeps={(mdRes.data ?? []) as unknown as MonthlyDepreciation[]}
       />
     )
   } catch (e) {

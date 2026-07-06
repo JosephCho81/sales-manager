@@ -6,7 +6,7 @@ import AnalyticsClient from './AnalyticsClient'
 import FetchErrorView from '@/components/FetchErrorView'
 import { buildAllAnalytics, extractAvailableProducts } from './analytics-compute'
 import { calcPrevPeriod, buildChangeAnalysis } from './analytics-change'
-import type { DeliveryForAnalytics, CommissionEntry, ProductRow, ChangeAnalysisResult } from './analytics-types'
+import type { DeliveryForAnalytics, CommissionEntry, MonthlyDepForAnalytics, ProductRow, ChangeAnalysisResult } from './analytics-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +29,7 @@ const fetchAnalyticsData = unstable_cache(
   async (fromYM: string, toYM: string) => {
     const supabase = createAdminClient()
 
-    const [dRes, fxRes] = await Promise.all([
+    const [dRes, fxRes, mdRes] = await Promise.all([
       supabase
         .from('deliveries')
         .select(`
@@ -43,10 +43,17 @@ const fetchAnalyticsData = unstable_cache(
         .order('invoice_month'),
       // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
       supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
+      // 월별 감가 (분탄 렘코 미수) — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로
+      supabase
+        .from('monthly_depreciations')
+        .select('product_id, year_month, amount')
+        .gte('year_month', shiftMonths(fromYM, -2))
+        .lte('year_month', toYM),
     ])
 
     if (dRes.error)  throw new Error(dRes.error.message)
     if (fxRes.error) throw new Error(fxRes.error.message)
+    if (mdRes.error) throw new Error(mdRes.error.message)
 
     const fxMap = new Map<string, number>()
     for (const r of (fxRes.data ?? []) as Array<{ product_id: string; bl_date: string; rate_krw_per_usd: number }>) {
@@ -73,9 +80,11 @@ const fetchAnalyticsData = unstable_cache(
     return {
       deliveries,
       commissions: (cRes.data ?? []) as CommissionEntry[],
+      monthlyDeps: ((mdRes.data ?? []) as MonthlyDepForAnalytics[]).map(md => ({ ...md, amount: Number(md.amount) })),
     }
   },
-  ['analytics-data'],
+  // v2: monthlyDeps 추가 — 구 캐시 엔트리(필드 없음)와 분리
+  ['analytics-data-v2'],
   { revalidate: 120 },
 )
 
@@ -132,14 +141,14 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: SP
 
     const availableProducts = extractAvailableProducts(allDeliveries)
     const filtered = applyDeliveryFilter(allDeliveries, filterProduct, filterBuyer)
-    const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM)
+    const precomputed = buildAllAnalytics(filtered, commissions, fromYM, toYM, currentData.monthlyDeps)
 
     let prevProductRows: ProductRow[] = []
     let hasPrevData = false
     if (prevData && prevData.deliveries.length > 0) {
       hasPrevData = true
       const prevFiltered = applyDeliveryFilter(prevData.deliveries, filterProduct, filterBuyer)
-      prevProductRows = buildAllAnalytics(prevFiltered, prevData.commissions, prevFromYM, prevToYM).productRows
+      prevProductRows = buildAllAnalytics(prevFiltered, prevData.commissions, prevFromYM, prevToYM, prevData.monthlyDeps).productRows
     }
 
     const changeAnalysis: ChangeAnalysisResult = buildChangeAnalysis(

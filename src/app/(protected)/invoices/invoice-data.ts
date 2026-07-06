@@ -1,12 +1,13 @@
 import 'server-only'
 import { shiftMonths } from '@/lib/date'
 import { createAdminClient } from '@/lib/supabase/server'
-import type { DeliveryRawForInvoice, FxRateRaw, CommissionForInvoice } from '@/lib/invoice-generator'
+import type { DeliveryRawForInvoice, FxRateRaw, CommissionForInvoice, MonthlyDepInput } from '@/lib/invoice-generator'
 
 export type InvoiceInputs = {
   deliveries: DeliveryRawForInvoice[]
   fxRates: FxRateRaw[]
   commissions: CommissionForInvoice[]
+  monthlyDeps: MonthlyDepInput[]
 }
 
 /**
@@ -94,9 +95,25 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     if (!deliveryMap.has(d.id)) deliveryMap.set(d.id, d)
   }
 
+  const dedupedDeliveries = Array.from(deliveryMap.values())
+
+  // 월별 감가 — 조회된 납품월들만 좁게 조회 (분탄 offset=1: 지급월 M → 납품월 M−1)
+  const ymList = Array.from(new Set(dedupedDeliveries.map(d => d.year_month)))
+  let monthlyDeps: MonthlyDepInput[] = []
+  if (ymList.length > 0) {
+    const mdRes = await supabase
+      .from('monthly_depreciations')
+      .select('product_id, year_month, amount')
+      .in('year_month', ymList)
+    // 조용히 빈 배열로 폴백하면 감가 누락된 총액 계산서가 발행됨 — 명시적 throw
+    if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
+    monthlyDeps = ((mdRes.data ?? []) as MonthlyDepInput[]).map(md => ({ ...md, amount: Number(md.amount) }))
+  }
+
   return {
-    deliveries: Array.from(deliveryMap.values()),
+    deliveries: dedupedDeliveries,
     fxRates: (fxRes.data ?? []) as unknown as FxRateRaw[],
     commissions,
+    monthlyDeps,
   }
 }

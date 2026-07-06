@@ -89,6 +89,7 @@ export function buildProductRows(
         deliveryYearMonth: d.year_month,
         sellPricePerTon: m.sell_price_krw,
         costPricePerTon: m.cost_price_krw,
+        depreciationKrw: 0,
       }
       accDelivery(row, m, gmSell, dep)
       map.set(key, row)

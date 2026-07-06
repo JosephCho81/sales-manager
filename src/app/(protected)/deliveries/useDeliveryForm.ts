@@ -52,6 +52,8 @@ export function useDeliveryForm({
   )
   const isFeSi = selectedProduct?.price_unit === 'USD_TON'
   const isCoal = selectedProduct?.name === 'SOGGAE' || selectedProduct?.name === 'BUNTAN'
+  // 분탄 감가는 월별(monthly_depreciations)로 이동 — 건별 입력은 소괴탄만
+  const isSoggae = selectedProduct?.name === 'SOGGAE'
   const formYearMonth = form.delivery_date ? toYearMonth(form.delivery_date) : ''
 
   const availableContracts = useMemo(() => {
@@ -139,7 +141,7 @@ export function useDeliveryForm({
   return {
     form, setForm,
     saving, error,
-    selectedProduct, isFeSi, isCoal, formYearMonth,
+    selectedProduct, isFeSi, isCoal, isSoggae, formYearMonth,
     availableContracts, selectedContract, contractForPreview, mainMargin,
     handleSave,
   }
