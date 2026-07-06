@@ -13,7 +13,7 @@ import type { DeliveryForInvoice, InvoiceToCreate, InvoiceType } from './types'
  */
 const VAT_FLOOR_COMPANIES = new Set(['동창'])
 
-function calcVat(supply: number, counterparty: string): number {
+export function calcVat(supply: number, counterparty: string): number {
   return VAT_FLOOR_COMPANIES.has(counterparty)
     ? Math.floor(supply * 0.1)
     : Math.round(supply * 0.1)
@@ -33,11 +33,13 @@ export function makeInvoice(p: {
   paymentDue: string
   type: InvoiceType
   memo: string
+  /** 라인별 VAT 합산 등 일괄 10% 계산과 다른 경우 명시 (실제 세금계산서 일치용) */
+  vatOverride?: number
 }): InvoiceToCreate {
   const supply = Math.round(p.supply)
   // 상대 거래처(한국에이원이 아닌 쪽) 기준으로 부가세 끝자리 처리 분기
   const counterparty = p.from === '(주)한국에이원' ? p.to : p.from
-  const vatAmt = p.vat ? calcVat(supply, counterparty) : 0
+  const vatAmt = p.vat ? (p.vatOverride ?? calcVat(supply, counterparty)) : 0
   return {
     year_month: p.yearMonth,
     delivery_year_month: p.deliveryYearMonth,

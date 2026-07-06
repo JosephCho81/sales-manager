@@ -225,6 +225,20 @@ describe('genBuntan', () => {
       expect(cost.supply_amount).toBe(1_800_000)
     })
 
+    it('동창 매입 VAT — 라인별(총액+감가) 절사 합산, 실제 2026-07 세금계산서와 일치', () => {
+      // 1,111.93톤 × 353,000 = 392,511,290 / 감가 180,851
+      // VAT = floor(39,251,129.0) − floor(18,085.1) = 39,233,044
+      // (차감 후 일괄 10% 절사면 39,233,043 — 동창 계산서와 1원 어긋남)
+      const real = makeDelivery({
+        product_name: 'BUNTAN', quantity_kg: 1_111_930,
+        contract: { sell_price: 363_000, cost_price: 353_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const [, cost] = genBuntan([real], '2026-08', 180_851)
+      expect(cost.supply_amount).toBe(392_330_439)
+      expect(cost.vat_amount).toBe(39_233_044)
+      expect(cost.total_amount).toBe(431_563_483)
+    })
+
     it('건별 감가(과거 데이터)와 월별 감가 동시 존재 시 각각 반영', () => {
       const legacy = makeDelivery({
         product_name: 'BUNTAN',

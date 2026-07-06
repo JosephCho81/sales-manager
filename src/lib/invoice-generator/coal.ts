@@ -13,7 +13,7 @@
  */
 import { splitMargin } from '@/lib/margin'
 import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
-import { makeInvoice } from './utils'
+import { makeInvoice, calcVat } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
 export function genSoggae(
@@ -106,6 +106,11 @@ export function genBuntan(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '동창', supply: costTotal - monthlyDep, vat: true,
+      // 동창 세금계산서는 라인별(매입 총액 + 감가 마이너스) VAT 절사 후 합산 —
+      // 차감된 공급가액에 일괄 10% 절사하면 1원 어긋남 (2026-07 실계산서로 확인)
+      vatOverride: monthlyDep > 0
+        ? calcVat(Math.round(costTotal), '동창') - calcVat(monthlyDep, '동창')
+        : undefined,
       basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'cost',
       memo: monthlyDep > 0
