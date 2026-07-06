@@ -241,7 +241,7 @@ export default function InvoicesClient({
         </div>
       </div>
 
-      {/* 분탄 감가 정산 — 동창 미지급 추적 */}
+      {/* 분탄 감가 정산 — 미배분 보관액(렘코 반환 예정) 추적 */}
       {(() => {
         const buntan = products.find(p => p.name.toUpperCase() === 'BUNTAN')
         if (!buntan) return null

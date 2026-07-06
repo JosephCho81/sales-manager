@@ -52,7 +52,7 @@ export default function DepreciationPanel({
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <h3 className="text-sm font-bold text-gray-900">
           {productLabel} 감가 정산
-          <span className="ml-1 font-normal text-xs text-gray-400">— 동창 미지급, 계약 종료 후 일괄 지급</span>
+          <span className="ml-1 font-normal text-xs text-gray-400">— 미배분 보관, 계약 종료 후 렘코 반환</span>
         </h3>
         <p className="text-sm">
           미정산 누계 <span className="font-bold text-red-600 tabular-nums">{fmtKrw(unsettled)}</span>
@@ -117,7 +117,8 @@ export default function DepreciationPanel({
         </button>
       </div>
       <p className="text-xs text-gray-400 mt-2">
-        저장 시 해당 납품월의 동창 매입 계산서가 감가 차감 금액으로 재생성됩니다. 렘코 매출·커미션은 총액 유지.
+        저장 시 해당 납품월의 동창 매입 계산서가 감가 차감 금액으로 재생성됩니다. 렘코 매출·커미션 배분은 총액 기준 유지
+        — 감가 금액은 3사 배분에서 제외되어 통장에 남고, 계약 종료 후 렘코에 반환합니다.
       </p>
 
       {error && <p className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
