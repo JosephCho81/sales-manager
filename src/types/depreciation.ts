@@ -5,7 +5,7 @@ export interface MonthlyDepreciation {
   year_month: string
   amount: number
   memo: string | null
-  /** 렘코 정산(회수) 완료 시각. null = 미정산 */
+  /** 동창 정산(지급) 완료 시각. null = 미정산 */
   settled_at: string | null
   created_at: string
 }

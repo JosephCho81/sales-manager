@@ -70,13 +70,13 @@ export default function ProductTable({
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">
                       {row.costPricePerTon !== null ? fmtNum(row.costPricePerTon, 0) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap">
-                      {fmtNum(row.sellKrw, 0)}
+                    <td className="table-td text-right tabular-nums whitespace-nowrap">{fmtNum(row.sellKrw, 0)}</td>
+                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">
+                      {fmtNum(row.costKrw, 0)}
                       {row.depreciationKrw > 0 && (
                         <div className="text-[10px] text-red-400 whitespace-nowrap">감가 −{fmtNum(row.depreciationKrw, 0)}</div>
                       )}
                     </td>
-                    <td className="table-td text-right tabular-nums whitespace-nowrap text-gray-600">{fmtNum(row.costKrw, 0)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap font-semibold text-blue-600">{fmtNum(row.totalMargin, 0)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-green-600">{fmtNum(row.a1, 0)}</td>
                     <td className="table-td text-right tabular-nums whitespace-nowrap text-purple-600">{fmtNum(row.gm, 0)}</td>

@@ -43,7 +43,7 @@ const fetchAnalyticsData = unstable_cache(
         .order('invoice_month'),
       // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
       supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
-      // 월별 감가 (분탄 렘코 미수) — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로
+      // 월별 감가 (분탄 동창 미지급) — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로
       supabase
         .from('monthly_depreciations')
         .select('product_id, year_month, amount')

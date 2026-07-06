@@ -20,7 +20,7 @@ export type DeliveryForAnalytics = {
   } | null
 }
 
-/** 월별 감가 (분탄 렘코 미수) — year_month는 납품월 기준 */
+/** 월별 감가 (분탄 동창 미지급) — year_month는 납품월 기준 */
 export type MonthlyDepForAnalytics = { product_id: string; year_month: string; amount: number }
 
 export type CommissionEntry = {
@@ -43,7 +43,7 @@ export type ProductRow = MarginTotals & {
   deliveryYearMonth: string
   sellPricePerTon: number | null
   costPricePerTon: number | null
-  /** 월별 감가(원) — 렘코 미수. 매출에서 차감 표시, 마진에는 미반영 */
+  /** 월별 감가(원) — 동창 미지급. 매입에서 차감 표시, 마진에는 미반영 */
   depreciationKrw: number
 }
 

@@ -131,18 +131,18 @@ export function buildAllAnalytics(
     monthlyMap.set(d.invoice_month, ma)
   }
 
-  // ─── 1.5) 월별 감가 (분탄 렘코 미수) — 매출만 차감, 마진 불변 ───
+  // ─── 1.5) 월별 감가 (분탄 동창 미지급) — 매입만 차감, 마진 불변 ───
   for (const md of monthlyDeps) {
     const key = `${md.product_id}_${md.year_month}`
     const row = productMap.get(key)
     if (!row) continue // 필터로 제외됐거나 해당 납품 없음
     const amt = Number(md.amount)
-    row.sellKrw         -= amt
+    row.costKrw         -= amt
     row.depreciationKrw += amt
-    totals.sellKrw      -= amt
+    totals.costKrw      -= amt
     const im = keyToInvoiceMonth.get(key)
     const ma = im ? monthlyMap.get(im) : undefined
-    if (ma) ma.sellKrw -= amt
+    if (ma) ma.costKrw -= amt
   }
 
   // ─── 2) commissions 단일 패스 ───────────────────────────

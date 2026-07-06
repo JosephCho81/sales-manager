@@ -38,7 +38,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .from('products')
         .select('id, name, display_name'),
 
-      // 월별 감가 (분탄 렘코 미수) — 전체 이력 (테이블 소형)
+      // 월별 감가 (분탄 동창 미지급) — 전체 이력 (테이블 소형)
       supabase
         .from('monthly_depreciations')
         .select('*')

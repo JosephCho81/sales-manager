@@ -204,12 +204,12 @@ describe('genBuntan', () => {
     expect(cost.supply_amount).toBe(1_750_000)
   })
 
-  describe('월별 감가 (렘코 미수 — 2026-07 상장 대응)', () => {
+  describe('월별 감가 (동창 미지급 — 2026-07 렘코 상장 대응)', () => {
     // sell 200_000 × 10톤 = 2_000_000 / cost 180_000 × 10톤 = 1_800_000
-    it('매출(렘코) 계산서만 차감, 매입(동창)은 총액', () => {
+    it('매입(동창) 계산서만 차감, 매출(렘코)은 총액', () => {
       const [sales, cost] = genBuntan([d], '2024-02', 100_000)
-      expect(sales.supply_amount).toBe(1_900_000)
-      expect(cost.supply_amount).toBe(1_800_000)
+      expect(sales.supply_amount).toBe(2_000_000)
+      expect(cost.supply_amount).toBe(1_700_000)
     })
 
     it('커미션은 월별 감가 제외한 총액 기준 (과소지급 방지)', () => {
@@ -232,8 +232,8 @@ describe('genBuntan', () => {
         contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
       })
       const [sales, cost] = genBuntan([legacy], '2024-02', 100_000)
-      expect(sales.supply_amount).toBe(1_850_000) // 2M − 50k(건별) − 100k(월별)
-      expect(cost.supply_amount).toBe(1_750_000)  // 1.8M − 50k(건별)만
+      expect(sales.supply_amount).toBe(1_950_000) // 2M − 50k(건별)만
+      expect(cost.supply_amount).toBe(1_650_000)  // 1.8M − 50k(건별) − 100k(월별)
     })
   })
 })
@@ -488,9 +488,9 @@ describe('generateInvoices 월별 감가 라우팅', () => {
       { product_id: 'other',  year_month: '2026-07', amount: 999_999 }, // 다른 품목 — 무시
     ])
     const sales = invoices.find(i => i.invoice_type === 'sales')!
-    expect(sales.supply_amount).toBe(1_900_000)
+    expect(sales.supply_amount).toBe(2_000_000)
     const cost = invoices.find(i => i.invoice_type === 'cost')!
-    expect(cost.supply_amount).toBe(1_800_000)
+    expect(cost.supply_amount).toBe(1_700_000)
   })
 
   it('monthlyDeps 미전달 — 기존 동작 불변', () => {
