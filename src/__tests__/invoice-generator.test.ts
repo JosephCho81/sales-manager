@@ -300,6 +300,22 @@ describe('genFeSi', () => {
     const [sales] = genFeSi(d, '2024-01')
     expect(sales.supply_amount).toBe(20_250_000)
   })
+
+  it('VAT는 USD 부가세를 센트 단위로 반올림 후 환율 환산 (2026-07 페로실리콘 실물 대사)', () => {
+    // 실제 세금계산서: 공급가액 19,747,044원 / 부가세 1,974,703원
+    // (공급가액 KRW × 10%를 바로 반올림하면 1,974,704로 1원 어긋남)
+    const d = makeDelivery({
+      product_name: 'FESI60',
+      quantity_kg: 23_910,
+      delivery_date: '2026-07-08',
+      fx_rate: 1526.6,
+      contract: { sell_price: 541, cost_price: 540, currency: 'USD', reference_exchange_rate: 1474.6 },
+    })
+    const [sales, cost] = genFeSi(d, '2026-07')
+    expect(sales.supply_amount).toBe(19_747_044)
+    expect(sales.vat_amount).toBe(1_974_703)
+    expect(cost.vat_amount).toBe(1_971_054)
+  })
 })
 
 // ── genALSeries ───────────────────────────────────────────
