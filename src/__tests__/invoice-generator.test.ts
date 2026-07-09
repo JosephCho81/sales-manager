@@ -301,7 +301,7 @@ describe('genFeSi', () => {
     expect(sales.supply_amount).toBe(20_250_000)
   })
 
-  it('VAT는 USD 부가세를 센트 단위로 반올림 후 환율 환산 (2026-07 페로실리콘 실물 대사)', () => {
+  it('VAT는 USD 부가세를 센트 단위로 절사 후 환율 환산 (2026-07 페로실리콘 실물 대사)', () => {
     // 실제 세금계산서: 공급가액 19,747,044원 / 부가세 1,974,703원
     // (공급가액 KRW × 10%를 바로 반올림하면 1,974,704로 1원 어긋남)
     const d = makeDelivery({
@@ -315,6 +315,21 @@ describe('genFeSi', () => {
     expect(sales.supply_amount).toBe(19_747_044)
     expect(sales.vat_amount).toBe(1_974_703)
     expect(cost.vat_amount).toBe(1_971_054)
+  })
+
+  it('센트 절사 경계 — 1,303.269 USD → 절사 1,303.26 (2026-07 동국 역발행 대사)', () => {
+    // 공급가액 13,032.69 USD × 환율 1531.80 = 19,963,475원
+    // USD 부가세 1,303.269 → 절사 1,303.26 × 1531.80 = 1,996,334원 (반올림하면 1,303.27)
+    const d = makeDelivery({
+      product_name: 'FESI75',
+      quantity_kg: 24_090,
+      delivery_date: '2026-07-08',
+      fx_rate: 1531.8,
+      contract: { sell_price: 541, cost_price: 540, currency: 'USD', reference_exchange_rate: 1474.6 },
+    })
+    const [sales] = genFeSi(d, '2026-07')
+    expect(sales.supply_amount).toBe(19_963_475)
+    expect(sales.vat_amount).toBe(1_996_334)
   })
 })
 

@@ -29,10 +29,11 @@ export function genFeSi(
   const costUsdTotal = delivery.contract.cost_price * delivery.quantity_kg / 1000
   const costKrwTotal = costUsdTotal * rate
 
-  // 실제 세금계산서는 USD 부가세를 센트 단위로 반올림한 뒤 환율을 곱해 KRW로 환산
-  // (KRW 환산 공급가액에 바로 10%를 곱하면 원 단위에서 1원 어긋남 — 2026-07 페로실리콘 대사 확인)
+  // 실제 세금계산서는 USD 부가세를 센트 단위로 절사(버림)한 뒤 환율을 곱해 KRW로 환산
+  // (KRW 환산 공급가액에 바로 10%를 곱하면 원 단위에서 어긋남 — 동국 역발행 계산서 대사 확인.
+  //  예: 13,032.69 USD × 10% = 1,303.269 → 절사 1,303.26 (반올림 시 1,303.27로 1원 초과))
   const usdVatToKrw = (usdTotal: number) =>
-    Math.round(Math.round(usdTotal * 0.1 * 100) / 100 * rate)
+    Math.round(Math.floor(usdTotal * 0.1 * 100) / 100 * rate)
   const sellVat = usdVatToKrw(sellUsdTotal)
   const costVat = usdVatToKrw(costUsdTotal)
 
