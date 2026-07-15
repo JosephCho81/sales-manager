@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { getCurrentUser } from '@/lib/auth'
+import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import type { Expense, ExpensePayer } from '@/types'
 
@@ -13,7 +13,7 @@ export async function insertExpense(payload: {
   note: string | null
   payer: ExpensePayer
 }) {
-  const auth = await getCurrentUser()
+  const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
@@ -29,7 +29,7 @@ export async function insertExpense(payload: {
 }
 
 export async function toggleSettled(id: string, isSettled: boolean) {
-  const auth = await getCurrentUser()
+  const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
@@ -51,7 +51,7 @@ export async function updateExpense(id: string, payload: {
   amount: number
   note: string | null
 }) {
-  const auth = await getCurrentUser()
+  const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
@@ -68,7 +68,7 @@ export async function updateExpense(id: string, payload: {
 }
 
 export async function updatePayer(id: string, payer: ExpensePayer | null) {
-  const auth = await getCurrentUser()
+  const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
@@ -85,7 +85,7 @@ export async function updatePayer(id: string, payer: ExpensePayer | null) {
 }
 
 export async function deleteExpense(id: string) {
-  const auth = await getCurrentUser()
+  const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
