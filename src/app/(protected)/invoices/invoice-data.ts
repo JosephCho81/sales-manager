@@ -21,9 +21,8 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
 
   const dongkukCommMonth  = shiftMonths(yearMonth, -2)
   const hyundaiCommMonth  = shiftMonths(yearMonth, -1)
-  const hyundaiDeliveryYM = shiftMonths(yearMonth, -2)
 
-  const [dRes, fxRes, cRes, edRes] = await Promise.all([
+  const [dRes, fxRes, cRes] = await Promise.all([
     // 1) 해당 월 입고 (invoice_month 기준)
     supabase
       .from('deliveries')
@@ -51,25 +50,12 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
       .select('id, year_month, company, commission_amount, memo')
       .in('year_month', [dongkukCommMonth, hyundaiCommMonth])
       .order('created_at', { ascending: true }),
-
-    // 4) 현대제철 M-2 납품 (AL40/AL30 이중계약 extra 처리용)
-    supabase
-      .from('deliveries')
-      .select(`
-        id, year_month, invoice_month, delivery_date, product_id,
-        quantity_kg, depreciation_amount,
-        product:products(id, name, display_name, vat),
-        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-      `)
-      .eq('year_month', hyundaiDeliveryYM)
-      .order('created_at', { ascending: true }),
   ])
 
   if (dRes.error)  throw new Error(`입고 조회 실패: ${dRes.error.message}`)
   if (fxRes.error) throw new Error(`환율 조회 실패: ${fxRes.error.message}`)
-  // 아래 2개도 실패 시 조용히 빈 배열로 폴백하면 커미션/이중계약이 누락됨 — 명시적 throw
+  // 실패 시 조용히 빈 배열로 폴백하면 커미션이 누락됨 — 명시적 throw
   if (cRes.error)  throw new Error(`커미션 조회 실패: ${cRes.error.message}`)
-  if (edRes.error) throw new Error(`추가 입고 조회 실패: ${edRes.error.message}`)
 
   // 커미션: 회사별 월 매칭 검증 (동국제강=M-2, 현대제철=M-1만 허용)
   const commissions = ((cRes.data ?? []) as unknown as CommissionForInvoice[]).filter(c =>
@@ -77,30 +63,12 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     (c.company === '현대제철' && c.year_month === hyundaiCommMonth)
   )
 
-  // 입고 합산 (중복 제거)
-  // offset=0 AL40/AL30 건(year_month === invoice_month)은 M+2 invoice에서 extra로 포함
-  const extraDeliveries = ((edRes.data ?? []) as unknown as DeliveryRawForInvoice[])
-    .filter(d => {
-      const n = d.product?.name?.toUpperCase()
-      return (n?.startsWith('AL40') ?? false) || n === 'AL30'
-    })
-
-  const deliveryMap = new Map<string, DeliveryRawForInvoice>()
-  for (const d of (dRes.data ?? []) as unknown as DeliveryRawForInvoice[]) {
-    const pName = d.product?.name?.toUpperCase()
-    if (d.year_month === yearMonth && ((pName?.startsWith('AL40') ?? false) || pName === 'AL30')) continue
-    deliveryMap.set(d.id, d)
-  }
-  for (const d of extraDeliveries) {
-    if (!deliveryMap.has(d.id)) deliveryMap.set(d.id, d)
-  }
-
-  const dedupedDeliveries = Array.from(deliveryMap.values())
+  const deliveries = (dRes.data ?? []) as unknown as DeliveryRawForInvoice[]
 
   // 월별 감가 — 조회된 납품월들만 좁게 조회 (분탄 offset=1: 지급월 M → 납품월 M−1)
   // year_month(귀속월)와 cost_deduct_ym(차감월)이 다른 감가가 있으므로 둘 다 매칭해야 한다.
   // year_month만 보면 2026-05 귀속 AL30 감가가 2026-07 납품분 계산서 생성 시 누락된다.
-  const ymList = Array.from(new Set(dedupedDeliveries.map(d => d.year_month)))
+  const ymList = Array.from(new Set(deliveries.map(d => d.year_month)))
   let monthlyDeps: MonthlyDepInput[] = []
   if (ymList.length > 0) {
     const inList = ymList.map(m => `"${m}"`).join(',')
@@ -114,7 +82,7 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
   }
 
   return {
-    deliveries: dedupedDeliveries,
+    deliveries,
     fxRates: (fxRes.data ?? []) as unknown as FxRateRaw[],
     commissions,
     monthlyDeps,
