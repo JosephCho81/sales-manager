@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { toMessage } from '@/lib/error'
+import { parsePaidAmount } from '@/lib/depreciation'
 import {
   generateInvoices,
   generateCommissionInvoices,
@@ -56,23 +57,29 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
   // 조회 실패를 무시하면 기존 지급완료 기록이 재생성 시 통째로 유실됨 — 명시적 중단
   const { data: existing, error: exErr } = await supabase
     .from('invoice_instructions')
-    .select('delivery_ids, product_id, from_company, to_company, invoice_type, paid_at')
+    .select('delivery_ids, product_id, from_company, to_company, invoice_type, paid_at, paid_amount')
     .eq('year_month', yearMonth)
     .eq('is_paid', true)
   if (exErr) return { error: `기존 지급완료 기록 조회 실패: ${exErr.message}` }
 
-  const paidMap = new Map<string, string | null>()
+  // paid_amount(실입금액)도 함께 보존 — 재생성 때 날리면 감가 차액 기록이 소멸한다
+  type PaidState = { paid_at: string | null; paid_amount: number | null }
+  const paidMap = new Map<string, PaidState>()
   for (const ex of (existing ?? [])) {
     const dids = ex.delivery_ids as string[] | null
+    const state: PaidState = {
+      paid_at: ex.paid_at,
+      paid_amount: ex.paid_amount === null || ex.paid_amount === undefined ? null : Number(ex.paid_amount),
+    }
     // product_id === null: commissions 테이블 기반 (동국/현대) → 커미션 레코드 ID 키
     // product_id !== null: 납품 기반 커미션 (소괴탄/분탄 등) → 상품 기반 키 (안정적)
     const stableKey = ex.invoice_type === 'commission' && ex.product_id === null && dids?.[0]
       ? `c:${dids[0]}:${ex.to_company}`
       : `d:${ex.product_id}:${ex.from_company}:${ex.to_company}:${ex.invoice_type}`
-    paidMap.set(stableKey, ex.paid_at)
+    paidMap.set(stableKey, state)
     // 구 형식(delivery_ids[0] 기반) 키도 저장해 첫 재생성 때 유실 방지
     if (ex.invoice_type === 'commission' && ex.product_id !== null && dids?.[0]) {
-      paidMap.set(`c:${dids[0]}:${ex.to_company}`, ex.paid_at)
+      paidMap.set(`c:${dids[0]}:${ex.to_company}`, state)
     }
   }
 
@@ -97,10 +104,11 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
         const key = row.invoice_type === 'commission' && row.product_id === null && row.delivery_ids?.[0]
           ? `c:${row.delivery_ids[0]}:${row.to_company}`
           : `d:${row.product_id}:${row.from_company}:${row.to_company}:${row.invoice_type}`
-        if (!paidMap.has(key)) return []
+        const state = paidMap.get(key)
+        if (!state) return []
         return supabase
           .from('invoice_instructions')
-          .update({ is_paid: true, paid_at: paidMap.get(key) })
+          .update({ is_paid: true, paid_at: state.paid_at, paid_amount: state.paid_amount })
           .eq('id', row.id)
       })
     )
@@ -117,15 +125,42 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
   return { data }
 }
 
-export async function updatePaidDate(id: string, paidDate: string | null) {
+export async function updatePaidDate(
+  id: string,
+  paidDate: string | null,
+  /** 실입금액. null = 계산서 총액대로 입금됨 */
+  paidAmount: number | null = null,
+) {
   const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
 
+  // 계산서 총액과 다른 금액을 사유 없이 저장하려는 시도를 서버에서 차단.
+  // 허용하면 차액이 흔적 없이 사라진다 (2026-05 AL30 현대 감가 61,797원 사고)
+  if (paidAmount !== null) {
+    const { data: inv, error: iErr } = await supabase
+      .from('invoice_instructions')
+      .select('total_amount')
+      .eq('id', id)
+      .maybeSingle()
+    if (iErr) return { error: `계산서 조회 실패: ${iErr.message}` }
+    if (!inv) return { error: '대상 계산서가 없습니다. 새로고침 후 다시 시도하세요.' }
+    const parsed = parsePaidAmount(paidAmount, Number(inv.total_amount))
+    if (!parsed.ok) return { error: parsed.error }
+    if (parsed.diff !== 0) {
+      return { error: '계산서 총액과 다릅니다. 차액 사유(감가 등)를 함께 입력해야 저장됩니다.' }
+    }
+  }
+
   const { data, error } = await supabase
     .from('invoice_instructions')
-    .update({ is_paid: paidDate !== null, paid_at: paidDate })
+    .update({
+      is_paid: paidDate !== null,
+      paid_at: paidDate,
+      // 지급완료 취소 시 실입금액도 무효 (감가 레코드는 남으므로 감가 패널에서 별도 정리)
+      ...(paidDate === null ? { paid_amount: null } : {}),
+    })
     .eq('id', id)
     .select('id')
   if (error) return { error: error.message }
@@ -134,7 +169,7 @@ export async function updatePaidDate(id: string, paidDate: string | null) {
   if (!data || data.length === 0) {
     return { error: '대상 계산서가 없습니다. 계산서가 재생성되었을 수 있으니 새로고침 후 다시 시도하세요.' }
   }
-  await logAudit(auth.user, { table: 'invoice_instructions', rowId: id, action: 'update', after: { is_paid: paidDate !== null, paid_at: paidDate } })
+  await logAudit(auth.user, { table: 'invoice_instructions', rowId: id, action: 'update', after: { is_paid: paidDate !== null, paid_at: paidDate, paid_amount: paidDate === null ? null : paidAmount } })
 
   return { success: true }
 }

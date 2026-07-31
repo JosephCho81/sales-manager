@@ -51,8 +51,8 @@ export default function DepreciationPanel({
     <div className="card mb-6 p-4">
       <div className="flex items-baseline justify-between flex-wrap gap-2">
         <h3 className="text-sm font-bold text-gray-900">
-          {productLabel} 감가 정산
-          <span className="ml-1 font-normal text-xs text-gray-400">— 미배분 보관, 계약 종료 후 렘코 반환</span>
+          {productLabel} 감가 <span className="text-amber-700">(보관형)</span>
+          <span className="ml-1 font-normal text-xs text-gray-400">— 매입만 차감·미배분 보관, 계약 종료 후 렘코 반환</span>
         </h3>
         <p className="text-sm">
           미정산 누계 <span className="font-bold text-red-600 tabular-nums">{fmtKrw(unsettled)}</span>

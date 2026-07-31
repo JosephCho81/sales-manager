@@ -43,12 +43,16 @@ const fetchAnalyticsData = unstable_cache(
         .order('invoice_month'),
       // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
       supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
-      // 월별 감가 (분탄 동창 미지급) — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로
+      // 월별 감가 — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로.
+      // 귀속월(year_month)과 매입 차감월(cost_deduct_ym)이 다를 수 있어 둘 중 하나라도
+      // 범위에 걸리면 가져온다 (5월 귀속 감가가 7월 납품분에서 차감되는 케이스)
       supabase
         .from('monthly_depreciations')
-        .select('product_id, year_month, amount')
-        .gte('year_month', shiftMonths(fromYM, -2))
-        .lte('year_month', toYM),
+        .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym')
+        .or(
+          `and(year_month.gte.${shiftMonths(fromYM, -2)},year_month.lte.${toYM}),` +
+          `and(cost_deduct_ym.gte.${shiftMonths(fromYM, -2)},cost_deduct_ym.lte.${toYM})`,
+        ),
     ])
 
     if (dRes.error)  throw new Error(dRes.error.message)
@@ -83,8 +87,8 @@ const fetchAnalyticsData = unstable_cache(
       monthlyDeps: ((mdRes.data ?? []) as MonthlyDepForAnalytics[]).map(md => ({ ...md, amount: Number(md.amount) })),
     }
   },
-  // v2: monthlyDeps 추가 — 구 캐시 엔트리(필드 없음)와 분리
-  ['analytics-data-v2'],
+  // v4: 감가를 매출 감액월·매입 회수월로 분리 반영 — 구 캐시 엔트리와 분리
+  ['analytics-data-v4'],
   { revalidate: 120 },
 )
 

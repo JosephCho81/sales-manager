@@ -2,7 +2,10 @@
 
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
+import { depBadgeFor, depBreakdownFor } from '@/lib/depreciation'
+import type { MonthlyDepreciation } from '@/types'
 import type { InvoiceRow } from '@/lib/invoice-generator'
+import { BADGE_TONE, DepBreakdownNote } from './InvoiceTable'
 
 const TYPE_ORDER = ['sales', 'cost', 'commission', 'other'] as const
 
@@ -40,10 +43,12 @@ export default function InvoiceCardList({
   invoices,
   productMap,
   productOrderMap,
+  deps,
 }: {
   invoices: InvoiceRow[]
   productMap: Map<string, string>
   productOrderMap: Map<string, number>
+  deps: MonthlyDepreciation[]
 }) {
   const grouped = new Map<string, InvoiceRow[]>()
   for (const inv of invoices) {
@@ -104,6 +109,10 @@ export default function InvoiceCardList({
             {rows.map((inv, idx) => {
               const typeKey = inv.invoice_type ?? 'other'
               const hasVat  = Number(inv.vat_amount) > 0
+              const badge   = depBadgeFor(inv, deps)
+              const bd      = depBreakdownFor(inv, deps)
+              const paidAmt = inv.paid_amount === null ? null : Number(inv.paid_amount)
+              const shortfall = paidAmt === null ? 0 : Number(inv.total_amount) - paidAmt
               return (
                 <div
                   key={inv.id}
@@ -126,6 +135,14 @@ export default function InvoiceCardList({
                     <p className="text-xs text-gray-400 mb-2 pl-0.5">{inv.memo}</p>
                   )}
 
+                  {badge && (
+                    <p className={`mb-2 rounded border px-1.5 py-1 text-xs font-medium leading-snug ${BADGE_TONE[badge.tone]}`}>
+                      {badge.text}
+                    </p>
+                  )}
+
+                  {bd && <div className="mb-2"><DepBreakdownNote bd={bd} /></div>}
+
                   {/* 금액 + 지급예정일 */}
                   <div className="flex justify-between items-end">
                     <div>
@@ -136,6 +153,11 @@ export default function InvoiceCardList({
                       <p className="text-sm font-bold text-gray-900 mt-0.5 tabular-nums">
                         합계 {fmtKrw(Number(inv.total_amount))}
                       </p>
+                      {shortfall > 0 && (
+                        <p className="text-xs text-red-600 mt-0.5 tabular-nums">
+                          실입금 {fmtKrw(paidAmt!)} (−{fmtKrw(shortfall)})
+                        </p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">지급예정일</p>

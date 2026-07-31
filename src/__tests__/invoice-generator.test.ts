@@ -439,6 +439,157 @@ describe('genAL30', () => {
     // totalCost = 1_800_000 + 1_800_000 = 3_600_000
     expect(costInvoices[0].supply_amount).toBe(3_600_000)
   })
+
+  // 2026-05 현대제철 감가 — docs/al30-depreciation-2026-05.md
+  describe('감가 (통과형) — 매출 감액월', () => {
+    const dep = { amount: 56_179, originYMs: ['2026-05'] }
+    const NONE = { amount: 0, originYMs: [] as string[] }
+    const gen  = (s = NONE, c = NONE) => genAL30([al30('2024-01-05')], '2024-02', c, s)
+
+    it('매출(현대 역발행) 차감 — 총 61,797원 감소', () => {
+      const base    = gen().find(i => i.invoice_type === 'sales')!
+      const withDep = gen(dep).find(i => i.invoice_type === 'sales')!
+
+      expect(base.supply_amount - withDep.supply_amount).toBe(56_179)
+      // VAT는 감가액 기준 라인별 반올림(5,618)만큼만 줄어야 한다.
+      // 차감 후 공급가에 일괄 10%를 다시 매기면 5,617이 되어 현대 실입금액과 1원 어긋남
+      expect(base.vat_amount - withDep.vat_amount).toBe(5_618)
+      expect(base.total_amount - withDep.total_amount).toBe(61_797)
+    })
+
+    it('매입(화림)은 그대로 — 감가 발생월에는 전액 지급', () => {
+      const base    = gen().find(i => i.invoice_type === 'cost')!
+      const withDep = gen(dep).find(i => i.invoice_type === 'cost')!
+      expect(withDep.total_amount).toBe(base.total_amount)
+    })
+
+    it('커미션도 감액 — 3사가 감가를 나눠 부담', () => {
+      const withDep = gen(dep).filter(i => i.invoice_type === 'commission')
+      const sum = withDep.reduce((s, i) => s + i.supply_amount, 0)
+      // 마진 (200,000−180,000)×10톤 = 200,000 → 감가 후 143,821, 1/3씩 47,940
+      expect(withDep.map(i => i.supply_amount)).toEqual([47_940, 47_941])
+      expect(sum).toBe(143_821 - Math.floor(143_821 / 3))
+    })
+
+    it('매출 감가는 마지막 발행 구간 1장에만 반영', () => {
+      const sales = genAL30(
+        [al30('2024-01-05', 'd1'), al30('2024-01-15', 'd2')], '2024-02', NONE, dep,
+      ).filter(i => i.invoice_type === 'sales')
+      expect(sales).toHaveLength(2)
+      expect(sales[0].supply_amount).toBe(2_000_000)
+      expect(sales[1].supply_amount).toBe(2_000_000 - 56_179)
+    })
+
+    it('memo에 귀속월과 감액 발행 사실 명시', () => {
+      const sales = gen(dep).find(i => i.invoice_type === 'sales')!
+      expect(sales.memo).toContain('5월분 감가')
+      expect(sales.memo).toContain('반영 발행')
+    })
+  })
+
+  describe('감가 (통과형) — 매입 회수월', () => {
+    const dep = { amount: 56_179, originYMs: ['2026-05'] }
+    const NONE = { amount: 0, originYMs: [] as string[] }
+    const gen  = (c = NONE) => genAL30([al30('2024-01-05')], '2024-02', c)
+
+    it('매입(화림) 계산서 차감 — 총 61,797원 감소', () => {
+      const base    = gen().find(i => i.invoice_type === 'cost')!
+      const withDep = gen(dep).find(i => i.invoice_type === 'cost')!
+      expect(base.supply_amount - withDep.supply_amount).toBe(56_179)
+      expect(base.vat_amount - withDep.vat_amount).toBe(5_618)
+      expect(base.total_amount - withDep.total_amount).toBe(61_797)
+    })
+
+    it('매출은 불변 — 회수월 현대 계산서는 정상 금액', () => {
+      const base    = gen().filter(i => i.invoice_type === 'sales')
+      const withDep = gen(dep).filter(i => i.invoice_type === 'sales')
+      expect(withDep.map(i => i.total_amount)).toEqual(base.map(i => i.total_amount))
+    })
+
+    it('커미션 증가 — 감액월에 부담한 만큼 3사가 되찾음', () => {
+      const withDep = gen(dep).filter(i => i.invoice_type === 'commission')
+      // 마진 200,000 + 회수 56,179 = 256,179 → 1/3씩 85,393
+      expect(withDep.map(i => i.supply_amount)).toEqual([85_393, 85_393])
+    })
+
+    it('감가 미전달 — 기존 금액 불변 (과거 월 회귀)', () => {
+      const cost = gen().find(i => i.invoice_type === 'cost')!
+      expect(cost.supply_amount).toBe(1_800_000)
+      expect(cost.vat_amount).toBe(180_000)
+    })
+
+    it('memo에 귀속월과 회수 사유 명시', () => {
+      const cost = gen(dep).find(i => i.invoice_type === 'cost')!
+      expect(cost.memo).toContain('5월분 감가')
+      expect(cost.memo).toContain('현대 미입금분 회수')
+    })
+  })
+
+  // 매출 감액 → 매입 회수 왕복 후 3사 배분이 원상복구되는지
+  it('감가 왕복 — 두 달 합산 커미션이 감가 없을 때와 같음 (3사 배분 원단위 오차 ≤1원)', () => {
+    const dep  = { amount: 56_179, originYMs: ['2026-05'] }
+    const NONE = { amount: 0, originYMs: [] as string[] }
+    const comm = (inv: ReturnType<typeof genAL30>) =>
+      inv.filter(i => i.invoice_type === 'commission').reduce((s, i) => s + i.supply_amount, 0)
+
+    const plain     = comm(genAL30([al30('2024-01-05')], '2024-02')) * 2
+    const roundTrip = comm(genAL30([al30('2024-01-05')], '2024-02', NONE, dep))
+                    + comm(genAL30([al30('2024-01-05')], '2024-02', dep, NONE))
+    // 두 달에 걸쳐 1/3씩 나누므로 나머지 처리에서 최대 1원 어긋난다 (금액 소멸 아님)
+    expect(Math.abs(roundTrip - plain)).toBeLessThanOrEqual(1)
+  })
+})
+
+// ── generateInvoices: 감가 차감월 라우팅 ───────────────────
+describe('generateInvoices — cost_deduct_ym 기준 매칭', () => {
+  function al30At(ym: string): DeliveryForInvoice {
+    return makeDelivery({
+      id: `d-${ym}`, product_id: 'p-al30', product_name: 'AL30',
+      year_month: ym, delivery_date: `${ym}-05`,
+      contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+  }
+  // 2026-05 귀속(매출 감액), 2026-07 납품분 매입에서 회수
+  const deps = [{
+    product_id: 'p-al30', year_month: '2026-05', amount: 56_179,
+    sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07',
+  }]
+
+  it('매출 감액월(5월 납품분) 매출 계산서만 차감', () => {
+    const inv = generateInvoices([al30At('2026-05')], '2026-07', deps)
+    expect(inv.find(i => i.invoice_type === 'sales')!.supply_amount).toBe(2_000_000 - 56_179)
+    expect(inv.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(1_800_000)
+  })
+
+  it('회수월(7월 납품분) 매출은 불변', () => {
+    const inv = generateInvoices([al30At('2026-07')], '2026-09', deps)
+    expect(inv.find(i => i.invoice_type === 'sales')!.supply_amount).toBe(2_000_000)
+  })
+
+  it('회수월(7월 납품분)에만 차감', () => {
+    const cost = generateInvoices([al30At('2026-07')], '2026-09', deps)
+      .find(i => i.invoice_type === 'cost')!
+    expect(cost.supply_amount).toBe(1_800_000 - 56_179)
+  })
+
+  it('귀속월(5월 납품분) 매입은 차감하지 않음 — 화림에 전액 지급', () => {
+    const cost = generateInvoices([al30At('2026-05')], '2026-07', deps)
+      .find(i => i.invoice_type === 'cost')!
+    expect(cost.supply_amount).toBe(1_800_000)
+  })
+
+  it('중간월(6월 납품분)도 차감하지 않음 — 이중 차감 방지', () => {
+    const cost = generateInvoices([al30At('2026-06')], '2026-08', deps)
+      .find(i => i.invoice_type === 'cost')!
+    expect(cost.supply_amount).toBe(1_800_000)
+  })
+
+  it('cost_deduct_ym 미지정 감가는 당월 차감 (분탄 기존 동작)', () => {
+    const legacy = [{ product_id: 'p-al30', year_month: '2026-07', amount: 10_000 }]
+    const cost = generateInvoices([al30At('2026-07')], '2026-09', legacy)
+      .find(i => i.invoice_type === 'cost')!
+    expect(cost.supply_amount).toBe(1_800_000 - 10_000)
+  })
 })
 
 // ── generateCommissionInvoices ────────────────────────────

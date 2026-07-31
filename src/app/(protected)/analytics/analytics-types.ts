@@ -20,8 +20,16 @@ export type DeliveryForAnalytics = {
   } | null
 }
 
-/** 월별 감가 (분탄 동창 미지급) — year_month는 납품월 기준 */
-export type MonthlyDepForAnalytics = { product_id: string; year_month: string; amount: number }
+/** 월별 감가 — year_month는 감가가 발생한 납품월(귀속월) */
+export type MonthlyDepForAnalytics = {
+  product_id: string
+  year_month: string
+  amount: number
+  /** 매출 계산서가 감액 발행된 납품월 = 통과형(AL30). null이면 보관형(분탄) */
+  sales_deduct_ym?: string | null
+  /** 매입 계산서에서 차감하는 납품월. 미지정 시 year_month(당월 차감) */
+  cost_deduct_ym?: string | null
+}
 
 export type CommissionEntry = {
   year_month: string

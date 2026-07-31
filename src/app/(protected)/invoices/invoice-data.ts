@@ -98,13 +98,16 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
   const dedupedDeliveries = Array.from(deliveryMap.values())
 
   // 월별 감가 — 조회된 납품월들만 좁게 조회 (분탄 offset=1: 지급월 M → 납품월 M−1)
+  // year_month(귀속월)와 cost_deduct_ym(차감월)이 다른 감가가 있으므로 둘 다 매칭해야 한다.
+  // year_month만 보면 2026-05 귀속 AL30 감가가 2026-07 납품분 계산서 생성 시 누락된다.
   const ymList = Array.from(new Set(dedupedDeliveries.map(d => d.year_month)))
   let monthlyDeps: MonthlyDepInput[] = []
   if (ymList.length > 0) {
+    const inList = ymList.map(m => `"${m}"`).join(',')
     const mdRes = await supabase
       .from('monthly_depreciations')
-      .select('product_id, year_month, amount')
-      .in('year_month', ymList)
+      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym')
+      .or(`year_month.in.(${inList}),cost_deduct_ym.in.(${inList}),sales_deduct_ym.in.(${inList})`)
     // 조용히 빈 배열로 폴백하면 감가 누락된 총액 계산서가 발행됨 — 명시적 throw
     if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
     monthlyDeps = ((mdRes.data ?? []) as MonthlyDepInput[]).map(md => ({ ...md, amount: Number(md.amount) }))

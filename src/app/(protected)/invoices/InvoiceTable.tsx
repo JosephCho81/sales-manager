@@ -2,9 +2,18 @@
 
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
+import { depBadgeFor, depBreakdownFor, type DepBreakdown } from '@/lib/depreciation'
+import type { MonthlyDepreciation } from '@/types'
 import type { InvoiceRow } from '@/lib/invoice-generator'
 
 const TYPE_ORDER = ['sales', 'cost', 'commission', 'other'] as const
+
+export const BADGE_TONE: Record<string, string> = {
+  shortfall: 'bg-red-50 text-red-700 border-red-200',
+  applied:   'bg-blue-50 text-blue-700 border-blue-200',
+  pending:   'bg-gray-100 text-gray-600 border-gray-300',
+  hold:      'bg-amber-50 text-amber-700 border-amber-200',
+}
 
 const TYPE_LABELS: Record<string, string> = {
   sales: '매출', cost: '매입', commission: '커미션', other: '기타',
@@ -21,16 +30,43 @@ function fmtDeliveryYM(ym: string): string {
   return `${y}년 ${parseInt(m)}월분`
 }
 
+/**
+ * 감가가 반영된 행의 산식을 그대로 노출.
+ * 순액만 보이면 담당자가 왜 줄었는지 알 수 없어 거래처 대사를 못 한다.
+ */
+export function DepBreakdownNote({ bd }: { bd: DepBreakdown }) {
+  const origin = bd.originYMs.map(y => `${parseInt(y.slice(5, 7))}월`).join('·')
+  return (
+    <div className="mt-1 inline-block rounded border border-dashed border-gray-300 bg-gray-50 px-2 py-1 text-xs leading-snug text-gray-600 tabular-nums">
+      <div>
+        감가 반영 전 <span className="font-medium">{fmtKrw(bd.grossTotal)}</span>
+        <span className="text-gray-400"> (공급가 {fmtKrw(bd.grossSupply)} + VAT {fmtKrw(bd.grossVat)})</span>
+      </div>
+      <div className="text-red-600">
+        − {origin}분 감가 {fmtKrw(bd.depTotal)}
+        <span className="opacity-70"> (공급가 {fmtKrw(bd.depSupply)} + VAT {fmtKrw(bd.depVat)})</span>
+      </div>
+      <div className="mt-0.5 border-t border-gray-200 pt-0.5 font-medium text-gray-800">
+        = 계산서 {fmtKrw(bd.netTotal)}
+      </div>
+    </div>
+  )
+}
+
 export default function InvoiceTable({
   invoices,
   productMap,
   productOrderMap,
+  deps,
   onSetPaidDate,
+  onOpenPayment,
 }: {
   invoices: InvoiceRow[]
   productMap: Map<string, string>
   productOrderMap: Map<string, number>
+  deps: MonthlyDepreciation[]
   onSetPaidDate: (id: string, date: string | null) => void
+  onOpenPayment: (inv: InvoiceRow) => void
 }) {
   // 품목별 그룹화
   // null product_id인 커미션은 delivery_ids[0](커미션 row ID)로 개별 그룹화
@@ -123,6 +159,10 @@ export default function InvoiceTable({
                   {/* 계산서 행 */}
                   {rows.map(inv => {
                     const typeKey = inv.invoice_type ?? 'other'
+                    const badge   = depBadgeFor(inv, deps)
+                    const bd      = depBreakdownFor(inv, deps)
+                    const paidAmt = inv.paid_amount === null ? null : Number(inv.paid_amount)
+                    const shortfall = paidAmt === null ? 0 : Number(inv.total_amount) - paidAmt
                     return (
                       <tr
                         key={inv.id}
@@ -142,6 +182,12 @@ export default function InvoiceTable({
                           {inv.memo && (
                             <p className="text-xs text-gray-400 mt-0.5 leading-snug">{inv.memo}</p>
                           )}
+                          {badge && (
+                            <p className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-xs font-medium leading-snug ${BADGE_TONE[badge.tone]}`}>
+                              {badge.text}
+                            </p>
+                          )}
+                          {bd && <DepBreakdownNote bd={bd} />}
                         </td>
                         <td className="table-td text-right tabular-nums whitespace-nowrap">
                           {fmtKrw(Number(inv.supply_amount))}
@@ -168,6 +214,13 @@ export default function InvoiceTable({
                               onChange={e => onSetPaidDate(inv.id, e.target.value || null)}
                               className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
                             />
+                            <button
+                              onClick={() => onOpenPayment(inv)}
+                              title="실입금액이 계산서와 다를 때"
+                              className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+                            >
+                              금액
+                            </button>
                             {inv.paid_at && (
                               <button
                                 onClick={() => onSetPaidDate(inv.id, null)}
@@ -178,6 +231,11 @@ export default function InvoiceTable({
                               </button>
                             )}
                           </div>
+                          {shortfall > 0 && (
+                            <p className="mt-1 text-xs text-red-600 tabular-nums whitespace-nowrap">
+                              실입금 {fmtKrw(paidAmt!)} (−{fmtKrw(shortfall)})
+                            </p>
+                          )}
                         </td>
                       </tr>
                     )

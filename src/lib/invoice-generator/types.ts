@@ -58,6 +58,8 @@ export type InvoiceRow = {
   payment_due_date: string | null
   is_paid: boolean
   paid_at: string | null
+  /** 실입금/실지급액. null = total_amount와 동일 */
+  paid_amount: number | null
   memo: string | null
   invoice_type: string | null
 }

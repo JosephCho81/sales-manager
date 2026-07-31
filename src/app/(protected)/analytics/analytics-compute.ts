@@ -131,18 +131,48 @@ export function buildAllAnalytics(
     monthlyMap.set(d.invoice_month, ma)
   }
 
-  // ─── 1.5) 월별 감가 (분탄 동창 미지급) — 매입만 차감, 마진 불변 ───
-  for (const md of monthlyDeps) {
-    const key = `${md.product_id}_${md.year_month}`
+  // ─── 1.5) 월별 감가 — 유형별·차감월별 반영 ─────────────────
+  //   보관형(분탄)  : 매입만 차감, 마진 불변. 감가액이 통장에 남아 렘코 반환 대기
+  //   통과형(AL30)  : 매출 감액월(sales_deduct_ym)에 매출·마진 −, 매입 회수월(cost_deduct_ym)에
+  //                   매입 − / 마진 + . 계산서·커미션 실지급액과 같은 달에 맞춰야 어긋나지 않는다
+  const applyAt = (productId: string, ym: string, fn: (t: MarginTotals) => void) => {
+    const key = `${productId}_${ym}`
     const row = productMap.get(key)
-    if (!row) continue // 필터로 제외됐거나 해당 납품 없음
-    const amt = Number(md.amount)
-    row.costKrw         -= amt
-    row.depreciationKrw += amt
-    totals.costKrw      -= amt
+    if (!row) return null // 필터로 제외됐거나 해당 납품 없음
+    fn(row)
+    fn(totals)
     const im = keyToInvoiceMonth.get(key)
     const ma = im ? monthlyMap.get(im) : undefined
-    if (ma) ma.costKrw -= amt
+    if (ma) fn(ma)
+    return row
+  }
+
+  const addMargin = (t: MarginTotals, delta: number) => {
+    const sp = splitMargin(delta)
+    t.totalMargin += delta
+    t.a1 += sp.korea_a1
+    t.gm += sp.geumhwa
+    t.rs += sp.raseong
+  }
+
+  for (const md of monthlyDeps) {
+    const amt         = Number(md.amount)
+    const passthrough = !!md.sales_deduct_ym
+
+    // 매입 차감 — 회수월(미지정 시 귀속월)
+    const costRow = applyAt(md.product_id, md.cost_deduct_ym ?? md.year_month, t => {
+      t.costKrw -= amt
+      if (passthrough) addMargin(t, amt) // 회수분은 3사가 나눠 되찾는다
+    })
+    if (costRow) costRow.depreciationKrw += amt
+
+    // 매출 감액 — 통과형만, 감액 발행된 달
+    if (md.sales_deduct_ym) {
+      applyAt(md.product_id, md.sales_deduct_ym, t => {
+        t.sellKrw -= amt
+        addMargin(t, -amt)
+      })
+    }
   }
 
   // ─── 2) commissions 단일 패스 ───────────────────────────

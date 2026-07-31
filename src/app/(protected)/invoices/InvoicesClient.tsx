@@ -13,10 +13,12 @@ import {
   type InvoiceRow,
   type CommissionForInvoice,
 } from '@/lib/invoice-generator'
+import { depKind } from '@/lib/depreciation'
 import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 import InvoiceCardList from './InvoiceCardList'
 import DepreciationPanel from './DepreciationPanel'
+import PaymentDialog from './PaymentDialog'
 
 type GS = { supply: number; vat: number; total: number }
 function sumG(rows: InvoiceRow[]): GS {
@@ -54,6 +56,7 @@ export default function InvoicesClient({
   const [generating, setGenerating] = useState(false)
   const [error,      setError]      = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
+  const [payTarget, setPayTarget] = useState<InvoiceRow | null>(null)
   const autoGenRef = useRef(false)
 
   // 감가 저장 등 router.refresh() 후 서버에서 재생성된 계산서를 state에 반영
@@ -182,6 +185,29 @@ export default function InvoicesClient({
         </div>
       )}
 
+      {/* 미회수 감가 배너 — 매출 입금에서 이미 차감됐으나 매입에서 아직 회수 못 한 금액.
+          어느 달을 보든 눈에 들어와야 "회수 잊어버림"이 구조적으로 불가능해진다 */}
+      {(() => {
+        const unrec = initialMonthlyDeps.filter(d => d.settled_at === null && depKind(d) === 'passthrough')
+        if (unrec.length === 0) return null
+        const sum = unrec.reduce((s, d) => s + Number(d.amount), 0)
+        return (
+          <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2.5">
+            <p className="text-sm font-bold text-red-700">
+              미회수 감가 {fmtKrw(sum)} <span className="font-normal text-xs">(공급가액 기준)</span>
+            </p>
+            <ul className="mt-1 space-y-0.5">
+              {unrec.map(d => (
+                <li key={d.id} className="text-xs text-red-700">
+                  {d.year_month} {productMap.get(d.product_id) ?? d.product_id} — {fmtKrw(Number(d.amount))}
+                  {d.cost_deduct_ym && ` · ${d.cost_deduct_ym} 납품분 매입 계산서에서 회수 예정`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })()}
+
       {/* 요약 카드 */}
       <div className="card mb-6 overflow-hidden">
         <div className="overflow-x-auto">
@@ -270,14 +296,25 @@ export default function InvoicesClient({
             invoices={invoices}
             productMap={productMap}
             productOrderMap={productOrderMap}
+            deps={initialMonthlyDeps}
             onSetPaidDate={handleSetPaidDate}
+            onOpenPayment={setPayTarget}
           />
           <InvoiceCardList
             invoices={invoices}
             productMap={productMap}
             productOrderMap={productOrderMap}
+            deps={initialMonthlyDeps}
           />
         </>
+      )}
+
+      {payTarget && (
+        <PaymentDialog
+          invoice={payTarget}
+          onClose={() => setPayTarget(null)}
+          onDone={() => { setPayTarget(null); router.refresh() }}
+        />
       )}
     </div>
   )

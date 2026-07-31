@@ -47,6 +47,7 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **납품 폼 로직** → `deliveries/useDeliveryForm.ts` (상태·저장), `DeliveryForm.tsx` (UI만)
 - **계약 폼 검증** → `contracts/validate.ts`
 - **분탄 월별 감가(렘코 반환 예정)** → `monthly_depreciations` 테이블(품목×납품월), 입력 검증 `lib/depreciation.ts`, 계산서 반영 `coal.ts` genBuntan(동창 매입만 차감, 렘코 매출·커미션 배분은 총액 기준 — 감가는 미배분 보관 후 계약 종료 시 렘코 반환), UI `invoices/DepreciationPanel.tsx`(입력·미정산 누계·정산완료)
+- **AL30 감가(통과형 — 현대 감액 발행 → 화림 회수)** → 같은 `monthly_depreciations` 테이블. `sales_deduct_ym`=매출 감액 납품월, `cost_deduct_ym`=매입 회수 납품월. `al30.ts`가 매출·매입 각각 차감하고 커미션(마진 1/3)도 같이 움직인다. 실입금액 입력은 `invoices/PaymentDialog.tsx` → `recordPaymentShortfall`. 상세 `docs/al30-depreciation-2026-05.md`
 - **테스트** → `src/__tests__/margin.test.ts` (`npm test`)
 
 ## LLM Wiki
