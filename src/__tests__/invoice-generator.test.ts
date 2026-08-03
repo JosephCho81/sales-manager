@@ -471,6 +471,25 @@ describe('genAL30', () => {
       expect(sum).toBe(143_821 - Math.floor(143_821 / 3))
     })
 
+    // 실제 2026-05 건: 마진 15,539,500 → 1/3 = 5,179,833(금화)·5,179,834(나성)
+    // 감가 후 각 5,161,107. 공급가에 일괄 10%면 516,111이지만 실제 계산서는 516,110
+    it('커미션 부가세도 라인별 — 감가분 VAT를 따로 빼야 실계산서와 일치', () => {
+      const real = makeDelivery({
+        id: 'r1', product_name: 'AL30', delivery_date: '2024-01-25', quantity_kg: 776_975,
+        contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const comm = genAL30([real], '2024-02', NONE, dep).filter(i => i.invoice_type === 'commission')
+
+      expect(comm.map(i => i.supply_amount)).toEqual([5_161_107, 5_161_107])
+      expect(comm.map(i => i.vat_amount)).toEqual([516_110, 516_110])
+      expect(comm.map(i => i.total_amount)).toEqual([5_677_217, 5_677_217])
+    })
+
+    it('감가 없는 달은 일괄 10% 유지 — 기존 커미션 VAT 회귀', () => {
+      const comm = gen().filter(i => i.invoice_type === 'commission')
+      expect(comm.map(i => i.vat_amount)).toEqual([6_667, 6_667])
+    })
+
     it('매출 감가는 마지막 발행 구간 1장에만 반영', () => {
       const sales = genAL30(
         [al30('2024-01-05', 'd1'), al30('2024-01-15', 'd2')], '2024-02', NONE, dep,

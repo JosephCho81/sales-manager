@@ -20,6 +20,17 @@ const NO_DEP: DepSlice = { amount: 0, originYMs: [] }
 const originLabel = (ymList: string[]) =>
   ymList.map(y => `${parseInt(y.slice(5, 7))}월`).join('·')
 
+/**
+ * 감가로 배분액이 움직인 커미션의 부가세.
+ * 매출·매입 계산서와 같은 원칙 — 감가 반영 후 공급가에 일괄 10%를 매기면 실제 계산서와 1원 어긋난다.
+ * (5,179,833 → 517,983, 감가분 18,726 → 1,873 ⇒ 516,110. 일괄 계산은 516,111)
+ */
+function commVat(base: number, final: number, to: string): number | undefined {
+  const delta = final - base
+  if (delta === 0) return undefined
+  return calcVat(base, to) + (delta > 0 ? calcVat(delta, to) : -calcVat(-delta, to))
+}
+
 export function genAL30(
   deliveries: DeliveryForInvoice[],
   ym: string,
@@ -62,6 +73,9 @@ export function genAL30(
   let totalCost    = 0
   let totalGeumhwa = 0
   let totalRaseong = 0
+  // 감가 반영 전 배분액 — 커미션 부가세를 라인별로 계산하기 위해 따로 누적
+  let baseGeumhwa  = 0
+  let baseRaseong  = 0
 
   // 매출 감가는 월 마지막 발행 구간 1장에만 반영 (분산하면 라인별 부가세가 실제와 어긋남)
   const active   = periods.filter(p => p.days.length > 0)
@@ -82,6 +96,8 @@ export function genAL30(
     totalCost    += costTotal
     totalGeumhwa += geumhwa
     totalRaseong += raseong
+    baseGeumhwa  += cm.geumhwa
+    baseRaseong  += cm.raseong
 
     // 현대→한국에이원 역발행 (10일 단위, 익익월말 지급)
     result.push(makeInvoice({
@@ -140,6 +156,7 @@ export function genAL30(
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
         from: '(주)한국에이원', to: '금화', supply: totalGeumhwa, vat: true,
+        vatOverride: commVat(baseGeumhwa, totalGeumhwa, '금화'),
         basisDate: wB1N2, deadline: wEnd2M, paymentDue: wEnd2M,
         type: 'commission', memo: `금화 커미션 1/3${commNote} — 익익월말`,
       }),
@@ -147,6 +164,7 @@ export function genAL30(
         yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid,
         deliveryIds: deliveries.map(d => d.id),
         from: '(주)한국에이원', to: '(주)나성', supply: totalRaseong, vat: true,
+        vatOverride: commVat(baseRaseong, totalRaseong, '(주)나성'),
         basisDate: wB1N2, deadline: wEnd2M, paymentDue: wEnd2M,
         type: 'commission', memo: `(주)나성 커미션 (나머지)${commNote} — 익익월말`,
       }),
