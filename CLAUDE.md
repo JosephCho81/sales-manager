@@ -49,6 +49,7 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **분탄 월별 감가(렘코 반환 예정)** → `monthly_depreciations` 테이블(품목×납품월), 입력 검증 `lib/depreciation.ts`, 계산서 반영 `coal.ts` genBuntan(동창 매입만 차감, 렘코 매출·커미션 배분은 총액 기준 — 감가는 미배분 보관 후 계약 종료 시 렘코 반환), UI `invoices/DepreciationPanel.tsx`(입력·미정산 누계·정산완료)
 - **현대제철 AL 매입단가 2개(반반 분할)** → AL40·AL30 모두 같은 납품을 **물량 반반·매입단가 2개**로 나눠 2건 입력한다(매출단가는 단일). 두 계약의 `invoice_month_offset`을 **반드시 같게** 둘 것 — 다르면 `invoice_month`가 갈려 analytics에서 한쪽이 통째로 누락된다. 집계·계산서 모두 `invoice_month` 하나로만 판단하며 품목별 특수 분기는 없다.
 - **AL30 감가(통과형 — 현대 감액 발행 → 화림 회수)** → 같은 `monthly_depreciations` 테이블. `sales_deduct_ym`=매출 감액 납품월, `cost_deduct_ym`=매입 회수 납품월. `al30.ts`가 매출·매입 각각 차감하고 커미션(마진 1/3)도 같이 움직인다. 실입금액 입력은 `invoices/PaymentDialog.tsx` → `recordPaymentShortfall`. 상세 `docs/al30-depreciation-2026-05.md`
+- **감가 반영 계산서의 부가세는 반드시 라인별** → 매출·매입·커미션 **모두** `vatOverride`로 `calcVat(감가 전) ∓ calcVat(감가분)`. 차감 후 공급가에 일괄 10%를 다시 매기면 실계산서와 1원 어긋난다(예: 커미션 5,161,107 → 일괄 516,111 vs 실제 516,110). 커미션은 `al30.ts`의 `commVat()`, 감가 없는 달은 일괄 10% 그대로
 - **테스트** → `src/__tests__/margin.test.ts` (`npm test`)
 
 ## LLM Wiki
