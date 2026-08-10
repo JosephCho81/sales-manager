@@ -42,7 +42,12 @@ npm install
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
+
+> `SUPABASE_SERVICE_ROLE_KEY`는 서버 액션 전용(`createAdminClient`)입니다.
+> 계산서 생성·감가 저장이 이 키로 동작하므로 없으면 저장이 전부 실패합니다.
+> **서버 전용 값이므로 `NEXT_PUBLIC_` 접두사를 붙이면 안 됩니다.**
 
 ### 3. 개발 서버 실행
 
@@ -64,8 +69,9 @@ Vercel 대시보드 → 프로젝트 → **Settings > Environment Variables** �
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | `https://xxxx.supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) 키 | `sb_publishable_...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | 서버 액션용 service role 키 (비공개) | `sb_secret_...` |
 
-두 값 모두 Supabase 대시보드 → **Project Settings > API** 에서 확인할 수 있습니다.
+세 값 모두 Supabase 대시보드 → **Project Settings > API** 에서 확인할 수 있습니다.
 
 ### 배포 절차
 
@@ -95,16 +101,12 @@ Vercel 대시보드 → 프로젝트 → **Settings > Environment Variables** �
 
 ### Supabase 마이그레이션
 
-초기 DB 설정은 `supabase/migrations/` 폴더의 SQL 파일을 순서대로
-Supabase SQL Editor에서 실행합니다.
+초기 DB 설정은 `supabase/migrations/` 폴더의 SQL 파일을 **번호 순서대로**
+Supabase SQL Editor에서 실행합니다 (`001` ~ 최신). CLI 연동은 없으므로
+새 마이그레이션도 같은 방식으로 직접 실행해야 하며, **코드 배포보다 먼저**
+실행해야 합니다 — 컬럼이 없는 상태로 새 코드가 뜨면 저장이 실패합니다.
 
-```
-001_initial.sql
-002_add_reference_exchange_rate.sql
-003_add_delivery_date.sql
-004_invoice_type.sql
-005_phase4_additions.sql
-```
+현재 파일 목록은 `ls supabase/migrations`로 확인하세요 (2026-08 기준 `016`까지).
 
 ---
 
@@ -115,6 +117,7 @@ Supabase SQL Editor에서 실행합니다.
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 > **주의**: `.env.local` 파일은 `.gitignore`에 의해 저장소에 포함되지 않습니다.

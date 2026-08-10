@@ -1,5 +1,7 @@
 # 판매관리 시스템 — 전체 스펙 문서
-> Claude Code 개발용. 이 문서 기반으로 전체 시스템을 구현한다.
+> 최초 구축용 요구사항 문서. 이후 운영하며 확정된 규칙은 각 절의 **[운영 반영]** 블록에 덧붙인다.
+> 코드 구조·수정 지점은 `CLAUDE.md`, 개별 사건의 상세는 `docs/`가 최신이다.
+> 세 문서가 어긋나면 **`CLAUDE.md` → `docs/` → 이 문서** 순으로 우선한다.
 
 ---
 
@@ -84,6 +86,15 @@
 - 총 마진 = (동국 판매단가 - 화림 원가단가) × 물량
 - 1/3씩 배분 (라성이 나머지)
 
+**[운영 반영] 2026-07~ 화림 매입단가 2개 (2026-08-10 확정)**
+- 매출단가는 1개, **화림 매입단가만 2개**다. 계약을 2건 등록하고 같은 납품을 단가별 2건으로 입력한다.
+- 물량은 현대 AL(반반)과 달리 **화림 매입 실톤수대로 배분**한다.
+  - 2026-07 예: 236,500원 × 202.905톤 + 330,000원 × 130.846톤 (합 333.751톤)
+- 두 계약의 `invoice_month_offset`은 **반드시 같게**(현재 2). 다르면 집계에서 한쪽이 통째로 누락된다.
+- 코드 수정은 필요 없다 — 매출·매입·금화 공급가·마진이 모두 건별 합산이다.
+- 금화→한국에이원 공급가는 건별 `(원가 + floor(톤당마진/3)) × 톤` 합산 후 1회 반올림.
+  금화가 2줄짜리 계산서로 라인별 반올림하면 1원 차이가 날 수 있어 첫 발행월 실물 대사가 필요하다.
+
 ---
 
 ### 4-2. 소괴탄 (동국제강)
@@ -123,6 +134,19 @@
 - 금화·라성: 익월 15일 커미션 지급
 
 **VAT:** 10% 적용
+
+**[운영 반영] 월별 감가 — 렘코 상장 대응 (2026-07-06 확정)**
+- 동국제강이 감가를 **월말 일괄 통보**한다(건별 아님). `monthly_depreciations` 테이블(품목×납품월)에 입력.
+- 렘코가 총액 기준 매출을 유지해야 하므로 **동창 매입 계산서만 차감**한다. 렘코 역발행 매출은 총액.
+- 커미션·마진 배분도 **총액 기준**. 계산서 금액 차이로 계산하면 감가까지 3사에 배분돼 반환 재원이 사라진다.
+- 감가는 한국에이원 통장에 미배분 보관 → **계약 종료 후 렘코에 반환**. 최종 부담자는 동창.
+
+**[운영 반영] 동창 부가세 끝자리는 공식으로 못 맞춘다 (2026-08-10 확정)**
+- 2026-06 납품분: 라인별 절사 합산 `floor(총액×0.1) − floor(감가×0.1)` = 39,233,044 가 실물
+- 2026-07 납품분: 차감 후 일괄 절사 `floor(차감후×0.1)` = 37,061,476 이 실물
+- 소수부 구조가 같은데 결과가 반대 → **하나의 공식으로 두 달을 못 맞춘다. 공식을 또 바꾸지 말 것.**
+- `monthly_depreciations.cost_vat_actual`에 실물 세액을 넣으면 계산값을 덮어쓴다. NULL이면 기존 계산 유지(과거 월 불변).
+- 감가 패널의 `부가세 실계산서` 입력란이 이 값이다. AL30(화림) 매입 계산서에도 같은 방식으로 적용된다.
 
 ---
 
@@ -185,6 +209,18 @@
 - 비고란에 "N월 마진" / "N월 부족분 커미션" 명시
 
 **VAT:** 10% 적용
+
+**[운영 반영] AL40 고품위알믹스 추가 · 화림 매입단가 2개 (반반 분할)**
+- 현대제철 납품 품목은 AL30 외에 **AL40고품위알믹스**가 있다(DB 품목명 그대로, 표시명 AL-40).
+- 두 품목 모두 매출단가 1개 / **화림 매입단가 2개**. 같은 납품을 **물량 반반**으로 나눠 2건 입력한다.
+- 두 계약의 `invoice_month_offset`을 **반드시 같게**(현재 2). 다르게 뒀다가 매출마진 현황에서
+  AL40 절반이 통째로 누락된 사고가 있었다(2026-07-31 수정). 집계·계산서 모두 `invoice_month` 하나로만 판단한다.
+
+**[운영 반영] AL30 통과형 감가 — 현대 감액 발행 → 화림 회수 (2026-05분)**
+- 현대제철은 감가를 **통보 없이 반영해 역발행**한다. 우리 저장액보다 실입금이 적어야 알게 된다.
+- `monthly_depreciations`의 `sales_deduct_ym`(매출 감액 납품월) / `cost_deduct_ym`(매입 회수 납품월)로 표현.
+- 매출 감액월에 매출·마진·커미션이 함께 줄고, 매입 회수월에 되돌아온다. 상세는 `docs/al30-depreciation-2026-05.md`.
+- 감가 반영 계산서의 부가세는 **매출·매입·커미션 모두 라인별**로 계산한다(차감 후 일괄 10%는 1원 어긋남).
 
 ---
 
@@ -257,6 +293,10 @@
 
 ## 7. DB 스키마 (Supabase PostgreSQL)
 
+> 아래는 최초 설계안이다. 운영하며 컬럼·테이블이 늘었으므로 **실제 스키마는
+> `supabase/migrations/`의 `001`~최신 파일을 순서대로 읽은 것이 정답**이다.
+> 주요 추가분은 이 절 끝의 "[운영 반영] 이후 추가된 테이블·컬럼"에 정리한다.
+
 ### products (품목)
 ```
 id, name, display_name, buyer (납품처), unit, price_unit,
@@ -301,6 +341,36 @@ margin_distribution (jsonb), memo
 ```
 id, bl_date, product_id, rate_krw_per_usd, memo
 ```
+
+### [운영 반영] 이후 추가된 테이블·컬럼
+
+**추가 테이블**
+
+| 테이블 | 용도 |
+|---|---|
+| `commissions` | 동국제강·현대제철 부족분 커미션 입력 (`year_month, company, quantity_kg, price_per_ton, commission_amount`). `hyundai_transactions`를 대체 — 신규 입력은 이쪽 |
+| `monthly_depreciations` | 품목×납품월 월별 감가. 분탄(보관형)·AL30(통과형) 공용 |
+| `expenses` | 공동 경비 (`date, description, amount, payer, is_settled`) |
+| `audit_log` | 서버 액션 변경 이력 (`actor_email, table_name, row_id, action, before, after`) |
+
+**추가 컬럼 (주요)**
+
+| 테이블.컬럼 | 의미 |
+|---|---|
+| `contracts.invoice_month_offset` | 납품월 → 청구월 오프셋. **집계·계산서의 유일한 기준**(`invoice_month = year_month + offset`) |
+| `contracts.reference_exchange_rate` | USD 계약 참고환율. 없으면 마진 계산이 throw |
+| `contracts.supersedes_contract_id` / `revision_reason` / `revised_at` | 계약 중도 정정 이력 |
+| `contracts.cost_price_2` | **미사용** (구 설계 잔재 — 매입단가 2개는 계약 2건으로 표현한다) |
+| `deliveries.invoice_month` | 청구월. 계산서·집계가 이 값 하나로만 판단 |
+| `deliveries.delivery_date` | AL30 10일 단위 구간 분류용 |
+| `deliveries.depreciation_amount` | **건별** 감가 (소괴탄 전용. 분탄은 `monthly_depreciations`로 이동) |
+| `invoice_instructions.invoice_type` | `sales` / `cost` / `commission` |
+| `invoice_instructions.delivery_year_month` | 납품월. `year_month`(지급월)와 다르다 |
+| `invoice_instructions.paid_amount` | 실입금/실지급액. NULL이면 `total_amount`와 동일 |
+| `monthly_depreciations.sales_deduct_ym` / `cost_deduct_ym` | 매출 감액 납품월 / 매입 차감·회수 납품월 |
+| `monthly_depreciations.cost_vat_actual` | 감가 반영 **매입** 계산서의 실물 부가세. NULL이면 계산값 |
+
+> `hyundai_transactions`는 초기 설계 테이블로 과거 데이터가 남아 있으나 현재 코드는 쓰지 않는다.
 
 ---
 
