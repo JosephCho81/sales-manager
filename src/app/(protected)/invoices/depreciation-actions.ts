@@ -49,6 +49,7 @@ export async function upsertMonthlyDepreciation(input: {
   memo?: string | null
   sales_deduct_ym?: string | null
   cost_deduct_ym?: string | null
+  cost_vat_actual?: string | number | null
 }): Promise<{ error?: string; success?: true }> {
   const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
@@ -64,6 +65,7 @@ export async function upsertMonthlyDepreciation(input: {
     memo: parsed.memo,
     sales_deduct_ym: parsed.sales_deduct_ym,
     cost_deduct_ym: parsed.cost_deduct_ym,
+    cost_vat_actual: parsed.cost_vat_actual,
   }
   const q = input.id
     ? supabase.from('monthly_depreciations').update(row).eq('id', input.id).select('id')

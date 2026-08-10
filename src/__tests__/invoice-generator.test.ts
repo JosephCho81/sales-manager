@@ -239,6 +239,31 @@ describe('genBuntan', () => {
       expect(cost.total_amount).toBe(431_563_483)
     })
 
+    // 2026-07 납품분은 6월분과 소수부 구조가 같은데도 실물이 반대(차감 후 일괄 절사)였다.
+    // 한 공식으로 두 달을 맞출 수 없으므로 실물 세액을 입력받아 덮어쓴다.
+    it('부가세 실계산서 값이 있으면 계산값을 덮어쓴다 (2026-07 납품분)', () => {
+      // 1,050.06톤 × 353,000 = 370,671,180 / 감가 56,411
+      // 계산값(라인별) = 37,067,118 − 5,641 = 37,061,477
+      // 실물          = 37,061,476
+      const real = makeDelivery({
+        product_name: 'BUNTAN', quantity_kg: 1_050_060,
+        contract: { sell_price: 363_000, cost_price: 353_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const [, calc] = genBuntan([real], '2026-09', 56_411)
+      expect(calc.vat_amount).toBe(37_061_477)
+
+      const [, cost] = genBuntan([real], '2026-09', 56_411, 37_061_476)
+      expect(cost.supply_amount).toBe(370_614_769)
+      expect(cost.vat_amount).toBe(37_061_476)
+      expect(cost.total_amount).toBe(407_676_245)
+      expect(cost.memo).toContain('부가세 실계산서 값')
+    })
+
+    it('부가세 실계산서 0원도 유효 — null과 구분', () => {
+      const [, cost] = genBuntan([d], '2024-02', 100_000, 0)
+      expect(cost.vat_amount).toBe(0)
+    })
+
     it('건별 감가(과거 데이터)와 월별 감가 동시 존재 시 각각 반영', () => {
       const legacy = makeDelivery({
         product_name: 'BUNTAN',
@@ -763,5 +788,36 @@ describe('generateInvoices 월별 감가 라우팅', () => {
     })
     const sales = generateInvoices([d], '2026-08').find(i => i.invoice_type === 'sales')!
     expect(sales.supply_amount).toBe(2_000_000)
+  })
+
+  describe('cost_vat_actual 전달', () => {
+    const d = makeDelivery({
+      product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-07',
+      contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const costOf = (deps: Parameters<typeof generateInvoices>[2]) =>
+      generateInvoices([d], '2026-08', deps).find(i => i.invoice_type === 'cost')!
+
+    it('매칭 감가의 실물 세액이 매입 계산서에 그대로 반영', () => {
+      // 계산값이면 floor(180,000) − floor(10,000) = 170,000
+      expect(costOf([{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000, cost_vat_actual: 169_999 }])
+        .vat_amount).toBe(169_999)
+    })
+
+    it('다른 품목·다른 차감월의 실물 세액은 무시', () => {
+      expect(costOf([
+        { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
+        { product_id: 'other',  year_month: '2026-07', amount: 100_000, cost_vat_actual: 1 },
+        { product_id: 'prod-b', year_month: '2026-06', amount: 100_000, cost_vat_actual: 2 },
+      ]).vat_amount).toBe(170_000)
+    })
+
+    // 계산서 한 장의 세액이라 합산이 불가능하다 — 어느 값이 진짜인지 못 정하면 계산값으로
+    it('같은 달 감가 2건이 서로 다른 세액을 주장하면 계산값으로 폴백', () => {
+      expect(costOf([
+        { product_id: 'prod-b', year_month: '2026-07', amount: 60_000, cost_deduct_ym: '2026-07', cost_vat_actual: 111 },
+        { product_id: 'prod-b', year_month: '2026-06', amount: 40_000, cost_deduct_ym: '2026-07', cost_vat_actual: 222 },
+      ]).vat_amount).toBe(170_000)
+    })
   })
 })

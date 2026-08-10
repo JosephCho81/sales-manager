@@ -28,17 +28,32 @@ export default function DepreciationPanel({
   const [ym, setYm]         = useState(defaultYearMonth)
   const [amount, setAmount] = useState('')
   const [memo, setMemo]     = useState('')
+  const [vat, setVat]       = useState('')
+  const [editId, setEditId] = useState<string | null>(null)
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState<string | null>(null)
 
   const unsettled = sumUnsettled(deps)
+
+  function reset() {
+    setEditId(null); setYm(defaultYearMonth); setAmount(''); setMemo(''); setVat('')
+  }
+
+  function startEdit(d: MonthlyDepreciation) {
+    setEditId(d.id)
+    setYm(d.year_month)
+    setAmount(String(Number(d.amount)))
+    setMemo(d.memo ?? '')
+    setVat(d.cost_vat_actual == null ? '' : String(Number(d.cost_vat_actual)))
+    setError(null)
+  }
 
   async function run(fn: () => Promise<{ error?: string }>) {
     setBusy(true); setError(null)
     try {
       const res = await fn()
       if (res.error) { setError(res.error); return }
-      setAmount(''); setMemo('')
+      reset()
       router.refresh() // 계산서 금액도 서버에서 재생성됨 — 서버 데이터 재조회
     } catch (e) {
       setError(toMessage(e))
@@ -66,8 +81,15 @@ export default function DepreciationPanel({
               <tr key={d.id} className="border-t border-gray-100">
                 <td className="py-2 tabular-nums whitespace-nowrap">{d.year_month} 납품분</td>
                 <td className="py-2 text-right tabular-nums font-medium whitespace-nowrap">{fmtKrw(Number(d.amount))}</td>
-                <td className="py-2 pl-3 text-gray-400">{d.memo}</td>
+                <td className="py-2 pl-3 text-gray-400">
+                  {d.memo}
+                  {d.cost_vat_actual != null && (
+                    <span className="ml-2 text-amber-700">부가세 실계산서 {fmtKrw(Number(d.cost_vat_actual))}</span>
+                  )}
+                </td>
                 <td className="py-2 text-right whitespace-nowrap">
+                  <button disabled={busy} className="text-gray-500 underline mr-2"
+                    onClick={() => startEdit(d)}>수정</button>
                   {d.settled_at ? (
                     <span className="text-green-600">
                       정산완료
@@ -105,6 +127,12 @@ export default function DepreciationPanel({
             placeholder="예: 500000" min="1" step="1"
             className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-32" />
         </div>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">부가세 실계산서(선택)</label>
+          <input type="number" value={vat} onChange={e => setVat(e.target.value)}
+            placeholder="비우면 자동" min="0" step="1"
+            className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-32" />
+        </div>
         <div className="flex-1 min-w-[8rem]">
           <label className="block text-xs text-gray-400 mb-1">메모</label>
           <input value={memo} onChange={e => setMemo(e.target.value)}
@@ -112,13 +140,23 @@ export default function DepreciationPanel({
         </div>
         <button disabled={busy || !amount}
           className="btn-primary text-xs disabled:opacity-40"
-          onClick={() => run(() => upsertMonthlyDepreciation({ product_id: productId, year_month: ym, amount, memo }))}>
-          {busy ? '저장 중…' : '감가 저장'}
+          onClick={() => run(() => upsertMonthlyDepreciation({
+            id: editId ?? undefined,
+            product_id: productId, year_month: ym, amount, memo, cost_vat_actual: vat,
+          }))}>
+          {busy ? '저장 중…' : editId ? '감가 수정' : '감가 저장'}
         </button>
+        {editId && (
+          <button disabled={busy} className="text-xs text-gray-500 underline" onClick={reset}>취소</button>
+        )}
       </div>
       <p className="text-xs text-gray-400 mt-2">
         저장 시 해당 납품월의 동창 매입 계산서가 감가 차감 금액으로 재생성됩니다. 렘코 매출·커미션 배분은 총액 기준 유지
         — 감가 금액은 3사 배분에서 제외되어 통장에 남고, 계약 종료 후 렘코에 반환합니다.
+      </p>
+      <p className="text-xs text-gray-400 mt-1">
+        <b>부가세 실계산서</b>는 동창 실물 세금계산서의 세액이 자동 계산값과 다를 때만 입력합니다(끝자리 1원 차이).
+        비워두면 &quot;매입 총액 부가세 − 감가 부가세&quot;(라인별 절사)로 계산합니다.
       </p>
 
       {error && <p className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}

@@ -74,11 +74,15 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     const inList = ymList.map(m => `"${m}"`).join(',')
     const mdRes = await supabase
       .from('monthly_depreciations')
-      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym')
+      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym, cost_vat_actual')
       .or(`year_month.in.(${inList}),cost_deduct_ym.in.(${inList}),sales_deduct_ym.in.(${inList})`)
     // 조용히 빈 배열로 폴백하면 감가 누락된 총액 계산서가 발행됨 — 명시적 throw
     if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
-    monthlyDeps = ((mdRes.data ?? []) as MonthlyDepInput[]).map(md => ({ ...md, amount: Number(md.amount) }))
+    monthlyDeps = ((mdRes.data ?? []) as MonthlyDepInput[]).map(md => ({
+      ...md,
+      amount: Number(md.amount),
+      cost_vat_actual: md.cost_vat_actual == null ? null : Number(md.cost_vat_actual),
+    }))
   }
 
   return {

@@ -13,9 +13,13 @@ import { splitMargin } from '@/lib/margin'
 import { makeInvoice, calcCombinedMargin, calcVat } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
-/** 감가 차감분 — 금액과 귀속 납품월(메모 표기용) */
-export type DepSlice = { amount: number; originYMs: string[] }
-const NO_DEP: DepSlice = { amount: 0, originYMs: [] }
+/**
+ * 감가 차감분 — 금액과 귀속 납품월(메모 표기용).
+ * `vatActual`은 실물 계산서의 부가세. 거래처 반올림 관례가 달마다 흔들리는 경우의 탈출구로,
+ * 값이 있으면 계산값을 덮어쓴다.
+ */
+export type DepSlice = { amount: number; originYMs: string[]; vatActual?: number | null }
+const NO_DEP: DepSlice = { amount: 0, originYMs: [], vatActual: null }
 
 const originLabel = (ymList: string[]) =>
   ymList.map(y => `${parseInt(y.slice(5, 7))}월`).join('·')
@@ -128,13 +132,13 @@ export function genAL30(
       // 감가 라인의 VAT는 반드시 감가액 기준으로 따로 계산해 뺀다.
       // 차감된 공급가액에 일괄 10%를 다시 매기면 현대 미입금액과 1원 어긋난다
       // (56,179×0.1 = 5,617.9 — 라인별 반올림 5,618이 실제 차감액)
-      vatOverride: dep > 0
+      vatOverride: (costDep.vatActual ?? null) ?? (dep > 0
         ? calcVat(Math.round(totalCost), '화림') - calcVat(dep, '화림')
-        : undefined,
+        : undefined),
       basisDate: wBEnd, deadline: wDue1N, paymentDue: wEnd2M,
       type: 'cost',
       memo: dep > 0
-        ? `(주)한국에이원→화림 당월 합산 — ${origin}분 감가 ${dep.toLocaleString('ko-KR')}원 차감(현대 미입금분 회수), 익익월말 지급`
+        ? `(주)한국에이원→화림 당월 합산 — ${origin}분 감가 ${dep.toLocaleString('ko-KR')}원 차감(현대 미입금분 회수), 익익월말 지급${costDep.vatActual != null ? ' (부가세 실계산서 값)' : ''}`
         : '(주)한국에이원→화림 당월 합산 — 익월1일 발행, 익익월말 지급',
     }))
   }

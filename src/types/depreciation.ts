@@ -11,5 +11,7 @@ export interface MonthlyDepreciation {
   sales_deduct_ym: string | null
   /** 매입 계산서에서 차감할 납품월. 분탄=year_month, AL30=회수 합의 납품월 */
   cost_deduct_ym: string | null
+  /** 감가 반영 매입 계산서의 실제 부가세(실물 세금계산서 값). null = 라인별 절사 계산값 사용 */
+  cost_vat_actual: number | null
   created_at: string
 }

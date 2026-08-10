@@ -10,8 +10,19 @@ describe('parseMonthlyDepInput', () => {
     const r = parseMonthlyDepInput({ year_month: '2026-07', amount: '1,000,000', memo: ' 7월분 ' })
     expect(r).toEqual({
       ok: true, year_month: '2026-07', amount: 1_000_000, memo: '7월분',
-      sales_deduct_ym: null, cost_deduct_ym: '2026-07',
+      sales_deduct_ym: null, cost_deduct_ym: '2026-07', cost_vat_actual: null,
     })
+  })
+
+  it('부가세 실계산서 — 빈 값은 null, 정수는 그대로, 음수·소수는 거부', () => {
+    const raw = { year_month: '2026-07', amount: 1000 }
+    expect(parseMonthlyDepInput({ ...raw, cost_vat_actual: '' })).toMatchObject({ cost_vat_actual: null })
+    expect(parseMonthlyDepInput({ ...raw, cost_vat_actual: '37,061,476' })).toMatchObject({ cost_vat_actual: 37_061_476 })
+    // 0은 유효한 입력(면세) — 빈 값과 구분돼야 한다
+    expect(parseMonthlyDepInput({ ...raw, cost_vat_actual: 0 })).toMatchObject({ cost_vat_actual: 0 })
+    for (const bad of ['-1', '10.5', 'abc']) {
+      expect(parseMonthlyDepInput({ ...raw, cost_vat_actual: bad }).ok).toBe(false)
+    }
   })
 
   it('음수/0/소수/비숫자 거부', () => {
@@ -123,6 +134,7 @@ const dep2605: MonthlyDepreciation = {
   id: 'd1', product_id: AL30, year_month: '2026-05', amount: 56_179,
   memo: null, settled_at: null,
   sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07',
+  cost_vat_actual: null,
   created_at: '2026-07-31T00:00:00Z',
 }
 const inv = (o: Partial<Parameters<typeof depBadgeFor>[0]>) => ({

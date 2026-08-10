@@ -74,6 +74,8 @@ export function genBuntan(
   ym: string,
   /** 해당 납품월의 월별 감가(원). 동창 매입 계산서에서만 차감 — 렘코 매출·커미션은 총액 기준 */
   monthlyDep: number = 0,
+  /** 동창 실물 계산서의 부가세. null = 라인별 절사 계산값 사용 */
+  costVatActual: number | null = null,
 ): InvoiceToCreate[] {
   const pid        = deliveries[0].product_id
   const deliveryYM = deliveries[0].year_month
@@ -106,15 +108,17 @@ export function genBuntan(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '동창', supply: costTotal - monthlyDep, vat: true,
-      // 동창 세금계산서는 라인별(매입 총액 + 감가 마이너스) VAT 절사 후 합산 —
-      // 차감된 공급가액에 일괄 10% 절사하면 1원 어긋남 (2026-07 실계산서로 확인)
-      vatOverride: monthlyDep > 0
+      // 동창 세금계산서는 기본적으로 라인별(매입 총액 + 감가 마이너스) VAT 절사 후 합산 —
+      // 차감된 공급가액에 일괄 10% 절사하면 1원 어긋남 (2026-06 납품분 실계산서로 확인).
+      // 다만 이 관례가 달마다 흔들려(2026-07 납품분은 일괄 절사가 실물) 공식으로 못 맞춘다.
+      // 실물 세액이 입력돼 있으면 그 값이 무조건 이긴다 — 계산서는 실물과 1원까지 같아야 한다
+      vatOverride: costVatActual ?? (monthlyDep > 0
         ? calcVat(Math.round(costTotal), '동창') - calcVat(monthlyDep, '동창')
-        : undefined,
+        : undefined),
       basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue10N,
       type: 'cost',
       memo: monthlyDep > 0
-        ? `(주)한국에이원→동창 — 매입 (VAT10%), 월감가 ${monthlyDep.toLocaleString('ko-KR')}원 차감`
+        ? `(주)한국에이원→동창 — 매입 (VAT10%), 월감가 ${monthlyDep.toLocaleString('ko-KR')}원 차감${costVatActual !== null ? ' (부가세 실계산서 값)' : ''}`
         : '(주)한국에이원→동창 — 매입 (VAT10%), 익월1일 동시 발행',
     }),
     makeInvoice({

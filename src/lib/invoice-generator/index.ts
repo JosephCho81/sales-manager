@@ -39,6 +39,8 @@ export type MonthlyDepInput = {
   /** 매출 계산서가 감액 발행된 납품월. null = 매출 영향 없음(보관형) */
   sales_deduct_ym?: string | null
   cost_deduct_ym?: string | null
+  /** 감가 반영 매입 계산서의 실제 부가세(실물 세금계산서 값). null = 계산값 사용 */
+  cost_vat_actual?: number | null
 }
 
 function slice(
@@ -52,9 +54,23 @@ function slice(
   }
 }
 
-/** 특정 품목·납품월 매입 계산서에서 차감할 감가 합계 + 귀속월 목록 */
+/**
+ * 특정 품목·납품월 매입 계산서에서 차감할 감가 합계 + 귀속월 목록.
+ *
+ * `vatActual`은 계산서 한 장의 부가세 총액이므로 합산할 수 없다. 같은 달에 차감되는
+ * 감가가 여러 건인데 둘 이상이 값을 갖고 있으면 어느 쪽이 그 장의 실제 세액인지
+ * 결정할 수 없으므로 계산값으로 되돌린다 (임의로 하나를 고르면 조용히 틀린다).
+ */
 function costDepFor(deps: MonthlyDepInput[], productId: string, deliveryYM: string) {
-  return slice(deps, md => md.product_id === productId && (md.cost_deduct_ym ?? md.year_month) === deliveryYM)
+  const match = (md: MonthlyDepInput) =>
+    md.product_id === productId && (md.cost_deduct_ym ?? md.year_month) === deliveryYM
+  const declared = deps
+    .filter(md => match(md) && md.cost_vat_actual !== null && md.cost_vat_actual !== undefined)
+    .map(md => Number(md.cost_vat_actual))
+  return {
+    ...slice(deps, match),
+    vatActual: declared.length === 1 ? declared[0] : null,
+  }
 }
 
 /** 특정 품목·납품월 매출 계산서가 감액 발행된 금액 (통과형만 해당) */
@@ -91,7 +107,7 @@ export function generateInvoices(
     } else if (name === 'BUNTAN') {
       // genBuntan은 group[0].year_month를 납품월로 사용 — 감가도 동일 기준 매칭
       const dep = costDepFor(monthlyDeps, group[0].product_id, group[0].year_month)
-      result.push(...genBuntan(group, yearMonth, dep.amount))
+      result.push(...genBuntan(group, yearMonth, dep.amount, dep.vatActual))
     } else if (name.startsWith('AL40') || name === 'AL30') {
       const pid = group[0].product_id
       const dym = group[0].year_month

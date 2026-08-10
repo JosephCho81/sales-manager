@@ -19,6 +19,8 @@ export type MonthlyDepInputRaw = {
   sales_deduct_ym?: string | null
   /** 매입 계산서에서 차감할 납품월. 미지정 시 year_month(당월 차감) */
   cost_deduct_ym?: string | null
+  /** 감가 반영 매입 계산서의 실제 부가세. 빈 값 = 계산값 사용 */
+  cost_vat_actual?: string | number | null
 }
 
 export type ParsedMonthlyDep =
@@ -29,6 +31,7 @@ export type ParsedMonthlyDep =
       memo: string | null
       sales_deduct_ym: string | null
       cost_deduct_ym: string
+      cost_vat_actual: number | null
     }
   | { ok: false; error: string }
 
@@ -56,6 +59,19 @@ export function parseMonthlyDepInput(raw: MonthlyDepInputRaw): ParsedMonthlyDep 
     return { ok: false, error: '매입 차감월 형식이 잘못되었습니다 (YYYY-MM).' }
   }
 
+  // 실물 계산서 부가세 — 거래처 반올림 관례가 달마다 달라 공식으로 못 맞추는 경우의 탈출구.
+  // 빈 값은 "계산값 사용"이고, 0은 유효한 입력(면세)이므로 빈 문자열과 0을 구분해야 한다
+  const vatRaw = typeof raw.cost_vat_actual === 'string'
+    ? raw.cost_vat_actual.replace(/,/g, '').trim()
+    : raw.cost_vat_actual
+  let costVat: number | null = null
+  if (vatRaw !== null && vatRaw !== undefined && vatRaw !== '') {
+    costVat = Number(vatRaw)
+    if (!Number.isFinite(costVat) || !Number.isInteger(costVat) || costVat < 0) {
+      return { ok: false, error: '실제 부가세는 0 이상의 원 단위 정수여야 합니다.' }
+    }
+  }
+
   return {
     ok: true,
     year_month: raw.year_month,
@@ -63,6 +79,7 @@ export function parseMonthlyDepInput(raw: MonthlyDepInputRaw): ParsedMonthlyDep 
     memo: raw.memo?.trim() || null,
     sales_deduct_ym: sales,
     cost_deduct_ym: cost,
+    cost_vat_actual: costVat,
   }
 }
 
@@ -193,11 +210,14 @@ export function depBreakdownFor(
   const netSupply = Number(inv.supply_amount)
   const netVat    = Number(inv.vat_amount)
   const depSupply = hit.reduce((s, d) => s + Number(d.amount), 0)
-  // VAT 관례는 상대 거래처 기준 — 계산서 생성 시 vatOverride와 같은 규칙이어야 산식이 맞는다
+  // VAT 관례는 상대 거래처 기준 — 계산서 생성 시 vatOverride와 같은 규칙이어야 산식이 맞는다.
+  // 감가분 VAT는 감가 전 총액 VAT에서 실제 청구 VAT를 뺀 값으로 역산한다. 감가분에 직접
+  // 10%를 매기면 cost_vat_actual(실물 계산서 값)이 들어온 달에 산식이 1원 어긋난다
   const counterparty = inv.from_company === '(주)한국에이원' ? inv.to_company : inv.from_company
-  const depVat = netVat > 0
-    ? (counterparty === '동창' ? Math.floor(depSupply * 0.1) : Math.round(depSupply * 0.1))
-    : 0
+  const grossVat = counterparty === '동창'
+    ? Math.floor((netSupply + depSupply) * 0.1)
+    : Math.round((netSupply + depSupply) * 0.1)
+  const depVat = netVat > 0 ? grossVat - netVat : 0
 
   return {
     grossSupply: netSupply + depSupply,
