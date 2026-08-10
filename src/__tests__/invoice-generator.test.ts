@@ -364,6 +364,54 @@ describe('genALSeries', () => {
       const gmComm = invoices.find(i => i.from_company === '(주)한국에이원' && i.to_company === '금화')
       expect(gmComm).toBeUndefined()
     })
+
+    // 2026-07~ 화림 매입단가 2개 분할 (실데이터). 계약 2건 = 납품 2건으로 입력되며
+    // 매출·매입·금화공급가·커미션이 전부 건별 합산으로 나와야 한다.
+    describe('매입단가 2개 분할 (2026-07 실데이터)', () => {
+      const base = {
+        year_month: '2026-07', delivery_date: '2026-07-31',
+        product_id: 'p-al35b', product_name: 'AL35B', product_vat: 'TEN_PERCENT' as const,
+        depreciation_amount: null, fx_rate: null,
+      }
+      const lineA = makeDelivery({
+        ...base, id: 'a', quantity_kg: 202_905,
+        contract: { sell_price: 350_000, cost_price: 236_500, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const lineB = makeDelivery({
+        ...base, id: 'b', quantity_kg: 130_846,
+        contract: { sell_price: 350_000, cost_price: 330_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const invoices = genALSeries([lineA, lineB], '2026-09')
+
+      it('매출 = 단일 매출단가 × 전체 물량', () => {
+        // 350,000 × 333.751톤
+        const s = invoices.find(i => i.invoice_type === 'sales')!
+        expect(s.supply_amount).toBe(116_812_850)
+      })
+
+      it('화림 매입 = 두 단가 합산', () => {
+        // 236,500×202.905 + 330,000×130.846
+        const c = invoices.find(i => i.from_company === '화림')!
+        expect(c.supply_amount).toBe(91_166_213)
+      })
+
+      it('금화→한국에이원 = 건별 (원가 + floor(톤당마진/3)) 합산', () => {
+        // (236,500+37,833)×202.905 + (330,000+6,666)×130.846
+        const gm = invoices.find(i => i.from_company === '금화')!
+        expect(gm.supply_amount).toBe(99_714_937)
+      })
+
+      it('나성 커미션 = 건별 마진 합산의 1/3 배분 나머지', () => {
+        // 23,029,718 + 2,616,920 = 25,646,638 → raseong
+        const rs = invoices.find(i => i.to_company === '(주)나성')!
+        expect(rs.supply_amount).toBe(8_548_880)
+      })
+
+      it('계산서 장수·묶음은 단일 계약 때와 동일 (4장, delivery_ids 2건)', () => {
+        expect(invoices).toHaveLength(4)
+        for (const i of invoices) expect(i.delivery_ids).toEqual(['a', 'b'])
+      })
+    })
   })
 
   describe('AL65B', () => {
