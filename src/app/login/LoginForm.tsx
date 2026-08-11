@@ -7,8 +7,12 @@ import { login, type LoginState } from './actions'
 function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <button type="submit" className="btn-primary w-full justify-center flex" disabled={pending}>
-      {pending ? '로그인 중...' : '로그인'}
+    <button
+      type="submit"
+      disabled={pending}
+      className="btn-primary w-full flex justify-center py-2.5"
+    >
+      {pending ? '로그인 중…' : '로그인'}
     </button>
   )
 }
@@ -30,6 +34,7 @@ export default function LoginForm() {
           autoFocus
           autoCapitalize="none"
           autoCorrect="off"
+          spellCheck={false}
           autoComplete="username"
         />
       </div>
@@ -48,13 +53,18 @@ export default function LoginForm() {
       </div>
 
       {state?.error && (
-        <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">{state.error}</p>
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {state.error}
+        </p>
       )}
 
-      <SubmitButton />
+      <div className="pt-1">
+        <SubmitButton />
+      </div>
 
-      <p className="text-xs text-gray-400 text-center pt-1">
-        로그인 상태는 이 기기에 유지됩니다. 공용 PC에서는 사용 후 로그아웃하세요.
+      <p className="pt-1 text-center text-xs leading-relaxed text-gray-400">
+        로그인 상태는 이 기기에 유지됩니다.<br />
+        공용 PC에서는 사용 후 로그아웃하세요.
       </p>
     </form>
   )
