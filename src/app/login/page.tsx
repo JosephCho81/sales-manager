@@ -11,9 +11,8 @@ export default async function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="card overflow-hidden">
           {/* 사이드바와 같은 gray-900 헤더 — 로그인 후 화면과 톤을 맞춘다 */}
-          <div className="bg-gray-900 px-7 py-6 text-white">
+          <div className="bg-gray-900 px-7 py-7 text-center text-white">
             <h1 className="text-lg font-bold leading-tight">판매관리 시스템</h1>
-            <p className="mt-1 text-xs text-gray-400">(주)한국에이원 · 금화 · (주)나성</p>
           </div>
 
           <div className="px-7 py-7">
