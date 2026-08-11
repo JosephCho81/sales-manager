@@ -14,4 +14,6 @@ export interface MonthlyDepreciation {
   /** 감가 반영 매입 계산서의 실제 부가세(실물 세금계산서 값). null = 라인별 절사 계산값 사용 */
   cost_vat_actual: number | null
   created_at: string
+  /** 낙관적 잠금 기준 (019) */
+  updated_at?: string | null
 }

@@ -17,4 +17,6 @@ export interface Expense {
   payer: ExpensePayer | null
   is_settled: boolean
   created_at: string
+  /** 낙관적 잠금 기준 (019) */
+  updated_at?: string | null
 }

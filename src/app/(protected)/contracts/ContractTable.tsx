@@ -1,5 +1,6 @@
 'use client'
 
+import { useCanEdit } from '@/components/RoleProvider'
 import { deleteContract } from './actions'
 import { fmtNum } from '@/lib/margin'
 import type { Product } from '@/types'
@@ -36,6 +37,7 @@ export default function ContractTable({
   onRevise: (c: ContractRow) => void
   onDeleted: (id: string) => void
 }) {
+  const canEdit = useCanEdit()
   const filtered = filterProductId
     ? contracts.filter(c => c.product_id === filterProductId)
     : contracts
@@ -149,11 +151,15 @@ export default function ContractTable({
                   <td className="table-td text-center">{statusBadge(c)}</td>
                   <td className="table-td text-xs text-gray-400 max-w-[120px] truncate">{c.memo ?? '—'}</td>
                   <td className="table-td whitespace-nowrap">
-                    <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(c)}>수정</button>
-                    {today <= c.end_date && (
-                      <button className="text-xs text-amber-600 hover:underline mr-2" onClick={() => onRevise(c)}>개정</button>
-                    )}
-                    <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(c.id)}>삭제</button>
+                    {canEdit ? (
+                      <>
+                        <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(c)}>수정</button>
+                        {today <= c.end_date && (
+                          <button className="text-xs text-amber-600 hover:underline mr-2" onClick={() => onRevise(c)}>개정</button>
+                        )}
+                        <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(c.id)}>삭제</button>
+                      </>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                 </tr>
               )

@@ -1,6 +1,7 @@
 'use client'
 
 import { fmtKrw } from '@/lib/margin'
+import { useCanEdit } from '@/components/RoleProvider'
 import PayerSelect from './PayerSelect'
 import type { ExpenseRowProps } from './expense-row-props'
 
@@ -9,9 +10,10 @@ export default function ExpenseCard({
   row, editing, editForm, setEditForm,
   startEdit, handleToggle, handleDelete, handleUpdate, handlePayerChange,
 }: ExpenseRowProps) {
+  const canEdit = useCanEdit()
   return (
     <div
-      onClick={() => startEdit(row)}
+      onClick={() => { if (canEdit) startEdit(row) }}
       className={`card p-3 ${row.is_settled ? 'opacity-40' : ''} ${editing ? 'ring-1 ring-blue-300 bg-blue-50' : ''}`}
     >
       <div className="flex items-center justify-between mb-1.5">
@@ -65,6 +67,7 @@ export default function ExpenseCard({
         </>
       )}
       <div className="flex items-center gap-3 border-t border-gray-100 pt-2 mt-1">
+        {canEdit && (<>
         <button
           onClick={e => { e.stopPropagation(); handleToggle(row) }}
           className={`text-xs whitespace-nowrap ${row.is_settled ? 'text-blue-400 hover:text-blue-600' : 'text-green-500 hover:text-green-700'}`}
@@ -85,6 +88,7 @@ export default function ExpenseCard({
             수정완료
           </button>
         )}
+        </>)}
         <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
           <span className="text-[10px] text-gray-400">지불</span>
           <PayerSelect row={row} onChange={handlePayerChange} />

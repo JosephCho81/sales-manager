@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useCanEdit } from '@/components/RoleProvider'
 import { deleteDelivery } from './actions'
 import { calcMarginFromContract, fmtKrw, fmtNum } from '@/lib/margin'
 import type { DeliveryRow } from './types'
@@ -18,6 +19,7 @@ export default function DeliveryTable({
   onEdit: (d: DeliveryRow) => void
   onDeleted: (id: string) => void
 }) {
+  const canEdit = useCanEdit()
   const filtered = useMemo(
     () => deliveries.filter(d => !filterMonth || d.year_month === filterMonth),
     [deliveries, filterMonth]
@@ -113,8 +115,12 @@ export default function DeliveryTable({
                   </td>
                   <td className="table-td text-center text-xs text-gray-400 max-w-[80px] truncate">{d.memo}</td>
                   <td className="table-td text-center whitespace-nowrap">
-                    <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>
-                    <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(d.id)}>삭제</button>
+                    {canEdit ? (
+                      <>
+                        <button className="text-xs text-blue-600 hover:underline mr-2" onClick={() => onEdit(d)}>수정</button>
+                        <button className="text-xs text-red-500 hover:underline" onClick={() => handleDelete(d.id)}>삭제</button>
+                      </>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                 </tr>
               )

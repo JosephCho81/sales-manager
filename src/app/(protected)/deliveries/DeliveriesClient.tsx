@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { getCurrentYearMonth } from '@/lib/date'
+import { useCanEdit } from '@/components/RoleProvider'
 import DeliveryForm from './DeliveryForm'
 import DeliveryTable from './DeliveryTable'
 import type { ProductRow, ContractRow, DeliveryRow } from './types'
@@ -15,6 +16,7 @@ export default function DeliveriesClient({
   contracts: ContractRow[]
   initialDeliveries: DeliveryRow[]
 }) {
+  const canEdit = useCanEdit()
   const [deliveries, setDeliveries]   = useState<DeliveryRow[]>(initialDeliveries)
   const [filterMonth, setFilterMonth] = useState(getCurrentYearMonth())
   // undefined = 폼 숨김 | null = 새 입고 | DeliveryRow = 수정 중
@@ -27,10 +29,12 @@ export default function DeliveriesClient({
           <h2 className="text-xl font-bold text-gray-900">입고 입력</h2>
           <p className="text-sm text-gray-500 mt-0.5">물량 입력 → 마진 자동 계산 (1/3 배분)</p>
         </div>
-        <button className="btn-primary" onClick={() => setEditDelivery(null)}>+ 입고 입력</button>
+        {canEdit && (
+          <button className="btn-primary" onClick={() => setEditDelivery(null)}>+ 입고 입력</button>
+        )}
       </div>
 
-      {editDelivery !== undefined && (
+      {canEdit && editDelivery !== undefined && (
         <DeliveryForm
           products={products}
           contracts={contracts}

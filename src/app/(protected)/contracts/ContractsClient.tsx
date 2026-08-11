@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useCanEdit } from '@/components/RoleProvider'
 import ContractForm from './ContractForm'
 import ReviseContractForm from './ReviseContractForm'
 import ContractTable from './ContractTable'
@@ -20,6 +21,7 @@ export default function ContractsClient({
   initialContracts: ContractRow[]
   products: Product[]
 }) {
+  const canEdit = useCanEdit()
   const [contracts, setContracts] = useState<ContractRow[]>(initialContracts)
   const [filterProductId, setFilterProductId] = useState('')
   const [editContract, setEditContract] = useState<ContractRow | null | undefined>(undefined)
@@ -74,10 +76,12 @@ export default function ContractsClient({
           <h2 className="text-xl font-bold text-gray-900">낙찰 단가 관리</h2>
           <p className="text-sm text-gray-500 mt-0.5">품목별 입찰 기간 및 납품단가·원가단가 관리</p>
         </div>
-        <button className="btn-primary whitespace-nowrap flex-shrink-0 text-xs px-3 py-1.5 md:text-sm md:px-4 md:py-2" onClick={openNew}>+ 단가 등록</button>
+        {canEdit && (
+          <button className="btn-primary whitespace-nowrap flex-shrink-0 text-xs px-3 py-1.5 md:text-sm md:px-4 md:py-2" onClick={openNew}>+ 단가 등록</button>
+        )}
       </div>
 
-      {editContract !== undefined && (
+      {canEdit && editContract !== undefined && (
         <ContractForm
           products={products}
           editContract={editContract}
@@ -87,7 +91,7 @@ export default function ContractsClient({
         />
       )}
 
-      {reviseContract && (
+      {canEdit && reviseContract && (
         <ReviseContractForm
           contract={reviseContract}
           onClose={() => setReviseContract(null)}

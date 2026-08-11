@@ -3,7 +3,9 @@
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
 import { depBadgeFor, depBreakdownFor, type DepBreakdown } from '@/lib/depreciation'
+import { diffInvoice } from '@/lib/reconcile'
 import type { MonthlyDepreciation } from '@/types'
+import { useCanEdit } from '@/components/RoleProvider'
 import type { InvoiceRow } from '@/lib/invoice-generator'
 
 const TYPE_ORDER = ['sales', 'cost', 'commission', 'other'] as const
@@ -53,6 +55,40 @@ export function DepBreakdownNote({ bd }: { bd: DepBreakdown }) {
   )
 }
 
+/**
+ * 실물 대사 표시 — 합계 칸 아래에 붙는다.
+ * 미대사는 회색 "대사", 일치는 초록 체크, 차이는 빨간 금액을 그대로 보여준다.
+ * 조회 전용 계정은 결과만 보고 누를 수 없다.
+ */
+function ReconcileMark({
+  inv, canEdit, onOpen,
+}: {
+  inv: InvoiceRow
+  canEdit: boolean
+  onOpen: (inv: InvoiceRow) => void
+}) {
+  const d = diffInvoice(inv)
+  const label = d === null ? '대사' : d.matched ? '✓ 일치' : `${d.total > 0 ? '+' : ''}${fmtKrw(d.total)}`
+  const tone  = d === null
+    ? 'border-gray-200 text-gray-400'
+    : d.matched
+      ? 'border-green-200 bg-green-50 text-green-700'
+      : 'border-red-200 bg-red-50 text-red-700 font-semibold'
+
+  const content = (
+    <span className={`inline-block mt-1 rounded border px-1.5 py-0.5 text-xs tabular-nums ${tone}`}>
+      {label}
+    </span>
+  )
+
+  if (!canEdit) return <div>{d === null ? null : content}</div>
+  return (
+    <div>
+      <button onClick={() => onOpen(inv)} title="실물 세금계산서와 대조">{content}</button>
+    </div>
+  )
+}
+
 export default function InvoiceTable({
   invoices,
   productMap,
@@ -60,6 +96,7 @@ export default function InvoiceTable({
   deps,
   onSetPaidDate,
   onOpenPayment,
+  onOpenReconcile,
 }: {
   invoices: InvoiceRow[]
   productMap: Map<string, string>
@@ -67,7 +104,10 @@ export default function InvoiceTable({
   deps: MonthlyDepreciation[]
   onSetPaidDate: (id: string, date: string | null) => void
   onOpenPayment: (inv: InvoiceRow) => void
+  onOpenReconcile: (inv: InvoiceRow) => void
 }) {
+  const canEdit = useCanEdit()
+
   // 품목별 그룹화
   // null product_id인 커미션은 delivery_ids[0](커미션 row ID)로 개별 그룹화
   const grouped = new Map<string, InvoiceRow[]>()
@@ -199,6 +239,7 @@ export default function InvoiceTable({
                         </td>
                         <td className="table-td text-right tabular-nums font-semibold whitespace-nowrap">
                           {fmtKrw(Number(inv.total_amount))}
+                          <ReconcileMark inv={inv} canEdit={canEdit} onOpen={onOpenReconcile} />
                         </td>
                         <td className="table-td text-gray-600 whitespace-nowrap">
                           {inv.invoice_basis_date ?? '—'}
@@ -207,30 +248,36 @@ export default function InvoiceTable({
                           {inv.payment_due_date ?? '—'}
                         </td>
                         <td className="table-td text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <input
-                              type="date"
-                              value={inv.paid_at ? inv.paid_at.slice(0, 10) : ''}
-                              onChange={e => onSetPaidDate(inv.id, e.target.value || null)}
-                              className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                            <button
-                              onClick={() => onOpenPayment(inv)}
-                              title="실입금액이 계산서와 다를 때"
-                              className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
-                            >
-                              금액
-                            </button>
-                            {inv.paid_at && (
+                          {canEdit ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <input
+                                type="date"
+                                value={inv.paid_at ? inv.paid_at.slice(0, 10) : ''}
+                                onChange={e => onSetPaidDate(inv.id, e.target.value || null)}
+                                className="border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
                               <button
-                                onClick={() => onSetPaidDate(inv.id, null)}
-                                title="지급완료 취소"
-                                className="shrink-0 px-1 text-xs text-gray-400 hover:text-red-500"
+                                onClick={() => onOpenPayment(inv)}
+                                title="실입금액이 계산서와 다를 때"
+                                className="shrink-0 rounded border border-gray-300 px-1.5 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
                               >
-                                ✕
+                                금액
                               </button>
-                            )}
-                          </div>
+                              {inv.paid_at && (
+                                <button
+                                  onClick={() => onSetPaidDate(inv.id, null)}
+                                  title="지급완료 취소"
+                                  className="shrink-0 px-1 text-xs text-gray-400 hover:text-red-500"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-600 whitespace-nowrap">
+                              {inv.paid_at ? inv.paid_at.slice(0, 10) : '—'}
+                            </span>
+                          )}
                           {shortfall > 0 && (
                             <p className="mt-1 text-xs text-red-600 tabular-nums whitespace-nowrap">
                               실입금 {fmtKrw(paidAmt!)} (−{fmtKrw(shortfall)})

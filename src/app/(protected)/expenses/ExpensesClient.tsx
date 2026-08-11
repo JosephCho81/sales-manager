@@ -1,5 +1,6 @@
 'use client'
 
+import { useCanEdit } from '@/components/RoleProvider'
 import { useExpenses } from './useExpenses'
 import { EXPENSE_PAYERS, EXPENSE_PAYER_LABELS, type Expense, type ExpensePayer } from '@/types'
 import ExpenseSettlementCard from './ExpenseSettlementCard'
@@ -16,9 +17,11 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
     handleSave, handleToggle, handlePayerChange, handleDelete,
   } = useExpenses(initialRows)
 
+  const canEdit = useCanEdit()
+
   const rowProps = (row: Expense) => ({
     row,
-    editing: editingId === row.id,
+    editing: canEdit && editingId === row.id,
     editForm, setEditForm,
     startEdit, handleToggle, handleDelete, handleUpdate, handlePayerChange,
   })
@@ -40,7 +43,8 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
         detailRows={detailRows}
       />
 
-      {/* 입력 폼 */}
+      {/* 입력 폼 — 조회 전용 계정에는 숨김 */}
+      {canEdit && (
       <div className="card p-5 mb-6 border-2 border-blue-100">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">비용 입력</h3>
         {error && (
@@ -109,6 +113,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
           {saving ? '저장 중…' : '비용 추가'}
         </button>
       </div>
+      )}
 
       {/* 비용 목록 */}
       {rows.length === 0 ? (
@@ -131,7 +136,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
                     <th className="table-th text-center whitespace-nowrap">금액</th>
                     <th className="table-th text-center whitespace-nowrap">비고</th>
                     <th className="table-th text-center whitespace-nowrap">상태</th>
-                    <th className="table-th text-center whitespace-nowrap">관리</th>
+                    {canEdit && <th className="table-th text-center whitespace-nowrap">관리</th>}
                     <th className="table-th text-center whitespace-nowrap">지불 업체</th>
                   </tr>
                 </thead>

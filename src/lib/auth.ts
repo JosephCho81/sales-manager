@@ -1,48 +1,65 @@
 import 'server-only'
 import type { User } from '@supabase/supabase-js'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { emailToUsername, displayNameFor, type Role } from '@/lib/account'
 
 export type AuthResult = { user: User } | { error: string }
 
-/**
- * [로그인 비활성화] (protected)/layout.tsx의 로그인 비활성화와 반드시 짝으로 관리.
- * true인 동안 requireOwner가 시스템 사용자로 통과 — URL을 아는 누구나 수정 가능.
- * 로그인 재활성화 시: 이 값을 false로 + layout.tsx 인증 체크 복원.
- * (2026-07-03: 가드 배포 후 세션이 없어 모든 저장·수정이 침묵 실패했던 사고의 임시 해제)
- */
-const AUTH_DISABLED = true
-
-/** 로그인 비활성화 기간의 audit_log 표기용 가상 사용자 */
-const SYSTEM_USER = {
-  id: '00000000-0000-0000-0000-000000000000',
-  email: 'auth-disabled@system',
-  aud: 'authenticated',
-  app_metadata: {},
-  user_metadata: {},
-  created_at: '',
-} as User
+export type SessionInfo = {
+  user: User
+  username: string
+  /** 화면 상단 표시용 이름 (예: '(주)금화 조중호 대표님') */
+  displayName: string
+  role: Role
+  /** owner만 입력·수정·삭제 가능 */
+  canEdit: boolean
+}
 
 /** 현재 로그인 사용자 (쿠키 세션 기반). 없으면 에러. */
 export async function getCurrentUser(): Promise<AuthResult> {
   const supabase = await createClient()
+  // getUser()는 Auth 서버에 토큰을 검증시킨다 — getSession()의 쿠키 신뢰와 다름
   const { data, error } = await supabase.auth.getUser()
   if (error || !data.user) return { error: '로그인이 필요합니다.' }
   return { user: data.user }
 }
 
-/** 역할 조회 — service-role로 RLS 우회 읽기 */
-export async function getRole(userId: string): Promise<'owner' | 'rep' | null> {
+/**
+ * 역할 조회 — service-role로 RLS 우회 읽기.
+ * user_roles에 행이 없으면 null → 권한 없음으로 취급(기본 거부).
+ */
+export async function getRole(userId: string): Promise<Role | null> {
   const admin = createAdminClient()
-  const { data } = await admin.from('user_roles').select('role').eq('user_id', userId).single()
-  return (data?.role as 'owner' | 'rep' | undefined) ?? null
+  const { data } = await admin.from('user_roles').select('role').eq('user_id', userId).maybeSingle()
+  const role = data?.role
+  return role === 'owner' || role === 'viewer' ? role : null
 }
 
-/** owner 전용 액션 가드. owner가 아니면 에러 반환. */
+/** 레이아웃·페이지용 세션 정보. 미로그인/역할 없음이면 null. */
+export async function getSession(): Promise<SessionInfo | null> {
+  const auth = await getCurrentUser()
+  if ('error' in auth) return null
+  const role = await getRole(auth.user.id)
+  if (!role) return null
+  const username = emailToUsername(auth.user.email)
+  return {
+    user: auth.user,
+    username,
+    displayName: displayNameFor(username),
+    role,
+    canEdit: role === 'owner',
+  }
+}
+
+/**
+ * 쓰기 액션 가드. owner가 아니면 에러 반환.
+ * 모든 mutation 서버 액션의 첫 줄에서 호출한다 — UI 숨김은 편의일 뿐,
+ * 실제 권한 경계는 여기 하나뿐이다.
+ */
 export async function requireOwner(): Promise<AuthResult> {
-  if (AUTH_DISABLED) return { user: SYSTEM_USER }
   const auth = await getCurrentUser()
   if ('error' in auth) return auth
   const role = await getRole(auth.user.id)
-  if (role !== 'owner') return { error: '권한이 없습니다. (관리자 전용)' }
+  if (role !== 'owner') return { error: '권한이 없습니다. (조회 전용 계정)' }
   return auth
 }

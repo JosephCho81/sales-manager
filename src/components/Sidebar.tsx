@@ -2,9 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-// [로그인 비활성화] 추후 활성화 시 복원
-// import { useRouter } from 'next/navigation'
-// import { createClient } from '@/lib/supabase/client'
+import { logout } from '@/lib/auth-actions'
 
 const navItems = [
   { href: '/analytics',   label: '매출·마진 현황',    icon: '📈' },
@@ -16,25 +14,15 @@ const navItems = [
   { href: '/expenses',    label: '비용 정산',         icon: '🧮' },
 ]
 
-// [로그인 비활성화] 추후 활성화 시 { userEmail }: { userEmail: string } 복원
-export default function Sidebar() {
+export default function Sidebar({ displayName, canEdit }: { displayName: string; canEdit: boolean }) {
   const pathname = usePathname()
-
-  // [로그인 비활성화] 추후 활성화 시 복원
-  // const router = useRouter()
-  // async function handleLogout() {
-  //   const supabase = createClient()
-  //   await supabase.auth.signOut()
-  //   router.push('/login')
-  //   router.refresh()
-  // }
 
   return (
     <aside className="hidden md:flex w-56 flex-shrink-0 bg-gray-900 text-white flex-col">
       {/* 로고 */}
       <div className="px-4 py-5 border-b border-gray-700">
         <h1 className="text-base font-bold leading-tight">판매관리 시스템</h1>
-        <p className="text-xs text-gray-400 mt-0.5">(주)한국에이원 · 금화 · (주)나성</p>
+        <p className="text-sm font-medium text-blue-300 mt-1.5 leading-snug">{displayName}</p>
       </div>
 
       {/* 네비게이션 */}
@@ -58,17 +46,23 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* [로그인 비활성화] 추후 활성화 시 아래 블록 복원
       <div className="px-4 py-4 border-t border-gray-700">
-        <p className="text-xs text-gray-400 truncate mb-2">{userEmail}</p>
-        <button
-          onClick={handleLogout}
-          className="w-full text-left text-xs text-gray-400 hover:text-white transition-colors"
-        >
-          로그아웃
-        </button>
+        <div className="mb-2">
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+            canEdit ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
+          }`}>
+            {canEdit ? '편집 가능' : '조회 전용'}
+          </span>
+        </div>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="w-full text-left text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            로그아웃
+          </button>
+        </form>
       </div>
-      */}
     </aside>
   )
 }

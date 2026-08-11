@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useCanEdit } from '@/components/RoleProvider'
 import { useRouter } from 'next/navigation'
 import { fmtKrw } from '@/lib/margin'
 import { sumUnsettled } from '@/lib/depreciation'
@@ -25,22 +26,26 @@ export default function DepreciationPanel({
   defaultYearMonth: string
 }) {
   const router = useRouter()
+  const canEdit = useCanEdit()
   const [ym, setYm]         = useState(defaultYearMonth)
   const [amount, setAmount] = useState('')
   const [memo, setMemo]     = useState('')
   const [vat, setVat]       = useState('')
   const [editId, setEditId] = useState<string | null>(null)
+  // 수정 시작 시점의 updated_at — 그 사이 누가 감가를 바꿨으면 저장을 거부한다
+  const [editUpdatedAt, setEditUpdatedAt] = useState<string | null>(null)
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState<string | null>(null)
 
   const unsettled = sumUnsettled(deps)
 
   function reset() {
-    setEditId(null); setYm(defaultYearMonth); setAmount(''); setMemo(''); setVat('')
+    setEditId(null); setEditUpdatedAt(null); setYm(defaultYearMonth); setAmount(''); setMemo(''); setVat('')
   }
 
   function startEdit(d: MonthlyDepreciation) {
     setEditId(d.id)
+    setEditUpdatedAt(d.updated_at ?? null)
     setYm(d.year_month)
     setAmount(String(Number(d.amount)))
     setMemo(d.memo ?? '')
@@ -88,6 +93,11 @@ export default function DepreciationPanel({
                   )}
                 </td>
                 <td className="py-2 text-right whitespace-nowrap">
+                  {!canEdit ? (
+                    <span className={d.settled_at ? 'text-green-600' : 'text-gray-300'}>
+                      {d.settled_at ? '정산완료' : '미정산'}
+                    </span>
+                  ) : (<>
                   <button disabled={busy} className="text-gray-500 underline mr-2"
                     onClick={() => startEdit(d)}>수정</button>
                   {d.settled_at ? (
@@ -108,6 +118,7 @@ export default function DepreciationPanel({
                         }}>삭제</button>
                     </>
                   )}
+                  </>)}
                 </td>
               </tr>
             ))}
@@ -115,6 +126,7 @@ export default function DepreciationPanel({
         </table>
       )}
 
+      {canEdit && (
       <div className="flex items-end gap-2 mt-3 flex-wrap">
         <div>
           <label className="block text-xs text-gray-400 mb-1">납품월</label>
@@ -142,6 +154,7 @@ export default function DepreciationPanel({
           className="btn-primary text-xs disabled:opacity-40"
           onClick={() => run(() => upsertMonthlyDepreciation({
             id: editId ?? undefined,
+            updated_at: editUpdatedAt,
             product_id: productId, year_month: ym, amount, memo, cost_vat_actual: vat,
           }))}>
           {busy ? '저장 중…' : editId ? '감가 수정' : '감가 저장'}
@@ -150,6 +163,7 @@ export default function DepreciationPanel({
           <button disabled={busy} className="text-xs text-gray-500 underline" onClick={reset}>취소</button>
         )}
       </div>
+      )}
       <p className="text-xs text-gray-400 mt-2">
         저장 시 해당 납품월의 동창 매입 계산서가 감가 차감 금액으로 재생성됩니다. 렘코 매출·커미션 배분은 총액 기준 유지
         — 감가 금액은 3사 배분에서 제외되어 통장에 남고, 계약 종료 후 렘코에 반환합니다.

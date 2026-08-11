@@ -7,6 +7,8 @@
     "build": "node -e \"require('fs').rmSync('.next/types',{recursive:true,force:true})\" && next build",
     "start": "next start",
     "lint": "next lint",
+    "seed:users": "tsx scripts/seed-users.ts",
+    "check:schema": "tsx scripts/check-schema.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

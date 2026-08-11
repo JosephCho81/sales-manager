@@ -168,6 +168,27 @@ describe('genSoggae', () => {
     expect(sales.supply_amount).toBe(1_950_000)
     expect(cost.supply_amount).toBe(1_750_000)
   })
+
+  it('커미션 지급일 = 익월10일 (영업일이면 그대로)', () => {
+    // 납품 2024-04 → 익월 2024-05-10 (금)
+    const d4 = makeDelivery({ ...d, year_month: '2024-04', delivery_date: '2024-04-15' })
+    const [, , gm, rs] = genSoggae([d4], '2024-05')
+    for (const inv of [gm, rs]) {
+      expect(inv.invoice_basis_date).toBe('2024-05-10')
+      expect(inv.issue_deadline).toBe('2024-05-10')
+      expect(inv.payment_due_date).toBe('2024-05-10')
+    }
+  })
+
+  it('커미션 지급일이 휴일이면 앞당김 — 대금(익월10일)은 반대로 미룸', () => {
+    // 납품 2024-01 → 2024-02-10(토, 설연휴). 커미션은 앞당겨 2024-02-08(목),
+    // 매출·매입 대금은 기존대로 뒤로 밀려 2024-02-13(화)
+    const [sales, cost, gm, rs] = genSoggae([d], '2024-02')
+    expect(gm.payment_due_date).toBe('2024-02-08')
+    expect(rs.payment_due_date).toBe('2024-02-08')
+    expect(sales.payment_due_date).toBe('2024-02-13')
+    expect(cost.payment_due_date).toBe('2024-02-13')
+  })
 })
 
 // ── genBuntan ─────────────────────────────────────────────
@@ -202,6 +223,18 @@ describe('genBuntan', () => {
     const [sales, cost] = genBuntan([dDep], '2024-02')
     expect(sales.supply_amount).toBe(1_950_000)
     expect(cost.supply_amount).toBe(1_750_000)
+  })
+
+  it('커미션 지급일 = 익월10일, 휴일이면 앞당김 (대금은 반대로 미룸)', () => {
+    const [sales, cost, gm, rs] = genBuntan([d], '2024-02')
+    expect(gm.payment_due_date).toBe('2024-02-08')
+    expect(rs.payment_due_date).toBe('2024-02-08')
+    expect(sales.payment_due_date).toBe('2024-02-13')
+    expect(cost.payment_due_date).toBe('2024-02-13')
+
+    // 영업일이면 그대로: 납품 2024-04 → 2024-05-10(금)
+    const d4 = makeDelivery({ ...d, year_month: '2024-04', delivery_date: '2024-04-15' })
+    expect(genBuntan([d4], '2024-05')[2].payment_due_date).toBe('2024-05-10')
   })
 
   describe('월별 감가 (동창 미지급 — 2026-07 렘코 상장 대응)', () => {

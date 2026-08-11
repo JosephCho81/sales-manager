@@ -29,6 +29,8 @@ export interface DeliveryRow {
   depreciation_amount: number | null
   memo: string | null
   created_at: string
+  /** 낙관적 잠금 기준 (019) */
+  updated_at?: string | null
   /** fx_rates 테이블에서 (product_id, delivery_date)로 조회한 FeSi 실제 환율. 없으면 계약 참고환율 사용 */
   fx_rate?: number | null
   product: { id: string; display_name: string; buyer: string }

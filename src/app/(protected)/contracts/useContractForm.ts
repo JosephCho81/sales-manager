@@ -100,7 +100,15 @@ export function useContractForm({
       memo: form.memo || null,
       invoice_month_offset: sibling?.invoice_month_offset ?? 0,
     }
-    const result = await upsertContract(payload, editContract?.id)
+    if (editContract && !editContract.updated_at) {
+      setError('수정 대상 정보가 오래됐습니다. 새로고침 후 다시 시도하세요.')
+      setSaving(false)
+      return
+    }
+    const result = await upsertContract(
+      payload,
+      editContract ? { id: editContract.id, updatedAt: editContract.updated_at! } : undefined,
+    )
     if (result.error) { setError(result.error); setSaving(false); return }
     onSaved(result.data as unknown as ContractRow)
   }

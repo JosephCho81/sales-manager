@@ -132,7 +132,15 @@ export function useDeliveryForm({
       }
     }
 
-    const result = await upsertDelivery(payload, editDelivery?.id)
+    if (editDelivery && !editDelivery.updated_at) {
+      setError('수정 대상 정보가 오래됐습니다. 새로고침 후 다시 시도하세요.')
+      setSaving(false)
+      return
+    }
+    const result = await upsertDelivery(
+      payload,
+      editDelivery ? { id: editDelivery.id, updatedAt: editDelivery.updated_at! } : undefined,
+    )
     if (result.error) { setError(result.error); setSaving(false); return }
 
     onSaved({ ...(result.data as unknown as DeliveryRow), fx_rate: savedFxRate })

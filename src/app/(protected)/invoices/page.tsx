@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import FetchErrorView from '@/components/FetchErrorView'
 import InvoicesClient from './InvoicesClient'
 import { fetchInvoiceInputs } from './invoice-data'
+import { hydrateHolidays, uncoveredHolidayYears } from '@/lib/holidays'
 import { type InvoiceRow } from '@/lib/invoice-generator'
 import type { MonthlyDepreciation } from '@/types'
 
@@ -21,6 +22,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
 
   try {
     const supabase = createAdminClient()
+
+    // 지급일 계산에 쓰이는 공휴일을 DB 값으로 맞춘 뒤에 미등록 연도를 판정한다
+    await hydrateHolidays()
+    const uncoveredYears = uncoveredHolidayYears(yearMonth)
 
     const [inputs, iRes, pRes, mdRes] = await Promise.all([
       // 입고·환율·커미션 — 재생성 액션과 동일한 조회 경로 공유
@@ -58,6 +63,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         initialCommissions={inputs.commissions}
         products={(pRes.data ?? []) as Array<{ id: string; name: string; display_name: string | null }>}
         initialMonthlyDeps={(mdRes.data ?? []) as unknown as MonthlyDepreciation[]}
+        uncoveredHolidayYears={uncoveredYears}
       />
     )
   } catch (e) {

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { toMessage } from '@/lib/error'
 import { splitMargin, fmtKrw, fmtNum } from '@/lib/margin'
 import { getCurrentYearMonth } from '@/lib/date'
+import { useCanEdit } from '@/components/RoleProvider'
 import { insertCommission, deleteCommission } from './actions'
 import { commissionPreview, validateCommissionInput } from './commission-calc'
 import type { CommissionRow } from './types'
@@ -20,6 +21,7 @@ export default function CommissionSection({
   onInserted: (row: CommissionRow) => void
   onDeleted: (id: string) => void
 }) {
+  const canEdit = useCanEdit()
   const [form, setForm] = useState({ ym: getCurrentYearMonth(), qty_ton: '', price_per_ton: '', memo: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +82,8 @@ export default function CommissionSection({
     <div className="mb-8">
       <h3 className="text-base font-bold text-gray-800 mb-4">{company}</h3>
 
-      {/* 입력 폼 */}
+      {/* 입력 폼 — 조회 전용 계정에는 숨김 */}
+      {canEdit && (
       <div className="card p-5 mb-4 border-2 border-blue-100">
         {error && (
           <div className="mb-3 bg-red-50 border border-red-200 rounded p-3 text-sm text-red-700">{error}</div>
@@ -133,6 +136,7 @@ export default function CommissionSection({
           {saving ? '저장 중…' : '커미션 등록'}
         </button>
       </div>
+      )}
 
       {/* 이력 테이블 */}
       {rows.length === 0 ? (
@@ -168,8 +172,10 @@ export default function CommissionSection({
                       <td className="table-td text-right tabular-nums text-orange-600 whitespace-nowrap">{fmtKrw(sp.raseong)}</td>
                       <td className="table-td text-xs text-gray-400 max-w-xs truncate">{row.memo ?? ''}</td>
                       <td className="table-td text-center whitespace-nowrap">
-                        <button onClick={() => handleDelete(row.id)}
-                          className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                        {canEdit ? (
+                          <button onClick={() => handleDelete(row.id)}
+                            className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                        ) : <span className="text-gray-300">—</span>}
                       </td>
                     </tr>
                   )

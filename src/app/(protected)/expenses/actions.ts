@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
+import { STALE_WRITE_ERROR, type EditTarget } from '@/lib/optimistic'
 import type { Expense, ExpensePayer } from '@/types'
 
 export async function insertExpense(payload: {
@@ -45,7 +46,7 @@ export async function toggleSettled(id: string, isSettled: boolean) {
   return { data: data as Expense }
 }
 
-export async function updateExpense(id: string, payload: {
+export async function updateExpense(edit: EditTarget, payload: {
   date: string
   description: string
   amount: number
@@ -58,13 +59,14 @@ export async function updateExpense(id: string, payload: {
   const { data, error } = await supabase
     .from('expenses')
     .update(payload)
-    .eq('id', id)
+    .eq('id', edit.id)
+    .eq('updated_at', edit.updatedAt)
     .select('*')
-    .single()
   if (error) return { error: error.message }
-  await logAudit(auth.user, { table: 'expenses', rowId: id, action: 'update', after: data })
+  if (!data || data.length === 0) return { error: STALE_WRITE_ERROR }
+  await logAudit(auth.user, { table: 'expenses', rowId: edit.id, action: 'update', after: data[0] })
   revalidatePath('/expenses')
-  return { data: data as Expense }
+  return { data: data[0] as Expense }
 }
 
 export async function updatePayer(id: string, payer: ExpensePayer | null) {

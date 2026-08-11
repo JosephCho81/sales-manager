@@ -104,12 +104,14 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
 
   async function handleUpdate() {
     if (!editingId) return
+    const editing = rows.find(r => r.id === editingId)
+    if (!editing?.updated_at) { setError('수정 대상 정보가 오래됐습니다. 새로고침 후 다시 시도하세요.'); return }
     const v = validateExpenseEdit(editForm.date, editForm.description, editForm.amount)
     if (!v.ok) { setError(v.error); return }
 
     setError(null)
     try {
-      const result = await updateExpense(editingId, {
+      const result = await updateExpense({ id: editing.id, updatedAt: editing.updated_at }, {
         ...v.payload,
         note: editForm.note.trim() || null,
       })

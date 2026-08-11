@@ -3,6 +3,7 @@
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
 import { depBadgeFor, depBreakdownFor } from '@/lib/depreciation'
+import { diffInvoice } from '@/lib/reconcile'
 import type { MonthlyDepreciation } from '@/types'
 import type { InvoiceRow } from '@/lib/invoice-generator'
 import { BADGE_TONE, DepBreakdownNote } from './InvoiceTable'
@@ -158,6 +159,18 @@ export default function InvoiceCardList({
                           실입금 {fmtKrw(paidAmt!)} (−{fmtKrw(shortfall)})
                         </p>
                       )}
+                      {(() => {
+                        // 모바일은 대사 입력 없이 결과만 — 입력은 데스크톱 표에서
+                        const rd = diffInvoice(inv)
+                        if (rd === null) return null
+                        return rd.matched ? (
+                          <p className="text-xs text-green-600 mt-0.5">실물 대사 일치</p>
+                        ) : (
+                          <p className="text-xs text-red-600 mt-0.5 font-semibold tabular-nums">
+                            실물 차이 {rd.total > 0 ? '+' : ''}{fmtKrw(rd.total)}
+                          </p>
+                        )
+                      })()}
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">지급예정일</p>

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toMessage } from '@/lib/error'
+import { useCanEdit } from '@/components/RoleProvider'
 import { upsertProduct, toggleProductActive } from './actions'
 import type { Product, PriceUnit, VatType } from '@/types'
 import ProductForm, {
@@ -13,6 +14,7 @@ import ProductForm, {
 
 export default function ProductsClient({ initialProducts }: { initialProducts: Product[] }) {
   const router = useRouter()
+  const canEdit = useCanEdit()
   const [products, setProducts] = useState(initialProducts)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
@@ -73,7 +75,17 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
       is_active: true,
     }
 
-    const result = await upsertProduct(payload, editId ?? undefined)
+    const editing = editId ? products.find(p => p.id === editId) : undefined
+    if (editId && !editing?.updated_at) {
+      setError('수정 대상을 찾지 못했습니다. 새로고침 후 다시 시도하세요.')
+      setSaving(false)
+      return
+    }
+
+    const result = await upsertProduct(
+      payload,
+      editing ? { id: editing.id, updatedAt: editing.updated_at! } : undefined,
+    )
 
     if (result.error) {
       setError(result.error)
@@ -108,14 +120,14 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
           <h2 className="text-xl font-bold text-gray-900">품목 설정</h2>
           <p className="text-sm text-gray-500 mt-0.5">총 {products.length}개 품목</p>
         </div>
-        <button className="btn-primary" onClick={openNew}>+ 품목 추가</button>
+        {canEdit && <button className="btn-primary" onClick={openNew}>+ 품목 추가</button>}
       </div>
 
       {error && !showForm && (
         <p className="mb-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>
       )}
 
-      {showForm && (
+      {canEdit && showForm && (
         <ProductForm
           editId={editId}
           form={form}
@@ -171,16 +183,18 @@ export default function ProductsClient({ initialProducts }: { initialProducts: P
                   </span>
                 </td>
                 <td className="table-td">
-                  <div className="flex gap-2">
-                    <button
-                      className="text-xs text-blue-600 hover:underline"
-                      onClick={() => openEdit(p)}
-                    >수정</button>
-                    <button
-                      className="text-xs text-gray-500 hover:underline"
-                      onClick={() => toggleActive(p)}
-                    >{p.is_active ? '비활성화' : '활성화'}</button>
-                  </div>
+                  {canEdit ? (
+                    <div className="flex gap-2">
+                      <button
+                        className="text-xs text-blue-600 hover:underline"
+                        onClick={() => openEdit(p)}
+                      >수정</button>
+                      <button
+                        className="text-xs text-gray-500 hover:underline"
+                        onClick={() => toggleActive(p)}
+                      >{p.is_active ? '비활성화' : '활성화'}</button>
+                    </div>
+                  ) : <span className="text-gray-300">—</span>}
                 </td>
               </tr>
             ))}

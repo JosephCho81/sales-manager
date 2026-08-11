@@ -14,11 +14,14 @@ import {
   type CommissionForInvoice,
 } from '@/lib/invoice-generator'
 import { depKind } from '@/lib/depreciation'
+import { useCanEdit } from '@/components/RoleProvider'
 import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 import InvoiceCardList from './InvoiceCardList'
 import DepreciationPanel from './DepreciationPanel'
 import PaymentDialog from './PaymentDialog'
+import ReconcileDialog from './ReconcileDialog'
+import { summarizeReconciliation } from '@/lib/reconcile'
 
 type GS = { supply: number; vat: number; total: number }
 function sumG(rows: InvoiceRow[]): GS {
@@ -43,6 +46,7 @@ export default function InvoicesClient({
   initialCommissions,
   products,
   initialMonthlyDeps,
+  uncoveredHolidayYears,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
@@ -50,13 +54,17 @@ export default function InvoicesClient({
   initialCommissions: CommissionForInvoice[]
   products: Array<{ id: string; name: string; display_name: string | null }>
   initialMonthlyDeps: MonthlyDepreciation[]
+  /** 공휴일이 등록되지 않은 연도 — 지급일이 조용히 틀릴 수 있어 경고한다 */
+  uncoveredHolidayYears: number[]
 }) {
   const router        = useRouter()
+  const canEdit = useCanEdit()
   const [invoices,   setInvoices]   = useState<InvoiceRow[]>(initialInvoices)
   const [generating, setGenerating] = useState(false)
   const [error,      setError]      = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const [payTarget, setPayTarget] = useState<InvoiceRow | null>(null)
+  const [reconcileTarget, setReconcileTarget] = useState<InvoiceRow | null>(null)
   const autoGenRef = useRef(false)
 
   // 감가 저장 등 router.refresh() 후 서버에서 재생성된 계산서를 state에 반영
@@ -161,15 +169,60 @@ export default function InvoicesClient({
           <button onClick={handleSelectMonth} className="btn-primary">
             선택
           </button>
-          <button
-            onClick={handleGenerate}
-            disabled={generating || (initialDeliveries.length === 0 && initialCommissions.length === 0)}
-            className="btn-secondary text-xs disabled:opacity-40"
-          >
-            재생성
-          </button>
+          {canEdit && (
+            <button
+              onClick={handleGenerate}
+              disabled={generating || (initialDeliveries.length === 0 && initialCommissions.length === 0)}
+              className="btn-secondary text-xs disabled:opacity-40"
+            >
+              재생성
+            </button>
+          )}
         </div>
       </div>
+
+      {/* 실물 대사 현황 — "아직 안 본 달"과 "차이 나는 줄"이 한눈에 드러나야 한다 */}
+      {invoices.length > 0 && (() => {
+        const r = summarizeReconciliation(invoices)
+        const done = r.reconciled === r.total
+        return (
+          <div className={`mb-4 rounded border px-3 py-2 ${
+            r.mismatched > 0 ? 'border-red-300 bg-red-50'
+            : done           ? 'border-green-300 bg-green-50'
+            :                  'border-gray-200 bg-gray-50'
+          }`}>
+            <p className={`text-sm font-medium ${
+              r.mismatched > 0 ? 'text-red-700' : done ? 'text-green-700' : 'text-gray-600'
+            }`}>
+              실물 대사 {r.reconciled}/{r.total}건
+              {r.mismatched > 0 && (
+                <span className="ml-2 tabular-nums font-bold">
+                  차이 {r.mismatched}건 (합계 {r.diffTotal > 0 ? '+' : ''}{fmtKrw(r.diffTotal)})
+                </span>
+              )}
+              {done && r.mismatched === 0 && <span className="ml-2">전부 일치</span>}
+            </p>
+            {r.reconciled < r.total && (
+              <p className="mt-0.5 text-xs text-gray-500">
+                합계 금액 아래 <b>대사</b> 표시를 눌러 실물 세금계산서의 공급가액·부가세를 입력하세요.
+              </p>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* 공휴일 미등록 경고 — 지급일 휴일 보정이 틀어질 수 있다 */}
+      {uncoveredHolidayYears.length > 0 && (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2.5">
+          <p className="text-sm font-bold text-amber-800">
+            {uncoveredHolidayYears.join('·')}년 공휴일 미등록
+          </p>
+          <p className="mt-0.5 text-xs text-amber-700">
+            설·추석·대체공휴일이 등록되지 않아 이 기간 지급일의 휴일 보정이 틀릴 수 있습니다.
+            품목 설정 화면의 <b>공휴일 관리</b>에서 등록한 뒤 계산서를 재생성하세요.
+          </p>
+        </div>
+      )}
 
       {/* 생성 중 */}
       {generating && (
@@ -299,6 +352,7 @@ export default function InvoicesClient({
             deps={initialMonthlyDeps}
             onSetPaidDate={handleSetPaidDate}
             onOpenPayment={setPayTarget}
+            onOpenReconcile={setReconcileTarget}
           />
           <InvoiceCardList
             invoices={invoices}
@@ -307,6 +361,14 @@ export default function InvoicesClient({
             deps={initialMonthlyDeps}
           />
         </>
+      )}
+
+      {reconcileTarget && (
+        <ReconcileDialog
+          invoice={reconcileTarget}
+          onClose={() => setReconcileTarget(null)}
+          onDone={() => { setReconcileTarget(null); router.refresh() }}
+        />
       )}
 
       {payTarget && (

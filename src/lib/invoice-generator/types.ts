@@ -60,6 +60,13 @@ export type InvoiceRow = {
   paid_at: string | null
   /** 실입금/실지급액. null = total_amount와 동일 */
   paid_amount: number | null
+  /** 실물 세금계산서 공급가액. null = 아직 대사 안 함 (020) */
+  actual_supply_amount: number | null
+  /** 실물 세금계산서 부가세 */
+  actual_vat_amount: number | null
+  /** 대사 완료 시각. null = 미대사 */
+  reconciled_at: string | null
+  reconcile_memo: string | null
   memo: string | null
   invoice_type: string | null
 }

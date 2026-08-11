@@ -74,11 +74,16 @@ const FIXED_HOLIDAYS_MD: ReadonlySet<string> = new Set([
 ])
 
 /**
- * 음력 기반 공휴일 + 대체공휴일 (YYYY-MM-DD) — 매년 검토 및 갱신 필요
- * 설날 연휴: 음력 1/1 전후 3일, 추석 연휴: 음력 8/15 전후 3일
- * 대체공휴일: 공휴일이 토/일 또는 다른 공휴일과 겹칠 때 다음 평일
+ * 음력 기반 공휴일 + 대체공휴일 (YYYY-MM-DD)의 **코드 시드**.
+ *
+ * 운영 시에는 `holidays` 테이블이 진짜 원본이고, 서버가 `setVariableHolidays()`로
+ * 덮어쓴다(`lib/holidays.ts`). 이 시드는 DB 조회 전(테스트·순수 계산)의 기본값이자
+ * 마이그레이션 018의 시드 데이터와 같은 값이다.
+ *
+ * 여기 없는 연도는 "공휴일 미등록" 상태이고, `isHolidayYearCovered()`가 false를
+ * 돌려준다 — 지급일이 조용히 틀리는 대신 UI가 경고하도록 하기 위한 장치다.
  */
-const VARIABLE_HOLIDAYS: Readonly<Record<number, readonly string[]>> = {
+const SEED_VARIABLE_HOLIDAYS: Readonly<Record<number, readonly string[]>> = {
   2024: [
     '2024-02-09', '2024-02-10', '2024-02-11', '2024-02-12', // 설날 연휴 + 대체 (설날 2/10 토)
     '2024-05-06', // 어린이날 대체 (5/5 일요일)
@@ -117,12 +122,41 @@ const VARIABLE_HOLIDAYS: Readonly<Record<number, readonly string[]>> = {
   ],
 }
 
+/** 현재 적용 중인 음력·대체공휴일 표. DB 값으로 교체된다. */
+let variableHolidays: Readonly<Record<number, ReadonlySet<string>>> = Object.fromEntries(
+  Object.entries(SEED_VARIABLE_HOLIDAYS).map(([y, list]) => [y, new Set(list)]),
+)
+
+/**
+ * DB(`holidays`)에서 읽은 공휴일로 표를 교체한다. 서버에서 계산 직전에 호출.
+ * 모듈 전역 상태인 이유: workingDay* 계열이 계산서 생성기 깊숙한 곳에서 동기로
+ * 불리기 때문. 호출 없이 쓰면 위 코드 시드가 그대로 적용된다.
+ */
+export function setVariableHolidays(byYear: Record<number, readonly string[]>): void {
+  variableHolidays = Object.fromEntries(
+    Object.entries(byYear).map(([y, list]) => [y, new Set(list)]),
+  )
+}
+
+/** 공휴일이 하나라도 등록된 연도 목록 (오름차순) */
+export function coveredHolidayYears(): number[] {
+  return Object.keys(variableHolidays).map(Number).sort((a, b) => a - b)
+}
+
+/**
+ * 해당 연도의 음력·대체공휴일이 등록돼 있는가.
+ * 한국은 어느 해든 설·추석이 있으므로, 행이 0개면 "아직 안 넣은 해"로 본다.
+ */
+export function isHolidayYearCovered(year: number): boolean {
+  return (variableHolidays[year]?.size ?? 0) > 0
+}
+
 function isKoreanHoliday(dateStr: string): boolean {
   const mm = dateStr.slice(5, 7)
   const dd = dateStr.slice(8, 10)
   if (FIXED_HOLIDAYS_MD.has(`${mm}-${dd}`)) return true
   const year = Number(dateStr.slice(0, 4))
-  return (VARIABLE_HOLIDAYS[year] ?? []).includes(dateStr)
+  return variableHolidays[year]?.has(dateStr) ?? false
 }
 
 /** YYYY-MM의 day일이 워킹데이이면 그대로, 토/일/공휴일이면 다음 워킹데이 반환 */
@@ -134,6 +168,21 @@ export function workingDayOnOrAfter(ym: string, day: number): string {
     const ds  = fmtDate(d)
     if (dow !== 0 && dow !== 6 && !isKoreanHoliday(ds)) return ds
     d.setDate(d.getDate() + 1)
+  }
+}
+
+/**
+ * YYYY-MM의 day일이 워킹데이이면 그대로, 토/일/공휴일이면 **직전** 워킹데이 반환.
+ * 커미션 지급일처럼 "지급일이 휴일이면 앞당겨 지급"하는 관례용.
+ */
+export function workingDayOnOrBefore(ym: string, day: number): string {
+  const [y, m] = parseYM(ym)
+  const d = new Date(y, m - 1, day)
+  while (true) {
+    const dow = d.getDay()
+    const ds  = fmtDate(d)
+    if (dow !== 0 && dow !== 6 && !isKoreanHoliday(ds)) return ds
+    d.setDate(d.getDate() - 1)
   }
 }
 

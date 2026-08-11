@@ -9,10 +9,11 @@
  *        (동국제강 없음. 매입처=동창, 매출처=렘코 역발행)
  *        월별 감가(monthlyDep)는 동창 매입 계산서만 차감. 렘코 매출·커미션은 총액 기준 유지
  *        (렘코 상장 총액매출 방침) — 감가 금액은 3사 배분에서 제외해 보관, 계약 종료 후 렘코 반환.
- * 커미션: 익월15일 (공통)
+ * 커미션(금화/나성): 익월10일 (공통). 대금(매출·매입)의 익월10일과 달리
+ *   지급일이 휴일이면 **앞당겨** 지급 — workingDayOnOrBefore
  */
 import { splitMargin } from '@/lib/margin'
-import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
+import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter, workingDayOnOrBefore } from '@/lib/date'
 import { makeInvoice, calcVat } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
@@ -39,7 +40,8 @@ export function genSoggae(
   const wBasisM = workingDayFrom(monthEnd(deliveryYM))
   const wDue1N  = workingDayOnOrAfter(nextM, 1)
   const wDue10N = workingDayOnOrAfter(nextM, 10)
-  const wDue15N = workingDayOnOrAfter(nextM, 15)
+  // 커미션 지급일: 익월10일, 휴일이면 앞당김
+  const wComm10N = workingDayOnOrBefore(nextM, 10)
 
   return [
     makeInvoice({
@@ -57,13 +59,13 @@ export function genSoggae(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: true,
-      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
+      basisDate: wComm10N, deadline: wComm10N, paymentDue: wComm10N,
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: true,
-      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
+      basisDate: wComm10N, deadline: wComm10N, paymentDue: wComm10N,
       type: 'commission', memo: '(주)나성 커미션 (나머지)',
     }),
   ]
@@ -96,7 +98,8 @@ export function genBuntan(
   const wBasisM = workingDayFrom(monthEnd(deliveryYM))
   const wDue1N  = workingDayOnOrAfter(nextM, 1)
   const wDue10N = workingDayOnOrAfter(nextM, 10)
-  const wDue15N = workingDayOnOrAfter(nextM, 15)
+  // 커미션 지급일: 익월10일, 휴일이면 앞당김
+  const wComm10N = workingDayOnOrBefore(nextM, 10)
 
   return [
     makeInvoice({
@@ -124,13 +127,13 @@ export function genBuntan(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '금화', supply: geumhwa, vat: true,
-      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
+      basisDate: wComm10N, deadline: wComm10N, paymentDue: wComm10N,
       type: 'commission', memo: '금화 커미션 1/3',
     }),
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '(주)한국에이원', to: '(주)나성', supply: raseong, vat: true,
-      basisDate: wDue15N, deadline: wDue15N, paymentDue: wDue15N,
+      basisDate: wComm10N, deadline: wComm10N, paymentDue: wComm10N,
       type: 'commission', memo: '(주)나성 커미션 (나머지)',
     }),
   ]

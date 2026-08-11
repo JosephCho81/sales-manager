@@ -13,6 +13,8 @@ import {
   type InvoiceToCreate,
 } from '@/lib/invoice-generator'
 import { fetchInvoiceInputs } from './invoice-data'
+import { parseAmountInput } from '@/lib/reconcile'
+import { hydrateHolidays } from '@/lib/holidays'
 
 /**
  * 계산서 재생성 — 입력을 반드시 서버에서 fresh 조회.
@@ -27,6 +29,8 @@ export async function regenerateInvoices(
 
   let inputs
   try {
+    // 지급일(휴일 보정)이 DB의 최신 공휴일로 계산되도록 생성 직전에 반영
+    await hydrateHolidays()
     inputs = await fetchInvoiceInputs(yearMonth)
   } catch (e) {
     return { error: toMessage(e) }
@@ -55,21 +59,35 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
   // 커미션 계산서: delivery_ids[0](커미션 레코드 ID) + to_company
   // 납품 계산서:   product_id + from_company + to_company + invoice_type
   // 조회 실패를 무시하면 기존 지급완료 기록이 재생성 시 통째로 유실됨 — 명시적 중단
+  // 대사 결과(020)도 같이 보존한다 — 미지급 계산서에도 붙을 수 있으므로
+  // is_paid만으로 거르면 재생성 때 대사 기록이 통째로 날아간다
   const { data: existing, error: exErr } = await supabase
     .from('invoice_instructions')
-    .select('delivery_ids, product_id, from_company, to_company, invoice_type, paid_at, paid_amount')
+    .select('delivery_ids, product_id, from_company, to_company, invoice_type, paid_at, paid_amount, actual_supply_amount, actual_vat_amount, reconciled_at, reconcile_memo')
     .eq('year_month', yearMonth)
-    .eq('is_paid', true)
-  if (exErr) return { error: `기존 지급완료 기록 조회 실패: ${exErr.message}` }
+    .or('is_paid.eq.true,reconciled_at.not.is.null')
+  if (exErr) return { error: `기존 지급완료·대사 기록 조회 실패: ${exErr.message}` }
 
   // paid_amount(실입금액)도 함께 보존 — 재생성 때 날리면 감가 차액 기록이 소멸한다
-  type PaidState = { paid_at: string | null; paid_amount: number | null }
+  type PaidState = {
+    paid_at: string | null
+    paid_amount: number | null
+    actual_supply_amount: number | null
+    actual_vat_amount: number | null
+    reconciled_at: string | null
+    reconcile_memo: string | null
+  }
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v))
   const paidMap = new Map<string, PaidState>()
   for (const ex of (existing ?? [])) {
     const dids = ex.delivery_ids as string[] | null
     const state: PaidState = {
       paid_at: ex.paid_at,
-      paid_amount: ex.paid_amount === null || ex.paid_amount === undefined ? null : Number(ex.paid_amount),
+      paid_amount: num(ex.paid_amount),
+      actual_supply_amount: num(ex.actual_supply_amount),
+      actual_vat_amount: num(ex.actual_vat_amount),
+      reconciled_at: ex.reconciled_at,
+      reconcile_memo: ex.reconcile_memo,
     }
     // product_id === null: commissions 테이블 기반 (동국/현대) → 커미션 레코드 ID 키
     // product_id !== null: 납품 기반 커미션 (소괴탄/분탄 등) → 상품 기반 키 (안정적)
@@ -96,7 +114,7 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
   if (insErr) return { error: insErr.message }
   await logAudit(user, { table: 'invoice_instructions', rowId: yearMonth, action: 'update', after: { year_month: yearMonth, count: rows.length } })
 
-  // paid_at 복원
+  // paid_at + 대사 결과 복원
   if (paidMap.size > 0 && data) {
     type Row = { id: string; delivery_ids: string[] | null; product_id: string | null; from_company: string; to_company: string; invoice_type: string | null }
     await Promise.all(
@@ -108,12 +126,20 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
         if (!state) return []
         return supabase
           .from('invoice_instructions')
-          .update({ is_paid: true, paid_at: state.paid_at, paid_amount: state.paid_amount })
+          .update({
+            is_paid: state.paid_at !== null,
+            paid_at: state.paid_at,
+            paid_amount: state.paid_amount,
+            actual_supply_amount: state.actual_supply_amount,
+            actual_vat_amount: state.actual_vat_amount,
+            reconciled_at: state.reconciled_at,
+            reconcile_memo: state.reconcile_memo,
+          })
           .eq('id', row.id)
       })
     )
 
-    // paid_at 반영 후 최종 상태 반환
+    // 복원 반영 후 최종 상태 반환
     const { data: finalData } = await supabase
       .from('invoice_instructions')
       .select('*')
@@ -171,5 +197,72 @@ export async function updatePaidDate(
   }
   await logAudit(auth.user, { table: 'invoice_instructions', rowId: id, action: 'update', after: { is_paid: paidDate !== null, paid_at: paidDate, paid_amount: paidDate === null ? null : paidAmount } })
 
+  return { success: true }
+}
+
+/**
+ * 실물 세금계산서 대사 — 실제 발행된 공급가액·부가세를 계산서 행에 기록한다.
+ *
+ * 값을 덮어쓰지 않고 "실물은 이랬다"를 따로 남기는 이유: 생성값을 실물에 맞춰
+ * 고쳐 버리면 왜 달랐는지가 사라지고, 다음 달에 같은 실수를 반복한다.
+ * 부가세가 어긋나는 감가 계산서는 여기서 확인한 값을 monthly_depreciations의
+ * cost_vat_actual에 넣어야 계산서가 실물과 1원까지 같아진다.
+ */
+export async function reconcileInvoice(input: {
+  invoiceId: string
+  actualSupply: string | number
+  actualVat: string | number
+  memo?: string | null
+}): Promise<{ error?: string; success?: true }> {
+  const auth = await requireOwner()
+  if ('error' in auth) return { error: auth.error }
+
+  const supply = parseAmountInput(input.actualSupply)
+  if (!supply.ok) return { error: `공급가액: ${supply.error}` }
+  const vat = parseAmountInput(input.actualVat)
+  if (!vat.ok) return { error: `부가세: ${vat.error}` }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('invoice_instructions')
+    .update({
+      actual_supply_amount: supply.value,
+      actual_vat_amount: vat.value,
+      reconciled_at: new Date().toISOString(),
+      reconcile_memo: input.memo?.trim() || null,
+    })
+    .eq('id', input.invoiceId)
+    .select('id, supply_amount, vat_amount')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '대상 계산서가 없습니다. 새로고침 후 다시 시도하세요.' }
+
+  await logAudit(auth.user, {
+    table: 'invoice_instructions', rowId: input.invoiceId, action: 'update',
+    before: { supply_amount: Number(data[0].supply_amount), vat_amount: Number(data[0].vat_amount) },
+    after: { actual_supply_amount: supply.value, actual_vat_amount: vat.value },
+  })
+  return { success: true }
+}
+
+/** 대사 취소 — 잘못 입력했을 때 미대사 상태로 되돌린다 */
+export async function clearReconciliation(invoiceId: string): Promise<{ error?: string; success?: true }> {
+  const auth = await requireOwner()
+  if ('error' in auth) return { error: auth.error }
+
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('invoice_instructions')
+    .update({
+      actual_supply_amount: null,
+      actual_vat_amount: null,
+      reconciled_at: null,
+      reconcile_memo: null,
+    })
+    .eq('id', invoiceId)
+    .select('id')
+  if (error) return { error: error.message }
+  if (!data || data.length === 0) return { error: '대상 계산서가 없습니다. 새로고침 후 다시 시도하세요.' }
+
+  await logAudit(auth.user, { table: 'invoice_instructions', rowId: invoiceId, action: 'update', after: { reconciled_at: null } })
   return { success: true }
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { fmtKrw } from '@/lib/margin'
+import { useCanEdit } from '@/components/RoleProvider'
 import PayerSelect from './PayerSelect'
 import type { ExpenseRowProps } from './expense-row-props'
 
@@ -9,10 +10,11 @@ export default function ExpenseTableRow({
   row, editing, editForm, setEditForm,
   startEdit, handleToggle, handleDelete, handleUpdate, handlePayerChange,
 }: ExpenseRowProps) {
+  const canEdit = useCanEdit()
   return (
     <tr
-      onClick={() => startEdit(row)}
-      className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : 'hover:bg-gray-50 cursor-pointer'} ${editing ? 'bg-blue-50' : ''}`}
+      onClick={() => { if (canEdit) startEdit(row) }}
+      className={`border-t border-gray-100 ${row.is_settled ? 'opacity-40' : canEdit ? 'hover:bg-gray-50 cursor-pointer' : ''} ${editing ? 'bg-blue-50' : ''}`}
     >
       <td className="table-td text-center whitespace-nowrap">
         {editing ? (
@@ -76,6 +78,7 @@ export default function ExpenseTableRow({
           </span>
         )}
       </td>
+      {canEdit && (
       <td className="table-td text-center whitespace-nowrap">
         <button
           onClick={e => { e.stopPropagation(); handleToggle(row) }}
@@ -102,6 +105,7 @@ export default function ExpenseTableRow({
           </button>
         )}
       </td>
+      )}
       <td className="table-td text-center whitespace-nowrap">
         <PayerSelect row={row} onChange={handlePayerChange} />
       </td>

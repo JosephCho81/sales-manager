@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
+import { STALE_WRITE_ERROR } from '@/lib/optimistic'
 import { parseMonthlyDepInput, parsePaidAmount, splitShortfall } from '@/lib/depreciation'
 import { regenerateInvoices } from './actions'
 
@@ -43,6 +44,8 @@ async function regenAffectedMonths(productId: string, yearMonths: string[]): Pro
 
 export async function upsertMonthlyDepreciation(input: {
   id?: string
+  /** id가 있을 때 필수 — 화면에 띄운 시점의 updated_at (낙관적 잠금) */
+  updated_at?: string | null
   product_id: string
   year_month: string
   amount: string | number
@@ -67,15 +70,19 @@ export async function upsertMonthlyDepreciation(input: {
     cost_deduct_ym: parsed.cost_deduct_ym,
     cost_vat_actual: parsed.cost_vat_actual,
   }
+  if (input.id && !input.updated_at) {
+    return { error: '수정 대상 정보가 오래됐습니다. 새로고침 후 다시 시도하세요.' }
+  }
   const q = input.id
-    ? supabase.from('monthly_depreciations').update(row).eq('id', input.id).select('id')
+    ? supabase.from('monthly_depreciations').update(row)
+        .eq('id', input.id).eq('updated_at', input.updated_at!).select('id')
     : supabase.from('monthly_depreciations').insert(row).select('id')
   const { data, error } = await q
   if (error) {
     if (error.code === '23505') return { error: '해당 품목·월의 감가가 이미 있습니다. 기존 항목을 수정하세요.' }
     return { error: error.message }
   }
-  if (!data || data.length === 0) return { error: '대상 감가가 없습니다. 새로고침 후 다시 시도하세요.' }
+  if (!data || data.length === 0) return { error: input.id ? STALE_WRITE_ERROR : '감가 저장 결과를 읽지 못했습니다.' }
   await logAudit(auth.user, {
     table: 'monthly_depreciations', rowId: data[0].id,
     action: input.id ? 'update' : 'insert', after: row,

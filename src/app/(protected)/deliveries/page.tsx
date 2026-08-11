@@ -29,7 +29,7 @@ export default async function DeliveriesPage() {
         .select(`
           id, year_month, invoice_month, delivery_date, product_id, contract_id,
           quantity_kg, depreciation_amount,
-          memo, created_at,
+          memo, created_at, updated_at,
           product:products(id, display_name, buyer),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, start_date, end_date)
         `)
