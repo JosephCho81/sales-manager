@@ -162,6 +162,9 @@ export function parsePaidAmount(
 
 export type DepBadge = {
   tone: 'shortfall' | 'applied' | 'pending' | 'hold'
+  /** 계산서 표에 그대로 놓는 한 줄 — 길면 행이 밀려 어느 줄에 뭐가 있는지 안 보인다 */
+  short: string
+  /** 전체 설명. 표에서는 title(툴팁), 감가 패널에서는 본문으로 쓴다 */
   text: string
 }
 
@@ -296,6 +299,7 @@ export function depBadgeFor(
     const to  = hit.find(d => d.cost_deduct_ym)?.cost_deduct_ym
     return {
       tone: 'shortfall',
+      short: `감가 −${fmt(amt)}원 반영 발행`,
       text: `감가 −${fmt(amt)}원(공급가) 반영 발행 — 실제 역발행·입금액과 일치, 커미션도 감액${to ? `. ${ymLabel(to)}분 매입에서 회수` : ''}`,
     }
   }
@@ -307,6 +311,7 @@ export function depBadgeFor(
       const amt = borne.reduce((s, d) => s + Number(d.amount), 0)
       return {
         tone: 'shortfall',
+        short: `감가 −${fmt(amt)}원 분담`,
         text: `${originLabels(borne)}분 감가 ${fmt(amt)}원을 뺀 마진 기준 — 3사가 나눠 부담(회수월에 되돌아옴)`,
       }
     }
@@ -315,6 +320,7 @@ export function depBadgeFor(
       const amt = back.reduce((s, d) => s + Number(d.amount), 0)
       return {
         tone: 'applied',
+        short: `감가 +${fmt(amt)}원 회수`,
         text: `${originLabels(back)}분 감가 ${fmt(amt)}원 회수분을 더한 마진 기준 — 3사 분담분 복구`,
       }
     }
@@ -331,6 +337,9 @@ export function depBadgeFor(
     const origins = Array.from(new Set(applied.map(d => ymLabel(d.year_month)))).join('·')
     return {
       tone: kind === 'passthrough' ? 'applied' : 'hold',
+      short: kind === 'passthrough'
+        ? `감가 −${fmt(amt)}원 회수`
+        : `감가 −${fmt(amt)}원 (보관)`,
       text: kind === 'passthrough'
         ? `${origins}분 감가 −${fmt(amt)}원 반영 발행 — 그대로 지급하면 회수 완료`
         : `${origins}분 감가 −${fmt(amt)}원 차감 발행 (보관 — 반환 예정)`,
@@ -348,6 +357,7 @@ export function depBadgeFor(
   const from = Array.from(new Set(waiting.map(d => ymLabel(d.year_month)))).join('·')
   return {
     tone: 'pending',
+    short: '감가 차감 없음',
     text: `감가 차감 없음 — 계산서대로 전액 지급. ${from}분 감가 ${fmt(amt)}원은 ${ymLabel(when)}분에서 회수 예정`,
   }
 }

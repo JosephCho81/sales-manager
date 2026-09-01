@@ -317,3 +317,34 @@ describe('salesDepTargetIds / depImpactsFor', () => {
     expect(depImpactsFor(dep2605, [other], [dep2605])).toEqual([])
   })
 })
+
+
+// ── 배지 요약 문구 (표 한 줄에 들어가야 한다) ───────────────
+describe('depBadgeFor short', () => {
+  const buntan: MonthlyDepreciation = {
+    ...dep2605, id: 'd9', product_id: 'p-buntan', year_month: '2026-08',
+    amount: 212_078, sales_deduct_ym: null, cost_deduct_ym: '2026-08',
+  }
+  it('보관형 매입 — 한 줄 요약, 전체 설명은 text에 남는다', () => {
+    const b = depBadgeFor({
+      invoice_type: 'cost', product_id: 'p-buntan', delivery_year_month: '2026-08',
+      from_company: '(주)한국에이원', to_company: '동창',
+    }, [buntan])!
+    expect(b.short).toBe('감가 −212,078원 (보관)')
+    expect(b.text).toContain('보관 — 반환 예정')
+    expect(b.short.length).toBeLessThan(b.text.length)
+  })
+
+  it('통과형 매출·매입 요약', () => {
+    const sales = depBadgeFor({
+      invoice_type: 'sales', product_id: AL30, delivery_year_month: '2026-05',
+      from_company: '현대제철', to_company: '(주)한국에이원',
+    }, [dep2605])!
+    expect(sales.short).toBe('감가 −56,179원 반영 발행')
+    const cost = depBadgeFor({
+      invoice_type: 'cost', product_id: AL30, delivery_year_month: '2026-07',
+      from_company: '(주)한국에이원', to_company: '화림',
+    }, [dep2605])!
+    expect(cost.short).toBe('감가 −56,179원 회수')
+  })
+})

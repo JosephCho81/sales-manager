@@ -230,20 +230,32 @@ export default function InvoiceTable({
                           </span>
                         </td>
                         <td className="table-td">
-                          <div>
-                            <span className="font-medium">{inv.from_company}</span>
-                            <span className="text-gray-400 mx-1.5">→</span>
-                            <span className="font-medium">{inv.to_company}</span>
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <span>
+                              <span className="font-medium">{inv.from_company}</span>
+                              <span className="text-gray-400 mx-1.5">→</span>
+                              <span className="font-medium">{inv.to_company}</span>
+                            </span>
+                            {/* 감가는 한 줄 요약만 — 전체 설명과 산식은 툴팁·상단 감가 패널에 있다.
+                                여기에 산식을 펼치면 행이 4줄로 늘어나 표를 읽을 수 없다 */}
+                            {badge && (
+                              <span
+                                title={bd
+                                  ? `${badge.text}
+
+감가 반영 전 ${fmtKrw(bd.grossTotal)} (공급가 ${fmtKrw(bd.grossSupply)} + VAT ${fmtKrw(bd.grossVat)})
+− 감가 ${fmtKrw(bd.depTotal)} (공급가 ${fmtKrw(bd.depSupply)} + VAT ${fmtKrw(bd.depVat)})
+= 계산서 ${fmtKrw(bd.netTotal)}`
+                                  : badge.text}
+                                className={`inline-block rounded border px-1.5 py-0.5 text-xs font-medium whitespace-nowrap cursor-help ${BADGE_TONE[badge.tone]}`}
+                              >
+                                {badge.short}
+                              </span>
+                            )}
                           </div>
                           {inv.memo && (
                             <p className="text-xs text-gray-400 mt-0.5 leading-snug">{inv.memo}</p>
                           )}
-                          {badge && (
-                            <p className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-xs font-medium leading-snug ${BADGE_TONE[badge.tone]}`}>
-                              {badge.text}
-                            </p>
-                          )}
-                          {bd && <DepBreakdownNote bd={bd} />}
                         </td>
                         <td className="table-td text-right tabular-nums whitespace-nowrap">
                           {fmtKrw(Number(inv.supply_amount))}

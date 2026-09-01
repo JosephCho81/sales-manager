@@ -2,11 +2,11 @@
 
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
-import { depBadgeFor, depBreakdownFor, salesDepTargetIds } from '@/lib/depreciation'
+import { depBadgeFor, salesDepTargetIds } from '@/lib/depreciation'
 import { diffInvoice } from '@/lib/reconcile'
 import type { MonthlyDepreciation } from '@/types'
 import type { InvoiceRow } from '@/lib/invoice-generator'
-import { BADGE_TONE, DepBreakdownNote } from './InvoiceTable'
+import { BADGE_TONE } from './InvoiceTable'
 
 const TYPE_ORDER = ['sales', 'cost', 'commission', 'other'] as const
 
@@ -113,7 +113,6 @@ export default function InvoiceCardList({
               const typeKey = inv.invoice_type ?? 'other'
               const hasVat  = Number(inv.vat_amount) > 0
               const badge   = depBadgeFor(inv, deps, salesTargets)
-              const bd      = depBreakdownFor(inv, deps, salesTargets)
               const paidAmt = inv.paid_amount === null ? null : Number(inv.paid_amount)
               const shortfall = paidAmt === null ? 0 : Number(inv.total_amount) - paidAmt
               return (
@@ -138,13 +137,12 @@ export default function InvoiceCardList({
                     <p className="text-xs text-gray-400 mb-2 pl-0.5">{inv.memo}</p>
                   )}
 
+                  {/* 모바일도 요약 1줄만 — 산식은 상단 감가 패널에서 본다 */}
                   {badge && (
-                    <p className={`mb-2 rounded border px-1.5 py-1 text-xs font-medium leading-snug ${BADGE_TONE[badge.tone]}`}>
-                      {badge.text}
+                    <p className={`mb-2 inline-block rounded border px-1.5 py-1 text-xs font-medium leading-snug ${BADGE_TONE[badge.tone]}`}>
+                      {badge.short}
                     </p>
                   )}
-
-                  {bd && <div className="mb-2"><DepBreakdownNote bd={bd} /></div>}
 
                   {/* 금액 + 지급예정일 */}
                   <div className="flex justify-between items-end">
