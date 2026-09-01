@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { useCanEdit } from '@/components/RoleProvider'
 import { useRouter } from 'next/navigation'
 import { fmtKrw } from '@/lib/margin'
-import { depKind, sumUnsettled, sumUnrecovered, depImpactsFor } from '@/lib/depreciation'
+import { depSettlement, sumUnsettled, sumUnrecovered, depImpactsFor, type DepSettlement } from '@/lib/depreciation'
 import { depDefaultDeliveryMonth } from '@/lib/invoice-generator'
 import { toMessage } from '@/lib/error'
 import type { MonthlyDepreciation } from '@/types'
@@ -24,18 +24,21 @@ export type DepProduct = {
   supported: boolean
 }
 
-type Kind = 'hold' | 'passthrough'
-
-const KIND_META: Record<Kind, { label: string; hint: string; cls: string }> = {
+const KIND_META: Record<DepSettlement, { label: string; hint: string; cls: string }> = {
   hold: {
     label: '보관형',
     hint: '매입 계산서만 차감하고 매출·커미션은 총액 유지 — 감가액이 통장에 남아 나중에 공급처로 반환 (분탄)',
     cls: 'bg-amber-50 text-amber-700 border-amber-200',
   },
-  passthrough: {
-    label: '통과형',
-    hint: '매출이 감액 발행돼 마진·커미션이 그달에 줄고, 회수월 매입 계산서에서 되돌아옴 (소괴탄·AL-30)',
+  recover: {
+    label: '통과형 · 계산서 회수',
+    hint: '매출이 감액 발행돼 마진·커미션이 그달에 줄고, 지정한 회수월 매입 계산서에서 −금액으로 되돌아옴 (AL-30)',
     cls: 'bg-blue-50 text-blue-700 border-blue-200',
+  },
+  manual: {
+    label: '통과형 · 별도 정산',
+    hint: '매출만 감액하고 계산서로는 회수하지 않음 — 계약 종료 후 공급처와 현금 정산. 정산할 때까지 미회수로 계속 표시된다 (소괴탄)',
+    cls: 'bg-red-50 text-red-700 border-red-200',
   },
 }
 
@@ -66,7 +69,7 @@ export default function DepreciationPanel({
   const firstPid  = supported[0]?.id ?? ''
 
   const [pid, setPid]       = useState(firstPid)
-  const [kind, setKind]     = useState<Kind>('hold')
+  const [kind, setKind]     = useState<DepSettlement>('hold')
   const [ym, setYm]         = useState('')
   const [costYm, setCostYm] = useState('')
   const [amount, setAmount] = useState('')
@@ -99,9 +102,9 @@ export default function DepreciationPanel({
     setEditId(d.id)
     setEditUpdatedAt(d.updated_at ?? null)
     setPid(d.product_id)
-    setKind(depKind(d))
+    setKind(depSettlement(d))
     setYm(d.year_month)
-    setCostYm(d.cost_deduct_ym ?? d.year_month)
+    setCostYm(d.cost_deduct_ym ?? '')
     setAmount(String(Number(d.amount)))
     setMemo(d.memo ?? '')
     setVat(d.cost_vat_actual == null ? '' : String(Number(d.cost_vat_actual)))
@@ -131,8 +134,10 @@ export default function DepreciationPanel({
       amount,
       memo,
       // 보관형은 매출 영향 없음 — null로 보내야 depKind가 보관형으로 판정된다
-      sales_deduct_ym: kind === 'passthrough' ? effYm : null,
+      sales_deduct_ym: kind === 'hold' ? null : effYm,
       cost_deduct_ym: effCostYm,
+      // 별도 정산은 매입 계산서를 건드리지 않는다 (빈 문자열과 구분해야 해서 플래그로 보낸다)
+      no_cost_deduct: kind === 'manual',
       cost_vat_actual: vat,
     })
   }
@@ -177,7 +182,7 @@ export default function DepreciationPanel({
             </thead>
             <tbody>
               {sorted.map(d => {
-                const k = depKind(d)
+                const k = depSettlement(d)
                 const meta = KIND_META[k]
                 // 이번 조회월 계산서 중 이 감가가 실제로 반영된 장 — 없으면 다른 달에 반영된 것
                 const impacts = depImpactsFor(d, invoices, deps)
@@ -195,8 +200,10 @@ export default function DepreciationPanel({
                       <span className={`inline-block rounded border px-1.5 py-0.5 ${meta.cls}`}>{meta.label}</span>
                     </td>
                     <td className="py-2 pl-3 text-gray-500 tabular-nums whitespace-nowrap">
-                      {k === 'passthrough' && <>매출 {d.sales_deduct_ym} · </>}
-                      매입 {d.cost_deduct_ym ?? d.year_month}
+                      {d.sales_deduct_ym && <>매출 {d.sales_deduct_ym} · </>}
+                      {d.cost_deduct_ym
+                        ? <>매입 {d.cost_deduct_ym}</>
+                        : <span className="text-red-600">계산서 회수 없음</span>}
                     </td>
                     <td className="py-2 pl-3 text-gray-400">
                       {d.memo}
@@ -304,10 +311,11 @@ export default function DepreciationPanel({
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">
-              매입 차감월{kind === 'passthrough' ? ' (회수월)' : ''}
+              매입 차감월{kind === 'recover' ? ' (회수월)' : ''}
             </label>
-            <input type="month" value={effCostYm} onChange={e => setCostYm(e.target.value)}
-              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+            <input type="month" value={kind === 'manual' ? '' : effCostYm} disabled={kind === 'manual'}
+              onChange={e => setCostYm(e.target.value)}
+              className="border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-400" />
           </div>
           <div>
             <label className="block text-xs text-gray-400 mb-1">부가세 실계산서(선택)</label>
@@ -323,7 +331,7 @@ export default function DepreciationPanel({
         </div>
 
         <div className="flex items-center gap-4 mt-3 flex-wrap">
-          {(['hold', 'passthrough'] as Kind[]).map(k => (
+          {(['hold', 'recover', 'manual'] as DepSettlement[]).map(k => (
             <label key={k} className="flex items-center gap-1.5 text-sm cursor-pointer">
               <input type="radio" name="dep-kind" checked={kind === k} onChange={() => setKind(k)} />
               <span className={`rounded border px-1.5 py-0.5 text-xs font-medium ${KIND_META[k].cls}`}>

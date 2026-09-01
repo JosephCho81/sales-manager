@@ -263,7 +263,9 @@ export default function InvoicesClient({
               {unrec.map(d => (
                 <li key={d.id} className="text-xs text-red-700">
                   {d.year_month} {productMap.get(d.product_id) ?? d.product_id} — {fmtKrw(Number(d.amount))}
-                  {d.cost_deduct_ym && ` · ${d.cost_deduct_ym} 납품분 매입 계산서에서 회수 예정`}
+                  {d.cost_deduct_ym
+                    ? ` · ${d.cost_deduct_ym} 납품분 매입 계산서에서 회수 예정`
+                    : ' · 계산서 회수 없음 — 계약 종료 후 공급처와 현금 정산'}
                 </li>
               ))}
             </ul>

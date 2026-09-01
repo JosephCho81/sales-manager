@@ -19,6 +19,11 @@ export type MonthlyDepInputRaw = {
   sales_deduct_ym?: string | null
   /** 매입 계산서에서 차감할 납품월. 미지정 시 year_month(당월 차감) */
   cost_deduct_ym?: string | null
+  /**
+   * true면 매입 계산서에서 회수하지 않는다 — 계약 종료 후 현금으로 정산하는 경우.
+   * 빈 문자열(= 기본값 사용)과 구분해야 하므로 별도 플래그로 받는다.
+   */
+  no_cost_deduct?: boolean
   /** 감가 반영 매입 계산서의 실제 부가세. 빈 값 = 계산값 사용 */
   cost_vat_actual?: string | number | null
 }
@@ -30,7 +35,8 @@ export type ParsedMonthlyDep =
       amount: number
       memo: string | null
       sales_deduct_ym: string | null
-      cost_deduct_ym: string
+      /** null = 매입 계산서에서 회수하지 않음(별도 정산) */
+      cost_deduct_ym: string | null
       cost_vat_actual: number | null
     }
   | { ok: false; error: string }
@@ -53,10 +59,14 @@ export function parseMonthlyDepInput(raw: MonthlyDepInputRaw): ParsedMonthlyDep 
   if (sales !== null && !YM_RE.test(sales)) {
     return { ok: false, error: '매출 감액월 형식이 잘못되었습니다 (YYYY-MM).' }
   }
-  // 미지정 = 당월 매입 차감(분탄 기존 동작)
-  const cost = raw.cost_deduct_ym?.trim() || raw.year_month
-  if (!YM_RE.test(cost)) {
+  // 미지정 = 당월 매입 차감(분탄 기존 동작). no_cost_deduct면 계산서 회수 자체가 없다
+  const cost = raw.no_cost_deduct ? null : (raw.cost_deduct_ym?.trim() || raw.year_month)
+  if (cost !== null && !YM_RE.test(cost)) {
     return { ok: false, error: '매입 차감월 형식이 잘못되었습니다 (YYYY-MM).' }
+  }
+  // 보관형은 매입 차감이 유일한 반영 수단 — 둘 다 없으면 계산서에 아무 영향이 없는 유령 행이 된다
+  if (cost === null && sales === null) {
+    return { ok: false, error: '매출 감액월과 매입 차감월이 모두 없으면 계산서에 반영할 수 없습니다.' }
   }
 
   // 실물 계산서 부가세 — 거래처 반올림 관례가 달마다 달라 공식으로 못 맞추는 경우의 탈출구.
@@ -90,6 +100,21 @@ export type DepKind = 'hold' | 'passthrough'
 /** 매출 입금이 줄었으면 통과형(회수 대상), 아니면 보관형 */
 export function depKind(d: Pick<MonthlyDepreciation, 'sales_deduct_ym'>): DepKind {
   return d.sales_deduct_ym ? 'passthrough' : 'hold'
+}
+
+/**
+ * 정산 방식 — 화면 라벨과 입력 폼이 이걸로 갈린다.
+ *   hold    : 매입만 차감하고 보관 → 나중에 공급처로 반환 (분탄)
+ *   recover : 매출 감액 후 지정한 회수월 매입 계산서에서 되찾음 (AL-30)
+ *   manual  : 매출만 감액하고 계산서로는 회수하지 않음 — 계약 종료 후 현금 정산 (소괴탄)
+ */
+export type DepSettlement = 'hold' | 'recover' | 'manual'
+
+export function depSettlement(
+  d: Pick<MonthlyDepreciation, 'sales_deduct_ym' | 'cost_deduct_ym'>,
+): DepSettlement {
+  if (!d.sales_deduct_ym) return 'hold'
+  return d.cost_deduct_ym ? 'recover' : 'manual'
 }
 
 /** 보관형 미정산 누계 (렘코 반환 예정액) */
@@ -236,7 +261,7 @@ export function depBreakdownFor(
     d.product_id === inv.product_id &&
     (inv.invoice_type === 'sales'
       ? d.sales_deduct_ym === dym
-      : inv.invoice_type === 'cost' && (d.cost_deduct_ym ?? d.year_month) === dym),
+      : inv.invoice_type === 'cost' && d.cost_deduct_ym === dym),
   )
   if (hit.length === 0) return null
 
@@ -315,7 +340,7 @@ export function depBadgeFor(
         text: `${originLabels(borne)}분 감가 ${fmt(amt)}원을 뺀 마진 기준 — 3사가 나눠 부담(회수월에 되돌아옴)`,
       }
     }
-    const back = mine.filter(d => (d.cost_deduct_ym ?? d.year_month) === dym && depKind(d) === 'passthrough')
+    const back = mine.filter(d => d.cost_deduct_ym === dym && depKind(d) === 'passthrough')
     if (back.length > 0) {
       const amt = back.reduce((s, d) => s + Number(d.amount), 0)
       return {
@@ -387,7 +412,7 @@ export function depImpactsFor(
   allDeps: MonthlyDepreciation[],
 ): DepImpact[] {
   const targets = salesDepTargetIds(invoices)
-  const costYM  = dep.cost_deduct_ym ?? dep.year_month
+  const costYM  = dep.cost_deduct_ym // null = 계산서 회수 없음
   const out: DepImpact[] = []
 
   for (const inv of invoices) {

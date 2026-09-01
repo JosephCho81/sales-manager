@@ -775,11 +775,20 @@ describe('generateInvoices — cost_deduct_ym 기준 매칭', () => {
     expect(cost.supply_amount).toBe(1_800_000)
   })
 
-  it('cost_deduct_ym 미지정 감가는 당월 차감 (분탄 기존 동작)', () => {
-    const legacy = [{ product_id: 'p-al30', year_month: '2026-07', amount: 10_000 }]
-    const cost = generateInvoices([al30At('2026-07')], '2026-09', legacy)
+  it('cost_deduct_ym 지정 감가는 그달 매입에서 차감', () => {
+    const deps = [{ product_id: 'p-al30', year_month: '2026-07', amount: 10_000, sales_deduct_ym: null, cost_deduct_ym: '2026-07' }]
+    const cost = generateInvoices([al30At('2026-07')], '2026-09', deps)
       .find(i => i.invoice_type === 'cost')!
     expect(cost.supply_amount).toBe(1_800_000 - 10_000)
+  })
+
+  // 계약 종료 후 현금으로 정산하는 감가 — 계산서에서 회수하면 이중 회수가 된다
+  it('cost_deduct_ym이 null이면 매입 계산서에서 차감하지 않는다', () => {
+    const deps = [{ product_id: 'p-al30', year_month: '2026-07', amount: 10_000, sales_deduct_ym: '2026-07', cost_deduct_ym: null }]
+    const invoices = generateInvoices([al30At('2026-07')], '2026-09', deps)
+    expect(invoices.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(1_800_000)
+    // 매출은 감액되고 커미션도 함께 줄어든다 (3사 분담분은 되돌아오지 않는다)
+    expect(invoices.find(i => i.invoice_type === 'sales')!.supply_amount).toBe(2_000_000 - 10_000)
   })
 })
 
@@ -870,9 +879,9 @@ describe('generateInvoices 월별 감가 라우팅', () => {
       contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
     })
     const invoices = generateInvoices([d], '2026-08', [
-      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
-      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999 }, // 다른 달 — 무시
-      { product_id: 'other',  year_month: '2026-07', amount: 999_999 }, // 다른 품목 — 무시
+      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000, sales_deduct_ym: null, cost_deduct_ym: '2026-07' },
+      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999, sales_deduct_ym: null, cost_deduct_ym: '2026-06' }, // 다른 달 — 무시
+      { product_id: 'other',  year_month: '2026-07', amount: 999_999, sales_deduct_ym: null, cost_deduct_ym: '2026-07' }, // 다른 품목 — 무시
     ])
     const sales = invoices.find(i => i.invoice_type === 'sales')!
     expect(sales.supply_amount).toBe(2_000_000)
@@ -915,7 +924,7 @@ describe('generateInvoices 월별 감가 라우팅', () => {
       contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
     })
     const withDep = generateInvoices([d], '2026-08', [
-      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
+      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000, sales_deduct_ym: null, cost_deduct_ym: '2026-07' },
     ]).filter(i => i.invoice_type === 'commission').map(i => i.supply_amount)
     const noDep = generateInvoices([d], '2026-08')
       .filter(i => i.invoice_type === 'commission').map(i => i.supply_amount)
@@ -941,23 +950,23 @@ describe('generateInvoices 월별 감가 라우팅', () => {
 
     it('매칭 감가의 실물 세액이 매입 계산서에 그대로 반영', () => {
       // 계산값이면 floor(180,000) − floor(10,000) = 170,000
-      expect(costOf([{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000, cost_vat_actual: 169_999 }])
+      expect(costOf([{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000, cost_vat_actual: 169_999, sales_deduct_ym: null, cost_deduct_ym: '2026-07' }])
         .vat_amount).toBe(169_999)
     })
 
     it('다른 품목·다른 차감월의 실물 세액은 무시', () => {
       expect(costOf([
-        { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
-        { product_id: 'other',  year_month: '2026-07', amount: 100_000, cost_vat_actual: 1 },
-        { product_id: 'prod-b', year_month: '2026-06', amount: 100_000, cost_vat_actual: 2 },
+        { product_id: 'prod-b', year_month: '2026-07', amount: 100_000, sales_deduct_ym: null, cost_deduct_ym: '2026-07' },
+        { product_id: 'other',  year_month: '2026-07', amount: 100_000, cost_vat_actual: 1, sales_deduct_ym: null, cost_deduct_ym: '2026-07' },
+        { product_id: 'prod-b', year_month: '2026-06', amount: 100_000, cost_vat_actual: 2, sales_deduct_ym: null, cost_deduct_ym: '2026-06' },
       ]).vat_amount).toBe(170_000)
     })
 
     // 계산서 한 장의 세액이라 합산이 불가능하다 — 어느 값이 진짜인지 못 정하면 계산값으로
     it('같은 달 감가 2건이 서로 다른 세액을 주장하면 계산값으로 폴백', () => {
       expect(costOf([
-        { product_id: 'prod-b', year_month: '2026-07', amount: 60_000, cost_deduct_ym: '2026-07', cost_vat_actual: 111 },
-        { product_id: 'prod-b', year_month: '2026-06', amount: 40_000, cost_deduct_ym: '2026-07', cost_vat_actual: 222 },
+        { product_id: 'prod-b', year_month: '2026-07', amount: 60_000, cost_deduct_ym: '2026-07', cost_vat_actual: 111, sales_deduct_ym: null },
+        { product_id: 'prod-b', year_month: '2026-06', amount: 40_000, cost_deduct_ym: '2026-07', cost_vat_actual: 222, sales_deduct_ym: null },
       ]).vat_amount).toBe(170_000)
     })
   })

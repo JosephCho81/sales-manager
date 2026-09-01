@@ -160,7 +160,8 @@ export function buildAllAnalytics(
     const passthrough = !!md.sales_deduct_ym
 
     // 매입 차감 — 회수월(미지정 시 귀속월)
-    const costRow = applyAt(md.product_id, md.cost_deduct_ym ?? md.year_month, t => {
+    // cost_deduct_ym이 null이면 계산서로 회수하지 않는다(계약 종료 후 현금 정산) — 매입 무영향
+    const costRow = md.cost_deduct_ym === null ? null : applyAt(md.product_id, md.cost_deduct_ym, t => {
       t.costKrw -= amt
       if (passthrough) addMargin(t, amt) // 회수분은 3사가 나눠 되찾는다
     })

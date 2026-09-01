@@ -51,16 +51,19 @@ export function depDefaultDeliveryMonth(productName: string, invoiceMonth: strin
 
 /**
  * 월별 감가 입력 — year_month는 감가가 발생한 납품월(귀속월).
- * 매입 계산서에서 실제로 차감하는 달은 cost_deduct_ym (미지정 시 year_month = 당월 차감).
- * 분탄은 당월 차감이라 둘이 같고, AL30은 회수 합의에 따라 몇 달 뒤가 된다.
+ * 매입 계산서에서 실제로 차감하는 달은 cost_deduct_ym.
+ * 분탄은 당월 차감이라 귀속월과 같고, AL30은 회수 합의에 따라 몇 달 뒤가 된다.
+ * 두 필드 모두 **필수**다 — 기본값을 두면 "회수 없음"과 "당월 회수"가 구분되지 않아
+ * 계약 종료 후 현금 정산하는 감가가 조용히 매입에서 차감된다.
  */
 export type MonthlyDepInput = {
   product_id: string
   year_month: string
   amount: number
   /** 매출 계산서가 감액 발행된 납품월. null = 매출 영향 없음(보관형) */
-  sales_deduct_ym?: string | null
-  cost_deduct_ym?: string | null
+  sales_deduct_ym: string | null
+  /** 매입 계산서에서 차감할 납품월. null = 계산서로 회수하지 않음(별도 정산) */
+  cost_deduct_ym: string | null
   /** 감가 반영 매입 계산서의 실제 부가세(실물 세금계산서 값). null = 계산값 사용 */
   cost_vat_actual?: number | null
 }
@@ -89,7 +92,7 @@ function slice(
  */
 function costDepFor(deps: MonthlyDepInput[], productId: string, deliveryYM: string) {
   const match = (md: MonthlyDepInput) =>
-    md.product_id === productId && (md.cost_deduct_ym ?? md.year_month) === deliveryYM
+    md.product_id === productId && md.cost_deduct_ym === deliveryYM
   const declared = deps
     .filter(md => match(md) && md.cost_vat_actual !== null && md.cost_vat_actual !== undefined)
     .map(md => Number(md.cost_vat_actual))

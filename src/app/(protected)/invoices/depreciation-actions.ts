@@ -15,8 +15,8 @@ import { regenerateInvoices } from './actions'
  *
  * 귀속월(year_month)과 매입 차감월(cost_deduct_ym)이 다를 수 있어 둘 다 넘겨야 한다.
  */
-async function regenAffectedMonths(productId: string, yearMonths: string[]): Promise<string | null> {
-  const targets = Array.from(new Set(yearMonths.filter(Boolean)))
+async function regenAffectedMonths(productId: string, yearMonths: (string | null)[]): Promise<string | null> {
+  const targets = Array.from(new Set(yearMonths.filter((m): m is string => !!m)))
   if (targets.length === 0) return null
 
   const supabase = createAdminClient()
@@ -53,6 +53,8 @@ export async function upsertMonthlyDepreciation(input: {
   memo?: string | null
   sales_deduct_ym?: string | null
   cost_deduct_ym?: string | null
+  /** true = 매입 계산서에서 회수하지 않음 (계약 종료 후 현금 정산) */
+  no_cost_deduct?: boolean
   cost_vat_actual?: string | number | null
 }): Promise<{ error?: string; success?: true }> {
   const auth = await requireOwner()
@@ -74,7 +76,7 @@ export async function upsertMonthlyDepreciation(input: {
   }
 
   // 통과형(매출 감액)은 회수가 감액보다 앞설 수 없다 — 뒤바뀌면 회수 계산서가 먼저 나간다
-  if (parsed.sales_deduct_ym && parsed.cost_deduct_ym < parsed.sales_deduct_ym) {
+  if (parsed.sales_deduct_ym && parsed.cost_deduct_ym !== null && parsed.cost_deduct_ym < parsed.sales_deduct_ym) {
     return { error: '매입 회수월은 매출 감액월보다 앞설 수 없습니다.' }
   }
 
@@ -105,7 +107,7 @@ export async function upsertMonthlyDepreciation(input: {
     action: input.id ? 'update' : 'insert', after: row,
   })
 
-  const regenErr = await regenAffectedMonths(input.product_id, [parsed.year_month, parsed.cost_deduct_ym])
+  const regenErr = await regenAffectedMonths(input.product_id, [parsed.year_month, parsed.cost_deduct_ym, parsed.sales_deduct_ym])
   if (regenErr) return { error: `감가는 저장됐지만 ${regenErr} — 지급 일정에서 "재생성"을 눌러 주세요.` }
   return { success: true }
 }
@@ -119,12 +121,12 @@ export async function deleteMonthlyDepreciation(id: string): Promise<{ error?: s
     .from('monthly_depreciations')
     .delete()
     .eq('id', id)
-    .select('product_id, year_month, cost_deduct_ym')
+    .select('product_id, year_month, cost_deduct_ym, sales_deduct_ym')
   if (error) return { error: error.message }
   if (!data || data.length === 0) return { error: '대상 감가가 없습니다. 새로고침 후 다시 시도하세요.' }
   await logAudit(auth.user, { table: 'monthly_depreciations', rowId: id, action: 'delete', after: null })
 
-  const regenErr = await regenAffectedMonths(data[0].product_id, [data[0].year_month, data[0].cost_deduct_ym ?? data[0].year_month])
+  const regenErr = await regenAffectedMonths(data[0].product_id, [data[0].year_month, data[0].cost_deduct_ym, data[0].sales_deduct_ym])
   if (regenErr) return { error: `감가는 삭제됐지만 ${regenErr} — 지급 일정에서 "재생성"을 눌러 주세요.` }
   return { success: true }
 }
@@ -189,7 +191,7 @@ export async function recordPaymentShortfall(input: {
     cost_deduct_ym: input.costDeductYM,
   })
   if (!depInput.ok) return { error: depInput.error }
-  if (depInput.cost_deduct_ym < depInput.year_month) {
+  if (depInput.cost_deduct_ym !== null && depInput.cost_deduct_ym < depInput.year_month) {
     return { error: '회수 납품월은 감가 발생 납품월보다 앞설 수 없습니다.' }
   }
 

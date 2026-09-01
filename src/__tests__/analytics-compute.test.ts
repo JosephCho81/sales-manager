@@ -207,7 +207,7 @@ describe('buildAllAnalytics 월별 감가 (분탄 동창 미지급)', () => {
 
   it('매입만 차감, 매출·마진 불변, depreciationKrw 기록', () => {
     const out = buildAllAnalytics([buntanDelivery], [], '2026-08', '2026-08',
-      [{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000 }])
+      [{ product_id: 'prod-b', year_month: '2026-07', amount: 100_000, sales_deduct_ym: null, cost_deduct_ym: '2026-07' }])
     expect(out.totals.sellKrw).toBe(2_000_000)     // 총액
     expect(out.totals.costKrw).toBe(1_700_000)     // 1_800_000 − 100_000
     expect(out.totals.totalMargin).toBe(200_000)   // 불변
@@ -218,8 +218,8 @@ describe('buildAllAnalytics 월별 감가 (분탄 동창 미지급)', () => {
 
   it('매칭되지 않는 감가(다른 품목/월)는 미적용', () => {
     const out = buildAllAnalytics([buntanDelivery], [], '2026-08', '2026-08', [
-      { product_id: 'other',  year_month: '2026-07', amount: 999_999 },
-      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999 },
+      { product_id: 'other',  year_month: '2026-07', amount: 999_999, sales_deduct_ym: null, cost_deduct_ym: '2026-07' },
+      { product_id: 'prod-b', year_month: '2026-06', amount: 999_999, sales_deduct_ym: null, cost_deduct_ym: '2026-06' },
     ])
     expect(out.totals.costKrw).toBe(1_800_000)
     expect(out.productRows[0].depreciationKrw).toBe(0)

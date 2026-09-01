@@ -26,9 +26,9 @@ export type MonthlyDepForAnalytics = {
   year_month: string
   amount: number
   /** 매출 계산서가 감액 발행된 납품월 = 통과형(AL30). null이면 보관형(분탄) */
-  sales_deduct_ym?: string | null
-  /** 매입 계산서에서 차감하는 납품월. 미지정 시 year_month(당월 차감) */
-  cost_deduct_ym?: string | null
+  sales_deduct_ym: string | null
+  /** 매입 계산서에서 차감하는 납품월. **null = 계산서로 회수하지 않음**(계약 종료 후 현금 정산) */
+  cost_deduct_ym: string | null
 }
 
 export type CommissionEntry = {

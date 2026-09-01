@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseMonthlyDepInput, sumUnsettled, sumUnrecovered,
-  depKind, splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
+  depKind, depSettlement, splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
   salesDepTargetIds, depImpactsFor,
 } from '@/lib/depreciation'
 import type { MonthlyDepreciation } from '@/types'
@@ -346,5 +346,62 @@ describe('depBadgeFor short', () => {
       from_company: '(주)한국에이원', to_company: '화림',
     }, [dep2605])!
     expect(cost.short).toBe('감가 −56,179원 회수')
+  })
+})
+
+
+// ── 계산서 회수 없는 통과형 (계약 종료 후 현금 정산) ────────
+describe('별도 정산 감가 (cost_deduct_ym = null)', () => {
+  it('no_cost_deduct — 매입 차감월을 null로 파싱', () => {
+    const r = parseMonthlyDepInput({
+      year_month: '2026-08', amount: 212_078,
+      sales_deduct_ym: '2026-08', no_cost_deduct: true,
+    })
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.sales_deduct_ym).toBe('2026-08')
+    expect(r.cost_deduct_ym).toBeNull()
+  })
+
+  it('매출 감액도 매입 차감도 없으면 거부 — 계산서에 반영되지 않는 유령 행', () => {
+    const r = parseMonthlyDepInput({ year_month: '2026-08', amount: 1, no_cost_deduct: true })
+    expect(r.ok).toBe(false)
+  })
+
+  it('no_cost_deduct 미지정이면 종전대로 당월 차감', () => {
+    const r = parseMonthlyDepInput({ year_month: '2026-08', amount: 1 })
+    expect(r.ok && r.cost_deduct_ym).toBe('2026-08')
+  })
+
+  it('depSettlement — hold / recover / manual 구분', () => {
+    expect(depSettlement({ sales_deduct_ym: null, cost_deduct_ym: '2026-08' })).toBe('hold')
+    expect(depSettlement({ sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07' })).toBe('recover')
+    expect(depSettlement({ sales_deduct_ym: '2026-08', cost_deduct_ym: null })).toBe('manual')
+  })
+
+  it('매입 계산서에는 배지가 붙지 않는다 — 차감할 달이 없다', () => {
+    const manual: MonthlyDepreciation = {
+      ...dep2605, id: 'dm', product_id: 'soggae', year_month: '2026-08',
+      amount: 212_078, sales_deduct_ym: '2026-08', cost_deduct_ym: null,
+    }
+    const cost = depBadgeFor({
+      invoice_type: 'cost', product_id: 'soggae', delivery_year_month: '2026-08',
+      from_company: '(주)한국에이원', to_company: '렘코',
+    }, [manual])
+    expect(cost).toBeNull()
+    const sales = depBadgeFor({
+      invoice_type: 'sales', product_id: 'soggae', delivery_year_month: '2026-08',
+      from_company: '동국제강', to_company: '(주)한국에이원',
+    }, [manual])!
+    expect(sales.short).toBe('감가 −212,078원 반영 발행')
+  })
+
+  it('미회수 누계에 계속 잡힌다 (정산완료 전까지)', () => {
+    const manual: MonthlyDepreciation = {
+      ...dep2605, id: 'dm', product_id: 'soggae', year_month: '2026-08',
+      amount: 212_078, sales_deduct_ym: '2026-08', cost_deduct_ym: null,
+    }
+    expect(sumUnrecovered([manual])).toBe(212_078)
+    expect(sumUnrecovered([{ ...manual, settled_at: '2026-12-31T00:00:00Z' }])).toBe(0)
   })
 })
