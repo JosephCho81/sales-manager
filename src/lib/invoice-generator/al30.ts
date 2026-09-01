@@ -10,30 +10,10 @@
  */
 import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
 import { splitMargin } from '@/lib/margin'
-import { makeInvoice, calcCombinedMargin, calcVat } from './utils'
-import type { DeliveryForInvoice, InvoiceToCreate } from './types'
+import { makeInvoice, calcCombinedMargin, calcVat, commVat, originLabel } from './utils'
+import { NO_DEP, type DeliveryForInvoice, type DepSlice, type InvoiceToCreate } from './types'
 
-/**
- * 감가 차감분 — 금액과 귀속 납품월(메모 표기용).
- * `vatActual`은 실물 계산서의 부가세. 거래처 반올림 관례가 달마다 흔들리는 경우의 탈출구로,
- * 값이 있으면 계산값을 덮어쓴다.
- */
-export type DepSlice = { amount: number; originYMs: string[]; vatActual?: number | null }
-const NO_DEP: DepSlice = { amount: 0, originYMs: [], vatActual: null }
-
-const originLabel = (ymList: string[]) =>
-  ymList.map(y => `${parseInt(y.slice(5, 7))}월`).join('·')
-
-/**
- * 감가로 배분액이 움직인 커미션의 부가세.
- * 매출·매입 계산서와 같은 원칙 — 감가 반영 후 공급가에 일괄 10%를 매기면 실제 계산서와 1원 어긋난다.
- * (5,179,833 → 517,983, 감가분 18,726 → 1,873 ⇒ 516,110. 일괄 계산은 516,111)
- */
-function commVat(base: number, final: number, to: string): number | undefined {
-  const delta = final - base
-  if (delta === 0) return undefined
-  return calcVat(base, to) + (delta > 0 ? calcVat(delta, to) : -calcVat(-delta, to))
-}
+export type { DepSlice } from './types'
 
 export function genAL30(
   deliveries: DeliveryForInvoice[],
@@ -93,7 +73,7 @@ export function genAL30(
 
     // 커미션은 그달 실제 계산서 기준 마진(매출 − 매입)의 1/3이어야 한다.
     // 매출 감액월은 3사가 함께 부담(−), 매입 회수월은 함께 회수(+) → 최종 상쇄
-    const adjust = period === lastSale ? costDep.amount - sDep : 0
+    const adjust = period === lastSale ? costDep.marginAmount - sDep : 0
     const cm = calcCombinedMargin(period.days)
     const { geumhwa, raseong } = adjust !== 0 ? splitMargin(cm.totalMargin + adjust) : cm
 

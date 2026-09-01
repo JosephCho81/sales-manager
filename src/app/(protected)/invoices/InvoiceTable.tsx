@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
-import { depBadgeFor, depBreakdownFor, type DepBreakdown } from '@/lib/depreciation'
+import { depBadgeFor, depBreakdownFor, salesDepTargetIds, type DepBreakdown } from '@/lib/depreciation'
 import { diffInvoice } from '@/lib/reconcile'
 import type { MonthlyDepreciation } from '@/types'
 import { useCanEdit } from '@/components/RoleProvider'
@@ -56,9 +56,11 @@ export function DepBreakdownNote({ bd }: { bd: DepBreakdown }) {
 }
 
 /**
- * 실물 대사 표시 — 합계 칸 아래에 붙는다.
- * 미대사는 회색 "대사", 일치는 초록 체크, 차이는 빨간 금액을 그대로 보여준다.
- * 조회 전용 계정은 결과만 보고 누를 수 없다.
+ * 실물 대사 표시 — 합계 숫자 옆 인라인 마커.
+ *
+ * 예전엔 합계 칸 아래 블록으로 붙였는데, 그 때문에 합계 열이 두 줄로 늘어나 표 전체가
+ * 읽기 어려웠다. 상태는 아이콘 하나(미대사 ⊙ / 일치 ✓ / 차이 ⊙+금액)로만 표현하고,
+ * 자세한 내용은 클릭해서 여는 대사 창에 둔다. 조회 전용 계정은 결과만 보고 누를 수 없다.
  */
 function ReconcileMark({
   inv, canEdit, onOpen,
@@ -68,24 +70,35 @@ function ReconcileMark({
   onOpen: (inv: InvoiceRow) => void
 }) {
   const d = diffInvoice(inv)
-  const label = d === null ? '대사' : d.matched ? '✓ 일치' : `${d.total > 0 ? '+' : ''}${fmtKrw(d.total)}`
-  const tone  = d === null
-    ? 'border-gray-200 text-gray-400'
+  const icon = d === null ? '⊙' : d.matched ? '✓' : '⊙'
+  const tone = d === null
+    ? 'text-gray-300 hover:text-blue-500'
     : d.matched
-      ? 'border-green-200 bg-green-50 text-green-700'
-      : 'border-red-200 bg-red-50 text-red-700 font-semibold'
+      ? 'text-green-600'
+      : 'text-red-600'
+  const title = d === null
+    ? '실물 세금계산서와 대조 (미대사)'
+    : d.matched
+      ? '실물 대사 일치'
+      : `실물과 ${d.total > 0 ? '+' : ''}${fmtKrw(d.total)} 차이 — 공급가 ${d.supply > 0 ? '+' : ''}${fmtKrw(d.supply)} / VAT ${d.vat > 0 ? '+' : ''}${fmtKrw(d.vat)}`
 
-  const content = (
-    <span className={`inline-block mt-1 rounded border px-1.5 py-0.5 text-xs tabular-nums ${tone}`}>
-      {label}
-    </span>
+  const body = (
+    <>
+      <span className={`text-sm leading-none ${tone}`}>{icon}</span>
+      {d !== null && !d.matched && (
+        <span className="ml-1 text-xs font-semibold text-red-600 tabular-nums">
+          {d.total > 0 ? '+' : ''}{fmtKrw(d.total)}
+        </span>
+      )}
+    </>
   )
 
-  if (!canEdit) return <div>{d === null ? null : content}</div>
+  // 조회 전용은 미대사 표시를 숨긴다 — 누를 수 없는 아이콘은 잡음일 뿐
+  if (!canEdit) return d === null ? null : <span className="ml-1.5">{body}</span>
   return (
-    <div>
-      <button onClick={() => onOpen(inv)} title="실물 세금계산서와 대조">{content}</button>
-    </div>
+    <button onClick={() => onOpen(inv)} title={title} className="ml-1.5 align-baseline">
+      {body}
+    </button>
   )
 }
 
@@ -107,6 +120,9 @@ export default function InvoiceTable({
   onOpenReconcile: (inv: InvoiceRow) => void
 }) {
   const canEdit = useCanEdit()
+
+  // 매출 계산서가 여러 장인 품목(AL30 3구간)에서 감가가 실제 반영된 1장만 배지·산식을 갖는다
+  const salesTargets = salesDepTargetIds(invoices)
 
   // 품목별 그룹화
   // null product_id인 커미션은 delivery_ids[0](커미션 row ID)로 개별 그룹화
@@ -199,8 +215,8 @@ export default function InvoiceTable({
                   {/* 계산서 행 */}
                   {rows.map(inv => {
                     const typeKey = inv.invoice_type ?? 'other'
-                    const badge   = depBadgeFor(inv, deps)
-                    const bd      = depBreakdownFor(inv, deps)
+                    const badge   = depBadgeFor(inv, deps, salesTargets)
+                    const bd      = depBreakdownFor(inv, deps, salesTargets)
                     const paidAmt = inv.paid_amount === null ? null : Number(inv.paid_amount)
                     const shortfall = paidAmt === null ? 0 : Number(inv.total_amount) - paidAmt
                     return (
@@ -237,8 +253,8 @@ export default function InvoiceTable({
                             ? fmtKrw(Number(inv.vat_amount))
                             : <span className="text-gray-300">—</span>}
                         </td>
-                        <td className="table-td text-right tabular-nums font-semibold whitespace-nowrap">
-                          {fmtKrw(Number(inv.total_amount))}
+                        <td className="table-td text-right whitespace-nowrap">
+                          <span className="tabular-nums font-semibold">{fmtKrw(Number(inv.total_amount))}</span>
                           <ReconcileMark inv={inv} canEdit={canEdit} onOpen={onOpenReconcile} />
                         </td>
                         <td className="table-td text-gray-600 whitespace-nowrap">

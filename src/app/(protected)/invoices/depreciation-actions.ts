@@ -5,6 +5,7 @@ import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { STALE_WRITE_ERROR } from '@/lib/optimistic'
 import { parseMonthlyDepInput, parsePaidAmount, splitShortfall } from '@/lib/depreciation'
+import { supportsDepreciation } from '@/lib/invoice-generator'
 import { regenerateInvoices } from './actions'
 
 /**
@@ -61,6 +62,22 @@ export async function upsertMonthlyDepreciation(input: {
   if (!parsed.ok) return { error: parsed.error }
 
   const supabase = createAdminClient()
+
+  // 계산서 자동 반영이 안 되는 품목은 저장 자체를 막는다 —
+  // 기록만 남으면 감가가 빠진 계산서가 조용히 발행된다 (UI의 disabled는 UX일 뿐)
+  const { data: prod, error: pErr } = await supabase
+    .from('products').select('name, display_name').eq('id', input.product_id).maybeSingle()
+  if (pErr) return { error: `품목 조회 실패: ${pErr.message}` }
+  if (!prod) return { error: '품목을 찾을 수 없습니다.' }
+  if (!supportsDepreciation(prod.name)) {
+    return { error: `${prod.display_name ?? prod.name}은(는) 아직 감가 자동 반영을 지원하지 않습니다. 반영 규칙 확정 후 사용하세요.` }
+  }
+
+  // 통과형(매출 감액)은 회수가 감액보다 앞설 수 없다 — 뒤바뀌면 회수 계산서가 먼저 나간다
+  if (parsed.sales_deduct_ym && parsed.cost_deduct_ym < parsed.sales_deduct_ym) {
+    return { error: '매입 회수월은 매출 감액월보다 앞설 수 없습니다.' }
+  }
+
   const row = {
     product_id: input.product_id,
     year_month: parsed.year_month,
@@ -143,6 +160,14 @@ export async function recordPaymentShortfall(input: {
   if (!inv) return { error: '대상 계산서가 없습니다. 계산서가 재생성되었을 수 있으니 새로고침 후 다시 시도하세요.' }
   if (!inv.product_id || !inv.delivery_year_month) {
     return { error: '품목·납품월이 없는 계산서(커미션 등)는 감가로 기록할 수 없습니다.' }
+  }
+
+  // 감가 자동 반영이 안 되는 품목은 차액을 감가로 기록해봐야 계산서에 반영되지 않는다
+  const { data: prod, error: pErr } = await supabase
+    .from('products').select('name, display_name').eq('id', inv.product_id).maybeSingle()
+  if (pErr) return { error: `품목 조회 실패: ${pErr.message}` }
+  if (!prod || !supportsDepreciation(prod.name)) {
+    return { error: `${prod?.display_name ?? '이 품목'}은(는) 아직 감가 자동 반영을 지원하지 않습니다. 차액 원인을 먼저 확인하세요.` }
   }
 
   const total  = Number(inv.total_amount)

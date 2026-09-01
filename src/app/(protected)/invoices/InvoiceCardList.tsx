@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { fmtKrw } from '@/lib/margin'
-import { depBadgeFor, depBreakdownFor } from '@/lib/depreciation'
+import { depBadgeFor, depBreakdownFor, salesDepTargetIds } from '@/lib/depreciation'
 import { diffInvoice } from '@/lib/reconcile'
 import type { MonthlyDepreciation } from '@/types'
 import type { InvoiceRow } from '@/lib/invoice-generator'
@@ -51,6 +51,8 @@ export default function InvoiceCardList({
   productOrderMap: Map<string, number>
   deps: MonthlyDepreciation[]
 }) {
+  const salesTargets = salesDepTargetIds(invoices)
+
   const grouped = new Map<string, InvoiceRow[]>()
   for (const inv of invoices) {
     const key = inv.product_id
@@ -110,8 +112,8 @@ export default function InvoiceCardList({
             {rows.map((inv, idx) => {
               const typeKey = inv.invoice_type ?? 'other'
               const hasVat  = Number(inv.vat_amount) > 0
-              const badge   = depBadgeFor(inv, deps)
-              const bd      = depBreakdownFor(inv, deps)
+              const badge   = depBadgeFor(inv, deps, salesTargets)
+              const bd      = depBreakdownFor(inv, deps, salesTargets)
               const paidAmt = inv.paid_amount === null ? null : Number(inv.paid_amount)
               const shortfall = paidAmt === null ? 0 : Number(inv.total_amount) - paidAmt
               return (

@@ -189,6 +189,68 @@ describe('genSoggae', () => {
     expect(sales.payment_due_date).toBe('2024-02-13')
     expect(cost.payment_due_date).toBe('2024-02-13')
   })
+
+  describe('월별 감가 — 통과형 (동국 감액 역발행 → 렘코 회수)', () => {
+    // 2026-08 실데이터: 214.14톤 × (345,000 / 340,000), 감가 212,078원
+    const real = makeDelivery({
+      product_name: 'SOGGAE', product_id: 'soggae', year_month: '2026-08', quantity_kg: 214_140,
+      contract: { sell_price: 345_000, cost_price: 340_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const pass = (amount: number, originYM: string) =>
+      ({ amount, originYMs: [originYM], marginAmount: amount })
+    const NONE = { amount: 0, originYMs: [] as string[], marginAmount: 0 }
+
+    it('감가 없음 — 실계산서 금액과 일치 (회귀 기준)', () => {
+      const [sales, cost, gm, rs] = genSoggae([real], '2026-09')
+      expect(sales.supply_amount).toBe(73_878_300)
+      expect(cost.supply_amount).toBe(72_807_600)
+      expect(gm.supply_amount).toBe(356_900)
+      expect(rs.supply_amount).toBe(356_900)
+    })
+
+    it('매출 감액월 — 동국 매출만 줄고 렘코 매입은 총액, 커미션도 함께 감액', () => {
+      const [sales, cost, gm, rs] = genSoggae([real], '2026-09', NONE, pass(212_078, '2026-08'))
+      expect(sales.supply_amount).toBe(73_666_222)
+      expect(sales.vat_amount).toBe(0)              // 소괴탄 매출·매입은 면세
+      expect(cost.supply_amount).toBe(72_807_600)
+      // 마진 1,070,700 − 212,078 = 858,622 → floor/3 = 286,207
+      expect(gm.supply_amount).toBe(286_207)
+      expect(rs.supply_amount).toBe(286_208)
+      expect(sales.memo).toContain('감가 212,078원 반영 발행')
+      expect(gm.memo).toContain('3사 분담')
+    })
+
+    it('회수월 — 렘코 매입에서 차감되고 커미션이 되돌아온다', () => {
+      const later = makeDelivery({ ...real, year_month: '2026-09' })
+      const [sales, cost, gm, rs] = genSoggae([later], '2026-10', pass(212_078, '2026-08'), NONE)
+      expect(sales.supply_amount).toBe(73_878_300)
+      expect(cost.supply_amount).toBe(72_595_522)
+      // 마진 1,070,700 + 212,078 = 1,282,778 → floor/3 = 427,592
+      expect(gm.supply_amount).toBe(427_592)
+      expect(rs.supply_amount).toBe(427_594)
+      expect(cost.memo).toContain('감가 212,078원 차감')
+      expect(gm.memo).toContain('3사 회수')
+    })
+
+    it('감액월 + 회수월 커미션 합 = 감가 없을 때와 동일 (왕복 상쇄)', () => {
+      const sum = (inv: ReturnType<typeof genSoggae>) =>
+        inv.filter(i => i.invoice_type === 'commission').reduce((s, i) => s + i.supply_amount, 0)
+      const plain = sum(genSoggae([real], '2026-09')) * 2
+      const round = sum(genSoggae([real], '2026-09', NONE, pass(212_078, '2026-08')))
+                  + sum(genSoggae([real], '2026-10', pass(212_078, '2026-08'), NONE))
+      // 마진 3분할이 floor 기반이라 감액·회수를 나눠 계산하면 최대 1원까지 어긋난다
+      // (한국에이원 몫이 1원 흡수). 커미션이 통째로 새거나 이중 지급되지 않음을 확인하는 게 목적
+      expect(Math.abs(round - plain)).toBeLessThanOrEqual(1)
+    })
+
+    it('보관형(marginAmount 0) — 매입만 차감하고 커미션은 총액 기준', () => {
+      const hold = { amount: 212_078, originYMs: ['2026-08'], marginAmount: 0 }
+      const [, cost, gm, rs] = genSoggae([real], '2026-09', hold, NONE)
+      expect(cost.supply_amount).toBe(72_595_522)
+      expect(gm.supply_amount).toBe(356_900)
+      expect(rs.supply_amount).toBe(356_900)
+    })
+  })
 })
 
 // ── genBuntan ─────────────────────────────────────────────
@@ -238,15 +300,19 @@ describe('genBuntan', () => {
   })
 
   describe('월별 감가 (동창 미지급 — 2026-07 렘코 상장 대응)', () => {
+    /** 보관형 — 매입만 차감하고 3사 배분은 총액 기준 유지 (marginAmount = 0) */
+    const hold = (amount: number, vatActual?: number) =>
+      ({ amount, originYMs: ['2024-01'], marginAmount: 0, vatActual })
+
     // sell 200_000 × 10톤 = 2_000_000 / cost 180_000 × 10톤 = 1_800_000
     it('매입(동창) 계산서만 차감, 매출(렘코)은 총액', () => {
-      const [sales, cost] = genBuntan([d], '2024-02', 100_000)
+      const [sales, cost] = genBuntan([d], '2024-02', hold(100_000))
       expect(sales.supply_amount).toBe(2_000_000)
       expect(cost.supply_amount).toBe(1_700_000)
     })
 
     it('커미션은 월별 감가 제외한 총액 기준 (과소지급 방지)', () => {
-      const withDep = genBuntan([d], '2024-02', 100_000)
+      const withDep = genBuntan([d], '2024-02', hold(100_000))
       const noDep   = genBuntan([d], '2024-02')
       expect(withDep[2].supply_amount).toBe(noDep[2].supply_amount)
       expect(withDep[3].supply_amount).toBe(noDep[3].supply_amount)
@@ -266,7 +332,7 @@ describe('genBuntan', () => {
         product_name: 'BUNTAN', quantity_kg: 1_111_930,
         contract: { sell_price: 363_000, cost_price: 353_000, currency: 'KRW', reference_exchange_rate: null },
       })
-      const [, cost] = genBuntan([real], '2026-08', 180_851)
+      const [, cost] = genBuntan([real], '2026-08', hold(180_851))
       expect(cost.supply_amount).toBe(392_330_439)
       expect(cost.vat_amount).toBe(39_233_044)
       expect(cost.total_amount).toBe(431_563_483)
@@ -282,10 +348,10 @@ describe('genBuntan', () => {
         product_name: 'BUNTAN', quantity_kg: 1_050_060,
         contract: { sell_price: 363_000, cost_price: 353_000, currency: 'KRW', reference_exchange_rate: null },
       })
-      const [, calc] = genBuntan([real], '2026-09', 56_411)
+      const [, calc] = genBuntan([real], '2026-09', hold(56_411))
       expect(calc.vat_amount).toBe(37_061_477)
 
-      const [, cost] = genBuntan([real], '2026-09', 56_411, 37_061_476)
+      const [, cost] = genBuntan([real], '2026-09', hold(56_411, 37_061_476))
       expect(cost.supply_amount).toBe(370_614_769)
       expect(cost.vat_amount).toBe(37_061_476)
       expect(cost.total_amount).toBe(407_676_245)
@@ -293,7 +359,7 @@ describe('genBuntan', () => {
     })
 
     it('부가세 실계산서 0원도 유효 — null과 구분', () => {
-      const [, cost] = genBuntan([d], '2024-02', 100_000, 0)
+      const [, cost] = genBuntan([d], '2024-02', hold(100_000, 0))
       expect(cost.vat_amount).toBe(0)
     })
 
@@ -303,7 +369,7 @@ describe('genBuntan', () => {
         depreciation_amount: 50_000,
         contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
       })
-      const [sales, cost] = genBuntan([legacy], '2024-02', 100_000)
+      const [sales, cost] = genBuntan([legacy], '2024-02', hold(100_000))
       expect(sales.supply_amount).toBe(1_950_000) // 2M − 50k(건별)만
       expect(cost.supply_amount).toBe(1_650_000)  // 1.8M − 50k(건별) − 100k(월별)
     })
@@ -548,8 +614,8 @@ describe('genAL30', () => {
 
   // 2026-05 현대제철 감가 — docs/al30-depreciation-2026-05.md
   describe('감가 (통과형) — 매출 감액월', () => {
-    const dep = { amount: 56_179, originYMs: ['2026-05'] }
-    const NONE = { amount: 0, originYMs: [] as string[] }
+    const dep = { amount: 56_179, originYMs: ['2026-05'], marginAmount: 56_179 }
+    const NONE = { amount: 0, originYMs: [] as string[], marginAmount: 0 }
     const gen  = (s = NONE, c = NONE) => genAL30([al30('2024-01-05')], '2024-02', c, s)
 
     it('매출(현대 역발행) 차감 — 총 61,797원 감소', () => {
@@ -613,8 +679,8 @@ describe('genAL30', () => {
   })
 
   describe('감가 (통과형) — 매입 회수월', () => {
-    const dep = { amount: 56_179, originYMs: ['2026-05'] }
-    const NONE = { amount: 0, originYMs: [] as string[] }
+    const dep = { amount: 56_179, originYMs: ['2026-05'], marginAmount: 56_179 }
+    const NONE = { amount: 0, originYMs: [] as string[], marginAmount: 0 }
     const gen  = (c = NONE) => genAL30([al30('2024-01-05')], '2024-02', c)
 
     it('매입(화림) 계산서 차감 — 총 61,797원 감소', () => {
@@ -652,8 +718,8 @@ describe('genAL30', () => {
 
   // 매출 감액 → 매입 회수 왕복 후 3사 배분이 원상복구되는지
   it('감가 왕복 — 두 달 합산 커미션이 감가 없을 때와 같음 (3사 배분 원단위 오차 ≤1원)', () => {
-    const dep  = { amount: 56_179, originYMs: ['2026-05'] }
-    const NONE = { amount: 0, originYMs: [] as string[] }
+    const dep  = { amount: 56_179, originYMs: ['2026-05'], marginAmount: 56_179 }
+    const NONE = { amount: 0, originYMs: [] as string[], marginAmount: 0 }
     const comm = (inv: ReturnType<typeof genAL30>) =>
       inv.filter(i => i.invoice_type === 'commission').reduce((s, i) => s + i.supply_amount, 0)
 
@@ -812,6 +878,48 @@ describe('generateInvoices 월별 감가 라우팅', () => {
     expect(sales.supply_amount).toBe(2_000_000)
     const cost = invoices.find(i => i.invoice_type === 'cost')!
     expect(cost.supply_amount).toBe(1_700_000)
+  })
+
+  it('SOGGAE 통과형 — 매출 감액월엔 매출·커미션이 줄고 매입은 총액', () => {
+    const d = makeDelivery({
+      product_name: 'SOGGAE', product_id: 'soggae', year_month: '2026-08', quantity_kg: 214_140,
+      contract: { sell_price: 345_000, cost_price: 340_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const invoices = generateInvoices([d], '2026-09', [
+      { product_id: 'soggae', year_month: '2026-08', amount: 212_078,
+        sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+    ])
+    expect(invoices.find(i => i.invoice_type === 'sales')!.supply_amount).toBe(73_666_222)
+    expect(invoices.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(72_807_600)
+    const comm = invoices.filter(i => i.invoice_type === 'commission')
+    expect(comm.map(i => i.supply_amount)).toEqual([286_207, 286_208])
+  })
+
+  it('SOGGAE 회수월 — 렘코 매입에서 차감, 커미션 복구', () => {
+    const d = makeDelivery({
+      product_name: 'SOGGAE', product_id: 'soggae', year_month: '2026-10', quantity_kg: 214_140,
+      contract: { sell_price: 345_000, cost_price: 340_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const invoices = generateInvoices([d], '2026-11', [
+      { product_id: 'soggae', year_month: '2026-08', amount: 212_078,
+        sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+    ])
+    expect(invoices.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(72_595_522)
+    expect(invoices.filter(i => i.invoice_type === 'commission').map(i => i.supply_amount))
+      .toEqual([427_592, 427_594])
+  })
+
+  it('보관형(sales_deduct_ym 없음)은 커미션을 움직이지 않는다 — 분탄 회귀', () => {
+    const d = makeDelivery({
+      product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-07',
+      contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+    })
+    const withDep = generateInvoices([d], '2026-08', [
+      { product_id: 'prod-b', year_month: '2026-07', amount: 100_000 },
+    ]).filter(i => i.invoice_type === 'commission').map(i => i.supply_amount)
+    const noDep = generateInvoices([d], '2026-08')
+      .filter(i => i.invoice_type === 'commission').map(i => i.supply_amount)
+    expect(withDep).toEqual(noDep)
   })
 
   it('monthlyDeps 미전달 — 기존 동작 불변', () => {

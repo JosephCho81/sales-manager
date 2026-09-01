@@ -8,6 +8,7 @@
  *   AL40 / AL30     → al30.ts
  *   FESI75 / FESI60 → fesi.ts (입고 건별)
  */
+import { shiftMonths } from '@/lib/date'
 import { genALSeries } from './al-series'
 import { genSoggae, genBuntan } from './coal'
 import { genFeSi } from './fesi'
@@ -28,6 +29,27 @@ const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'AL40고품위알�
 export { PRODUCT_ORDER }
 
 /**
+ * 월별 감가를 계산서에 자동 반영하는 품목 (DB product.name 기준).
+ *
+ * 여기 없는 품목(AL35B·AL65B·FeSi)은 감가 반영 구조가 확정되지 않았다 —
+ * 매입 계산서가 여러 장이거나(AL35B: 화림→금화, 금화→한국에이원) 입고 건별 발행(FeSi)이라
+ * 어느 장에서 빼야 하는지가 데이터로 결정되지 않는다. 입력만 받아두면 반영 안 된 계산서가
+ * 조용히 나가므로, 규칙이 확정될 때까지 UI에서 입력을 막는다.
+ */
+const DEP_SUPPORTED = ['SOGGAE', 'BUNTAN', 'AL30', 'AL40'] as const
+
+export function supportsDepreciation(productName: string): boolean {
+  const n = productName.toUpperCase()
+  return DEP_SUPPORTED.some(p => n === p || n.startsWith(p))
+}
+
+/** 지급월(invoice_month) → 감가 입력 기본 납품월. 소괴탄·분탄 offset 1, AL30·AL40 offset 2 */
+export function depDefaultDeliveryMonth(productName: string, invoiceMonth: string): string {
+  const n = productName.toUpperCase()
+  return shiftMonths(invoiceMonth, n.startsWith('AL') ? -2 : -1)
+}
+
+/**
  * 월별 감가 입력 — year_month는 감가가 발생한 납품월(귀속월).
  * 매입 계산서에서 실제로 차감하는 달은 cost_deduct_ym (미지정 시 year_month = 당월 차감).
  * 분탄은 당월 차감이라 둘이 같고, AL30은 회수 합의에 따라 몇 달 뒤가 된다.
@@ -46,11 +68,15 @@ export type MonthlyDepInput = {
 function slice(
   deps: MonthlyDepInput[],
   match: (md: MonthlyDepInput) => boolean,
-): { amount: number; originYMs: string[] } {
+): { amount: number; originYMs: string[]; marginAmount: number } {
   const hit = deps.filter(match)
   return {
     amount: hit.reduce((s, md) => s + Number(md.amount), 0),
     originYMs: Array.from(new Set(hit.map(md => md.year_month))).sort(),
+    // 통과형(sales_deduct_ym 있음)만 3사 배분을 움직인다. 보관형은 배분에서 빠져 통장에 남는다
+    marginAmount: hit
+      .filter(md => !!md.sales_deduct_ym)
+      .reduce((s, md) => s + Number(md.amount), 0),
   }
 }
 
@@ -102,12 +128,16 @@ export function generateInvoices(
 
     if (name === 'AL35B' || name === 'AL65B') {
       result.push(...genALSeries(group, yearMonth))
-    } else if (name === 'SOGGAE') {
-      result.push(...genSoggae(group, yearMonth))
-    } else if (name === 'BUNTAN') {
-      // genBuntan은 group[0].year_month를 납품월로 사용 — 감가도 동일 기준 매칭
-      const dep = costDepFor(monthlyDeps, group[0].product_id, group[0].year_month)
-      result.push(...genBuntan(group, yearMonth, dep.amount, dep.vatActual))
+    } else if (name === 'SOGGAE' || name === 'BUNTAN') {
+      // 두 함수 모두 group[0].year_month를 납품월로 사용 — 감가도 동일 기준 매칭
+      const pid = group[0].product_id
+      const dym = group[0].year_month
+      const gen = name === 'SOGGAE' ? genSoggae : genBuntan
+      result.push(...gen(
+        group, yearMonth,
+        costDepFor(monthlyDeps, pid, dym),
+        salesDepFor(monthlyDeps, pid, dym),
+      ))
     } else if (name.startsWith('AL40') || name === 'AL30') {
       const pid = group[0].product_id
       const dym = group[0].year_month

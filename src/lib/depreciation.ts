@@ -171,6 +171,33 @@ type BadgeInvoice = {
   delivery_year_month: string | null
   from_company: string
   to_company: string
+  id?: string
+  invoice_basis_date?: string | null
+}
+
+/**
+ * 매출 계산서가 같은 품목·납품월에 여러 장(AL30 10일 단위 3구간)일 때,
+ * 감가는 **마지막 발행 구간 1장**에만 반영된다(`al30.ts`의 lastSale). 나머지 두 장에도
+ * 감가 배지·산식을 붙이면 실제로 차감되지 않은 계산서를 차감된 것처럼 보여주게 된다.
+ * 반환값을 `depBadgeFor`/`depBreakdownFor`에 넘기면 대상이 아닌 매출 행은 걸러진다.
+ */
+export function salesDepTargetIds(invoices: BadgeInvoice[]): Set<string> {
+  const last = new Map<string, { id: string; basis: string }>()
+  for (const inv of invoices) {
+    if (inv.invoice_type !== 'sales' || !inv.id || !inv.product_id || !inv.delivery_year_month) continue
+    const key   = `${inv.product_id}_${inv.delivery_year_month}`
+    const basis = inv.invoice_basis_date ?? ''
+    const cur   = last.get(key)
+    if (!cur || basis >= cur.basis) last.set(key, { id: inv.id, basis })
+  }
+  return new Set(Array.from(last.values()).map(v => v.id))
+}
+
+/** 매출 행이면서 감가 반영 대상이 아닌 경우 true — 배지·산식을 숨겨야 한다 */
+function isSkippedSalesLine(inv: BadgeInvoice, salesTargetIds?: Set<string>): boolean {
+  return salesTargetIds !== undefined
+      && inv.invoice_type === 'sales'
+      && (!inv.id || !salesTargetIds.has(inv.id))
 }
 
 /** 감가가 반영된 계산서 행의 산식 — 화면에 "원금액 − 감가 = 청구액"을 그대로 보여주기 위한 값 */
@@ -195,8 +222,11 @@ type AmountInvoice = BadgeInvoice & {
 export function depBreakdownFor(
   inv: AmountInvoice,
   deps: MonthlyDepreciation[],
+  /** 매출 계산서가 여러 장인 품목에서 실제 차감된 1장을 가리는 집합 (salesDepTargetIds) */
+  salesTargetIds?: Set<string>,
 ): DepBreakdown | null {
   if (!inv.product_id || !inv.delivery_year_month) return null
+  if (isSkippedSalesLine(inv, salesTargetIds)) return null
   const dym = inv.delivery_year_month
 
   const hit = deps.filter(d =>
@@ -248,8 +278,11 @@ function originLabels(deps: MonthlyDepreciation[]): string {
 export function depBadgeFor(
   inv: BadgeInvoice,
   deps: MonthlyDepreciation[],
+  /** 매출 계산서가 여러 장인 품목에서 실제 차감된 1장을 가리는 집합 (salesDepTargetIds) */
+  salesTargetIds?: Set<string>,
 ): DepBadge | null {
   if (!inv.product_id || !inv.delivery_year_month) return null
+  if (isSkippedSalesLine(inv, salesTargetIds)) return null
   const mine = deps.filter(d => d.product_id === inv.product_id)
   if (mine.length === 0) return null
 
@@ -317,4 +350,54 @@ export function depBadgeFor(
     tone: 'pending',
     text: `감가 차감 없음 — 계산서대로 전액 지급. ${from}분 감가 ${fmt(amt)}원은 ${ymLabel(when)}분에서 회수 예정`,
   }
+}
+
+// ── 감가 → 계산서 반영 위치 ────────────────────────────────
+
+export type DepImpact = {
+  invoiceId: string
+  role: 'sales' | 'cost'
+  from: string
+  to: string
+  badge: DepBadge | null
+  breakdown: DepBreakdown | null
+}
+
+type ImpactInvoice = AmountInvoice & { id: string }
+
+/**
+ * 감가 한 건이 이번 조회월 계산서 중 어디에 반영됐는지 — 감가 패널에서
+ * "어느 계산서가 얼마로 바뀌었는지"를 숫자로 보여주기 위한 것.
+ *
+ * 표에 있는 계산서만 대상이므로, 반영 월이 다른 감가는 빈 배열이 나온다(= 이 달엔 영향 없음).
+ */
+export function depImpactsFor(
+  dep: MonthlyDepreciation,
+  invoices: ImpactInvoice[],
+  allDeps: MonthlyDepreciation[],
+): DepImpact[] {
+  const targets = salesDepTargetIds(invoices)
+  const costYM  = dep.cost_deduct_ym ?? dep.year_month
+  const out: DepImpact[] = []
+
+  for (const inv of invoices) {
+    if (inv.product_id !== dep.product_id || !inv.delivery_year_month) continue
+    const role: 'sales' | 'cost' | null =
+      inv.invoice_type === 'cost'  && inv.delivery_year_month === costYM            ? 'cost'
+    : inv.invoice_type === 'sales' && inv.delivery_year_month === dep.sales_deduct_ym ? 'sales'
+    : null
+    if (role === null) continue
+    if (role === 'sales' && !targets.has(inv.id)) continue
+
+    out.push({
+      invoiceId: inv.id,
+      role,
+      from: inv.from_company,
+      to: inv.to_company,
+      badge: depBadgeFor(inv, allDeps, targets),
+      breakdown: depBreakdownFor(inv, allDeps, targets),
+    })
+  }
+  // 매출(감액 발행) → 매입(차감·회수) 순으로 읽히게
+  return out.sort((a, b) => (a.role === 'sales' ? 0 : 1) - (b.role === 'sales' ? 0 : 1))
 }

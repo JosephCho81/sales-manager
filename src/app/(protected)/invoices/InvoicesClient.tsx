@@ -4,10 +4,10 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toMessage } from '@/lib/error'
 import { fmtKrw } from '@/lib/margin'
-import { shiftMonths } from '@/lib/date'
 import type { MonthlyDepreciation } from '@/types'
 import {
   needsInvoiceRegen,
+  supportsDepreciation,
   PRODUCT_ORDER,
   type DeliveryRawForInvoice,
   type InvoiceRow,
@@ -18,7 +18,7 @@ import { useCanEdit } from '@/components/RoleProvider'
 import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
 import InvoiceCardList from './InvoiceCardList'
-import DepreciationPanel from './DepreciationPanel'
+import DepreciationPanel, { type DepProduct } from './DepreciationPanel'
 import PaymentDialog from './PaymentDialog'
 import ReconcileDialog from './ReconcileDialog'
 import { summarizeReconciliation } from '@/lib/reconcile'
@@ -95,6 +95,16 @@ export default function InvoicesClient({
       productOrderMap.set(d.product_id, idx >= 0 ? idx : 999)
     }
   }
+
+  // 감가 패널용 품목 목록 — 표시 순서대로, 자동 반영 지원 여부를 함께 넘긴다
+  const depProducts: DepProduct[] = [...products]
+    .sort((a, b) => (productOrderMap.get(a.id) ?? 999) - (productOrderMap.get(b.id) ?? 999))
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      label: p.display_name ?? p.name,
+      supported: supportsDepreciation(p.name),
+    }))
 
   // 계산서 생성 — 서버가 입고·커미션을 fresh 조회해 생성 (stale props 방지)
   const handleGenerate = useCallback(async () => {
@@ -204,7 +214,7 @@ export default function InvoicesClient({
             </p>
             {r.reconciled < r.total && (
               <p className="mt-0.5 text-xs text-gray-500">
-                합계 금액 아래 <b>대사</b> 표시를 눌러 실물 세금계산서의 공급가액·부가세를 입력하세요.
+                합계 금액 옆 <b className="text-gray-400">⊙</b> 표시를 눌러 실물 세금계산서의 공급가액·부가세를 입력하세요.
               </p>
             )}
           </div>
@@ -320,19 +330,13 @@ export default function InvoicesClient({
         </div>
       </div>
 
-      {/* 분탄 감가 정산 — 미배분 보관액(렘코 반환 예정) 추적 */}
-      {(() => {
-        const buntan = products.find(p => p.name.toUpperCase() === 'BUNTAN')
-        if (!buntan) return null
-        return (
-          <DepreciationPanel
-            productId={buntan.id}
-            productLabel={buntan.display_name ?? '분탄'}
-            deps={initialMonthlyDeps.filter(d => d.product_id === buntan.id)}
-            defaultYearMonth={shiftMonths(yearMonth, -1)}
-          />
-        )
-      })()}
+      {/* 감가 관리 — 품목 무관. 보관형(분탄) / 통과형(소괴탄·AL-30) 모두 여기서 입력한다 */}
+      <DepreciationPanel
+        products={depProducts}
+        deps={initialMonthlyDeps}
+        invoices={invoices}
+        invoiceMonth={yearMonth}
+      />
 
       {/* 계산서 목록 */}
       {invoices.length === 0 && !generating ? (

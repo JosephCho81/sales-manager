@@ -78,3 +78,20 @@ export function separateALMargins(deliveries: DeliveryForInvoice[]) {
   }
   return { main: { total: mainTotal, ...splitMargin(mainTotal) } }
 }
+
+/**
+ * 감가로 배분액이 움직인 커미션의 부가세.
+ * 매출·매입 계산서와 같은 원칙 — 감가 반영 후 공급가에 일괄 10%를 매기면 실제 계산서와 1원 어긋난다.
+ * (5,179,833 → 517,983, 감가분 18,726 → 1,873 ⇒ 516,110. 일괄 계산은 516,111)
+ * 반환값 undefined = 움직임 없음 → makeInvoice의 기본 계산 사용
+ */
+export function commVat(base: number, final: number, to: string): number | undefined {
+  const delta = final - base
+  if (delta === 0) return undefined
+  return calcVat(base, to) + (delta > 0 ? calcVat(delta, to) : -calcVat(-delta, to))
+}
+
+/** 감가 귀속월 라벨 — "5월·7월" */
+export function originLabel(ymList: string[]): string {
+  return ymList.map(y => `${parseInt(y.slice(5, 7))}월`).join('·')
+}

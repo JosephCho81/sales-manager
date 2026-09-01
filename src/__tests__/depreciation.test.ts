@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseMonthlyDepInput, sumUnsettled, sumUnrecovered,
   depKind, splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
+  salesDepTargetIds, depImpactsFor,
 } from '@/lib/depreciation'
 import type { MonthlyDepreciation } from '@/types'
 
@@ -259,5 +260,60 @@ describe('depBreakdownFor', () => {
     }), [dep2605])!
     expect(bd.depVat).toBe(0)
     expect(bd.depTotal).toBe(56_179)
+  })
+})
+
+
+// ── 매출 다중 발행 품목의 감가 대상 1장 ─────────────────────
+describe('salesDepTargetIds / depImpactsFor', () => {
+  // AL30은 같은 납품월 매출이 10일 단위 3장. 감가는 마지막 발행 구간 1장에만 반영된다
+  const salesLine = (id: string, basis: string, supply: number, vat: number) => ({
+    id, invoice_type: 'sales', product_id: AL30, delivery_year_month: '2026-05',
+    from_company: '현대제철', to_company: '(주)한국에이원',
+    invoice_basis_date: basis,
+    supply_amount: supply, vat_amount: vat, total_amount: supply + vat,
+  })
+  const lines = [
+    salesLine('s1', '2026-05-11', 50_000_000, 5_000_000),
+    salesLine('s2', '2026-05-20', 40_000_000, 4_000_000),
+    salesLine('s3', '2026-05-29', 144_771_961, 14_477_196),
+  ]
+
+  it('가장 늦은 발행기준일 1장만 감가 대상', () => {
+    expect(salesDepTargetIds(lines)).toEqual(new Set(['s3']))
+  })
+
+  it('대상 아닌 매출 행은 배지·산식이 나오지 않는다', () => {
+    const targets = salesDepTargetIds(lines)
+    expect(depBadgeFor(lines[0], [dep2605], targets)).toBeNull()
+    expect(depBreakdownFor(lines[0], [dep2605], targets)).toBeNull()
+    expect(depBadgeFor(lines[2], [dep2605], targets)).not.toBeNull()
+    expect(depBreakdownFor(lines[2], [dep2605], targets)!.grossSupply).toBe(144_828_140)
+  })
+
+  it('targets 미전달 시 기존 동작 유지 (전 행 표시)', () => {
+    expect(depBadgeFor(lines[0], [dep2605])).not.toBeNull()
+  })
+
+  it('depImpactsFor — 매출 감액 1장 + 매입 회수 1장, 매출이 먼저', () => {
+    const cost = {
+      id: 'c1', invoice_type: 'cost', product_id: AL30, delivery_year_month: '2026-07',
+      from_company: '(주)한국에이원', to_company: '화림', invoice_basis_date: '2026-07-31',
+      supply_amount: 109_118_861, vat_amount: 10_911_886, total_amount: 120_030_747,
+    }
+    const impacts = depImpactsFor(dep2605, [...lines, cost], [dep2605])
+    expect(impacts.map(i => i.invoiceId)).toEqual(['s3', 'c1'])
+    expect(impacts[0].role).toBe('sales')
+    expect(impacts[1].breakdown!.grossTotal).toBe(120_092_544)
+    expect(impacts[1].breakdown!.depTotal).toBe(61_797)
+  })
+
+  it('반영 월이 아닌 계산서만 있으면 빈 배열', () => {
+    const other = {
+      id: 'x1', invoice_type: 'cost', product_id: AL30, delivery_year_month: '2026-09',
+      from_company: '(주)한국에이원', to_company: '화림', invoice_basis_date: '2026-09-30',
+      supply_amount: 1, vat_amount: 0, total_amount: 1,
+    }
+    expect(depImpactsFor(dep2605, [other], [dep2605])).toEqual([])
   })
 })

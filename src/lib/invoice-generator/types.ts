@@ -70,3 +70,26 @@ export type InvoiceRow = {
   memo: string | null
   invoice_type: string | null
 }
+
+// ── 월별 감가 차감분 ──
+/**
+ * 계산서 한 장에서 차감할 감가 조각.
+ *
+ * `amount`(계산서에서 빼는 금액)와 `marginAmount`(3사 배분에 반영하는 금액)를 분리한 이유:
+ *   보관형(분탄) — 매입만 차감하지만 커미션은 총액 기준 유지 → marginAmount = 0
+ *                  (감가액이 배분에서 빠져 통장에 남고, 계약 종료 후 공급처에 반환)
+ *   통과형(AL30·소괴탄) — 매출 감액·매입 회수가 그대로 마진을 움직임 → marginAmount = amount
+ * 기본값을 두면 한쪽을 조용히 틀리게 만들므로 필수 필드로 둔다.
+ */
+export type DepSlice = {
+  /** 계산서 공급가액에서 차감할 금액 */
+  amount: number
+  /** 감가 귀속 납품월 목록 (메모 표기용) */
+  originYMs: string[]
+  /** 마진(=3사 커미션 배분)에 반영할 금액. 보관형은 0 */
+  marginAmount: number
+  /** 감가 반영 계산서의 실물 부가세. null/미지정이면 라인별 계산값 */
+  vatActual?: number | null
+}
+
+export const NO_DEP: DepSlice = { amount: 0, originYMs: [], marginAmount: 0, vatActual: null }
