@@ -236,25 +236,36 @@ export default function DepreciationPanel({
                   </tr>
                   {impacts.length > 0 && (
                     <tr key={`${d.id}-impact`}>
-                      <td colSpan={7} className="pb-3 pl-0">
-                        <div className="flex flex-wrap gap-3">
-                          {impacts.map(im => (
-                            <div key={im.invoiceId} className="min-w-[18rem]">
-                              <p className="text-xs text-gray-500">
-                                <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 mr-1.5 font-medium">
-                                  {im.role === 'sales' ? '매출' : '매입'}
-                                </span>
-                                {im.from} <span className="text-gray-300">→</span> {im.to}
-                              </p>
-                              {im.badge && (
-                                <p className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-xs font-medium leading-snug ${BADGE_TONE[im.badge.tone]}`}>
-                                  {im.badge.text}
+                      <td colSpan={7} className="pb-2 pl-0">
+                        {/* 기본은 접어둔다 — 감가가 여러 건이면 산식이 화면을 덮어 목록을 못 읽는다.
+                            대사할 때만 펼쳐 보는 값이므로 요약 한 줄을 summary로 둔다 */}
+                        <details className="group">
+                          <summary className="cursor-pointer list-none text-xs text-gray-400 hover:text-gray-600 select-none">
+                            <span className="mr-1 inline-block transition-transform group-open:rotate-90">▸</span>
+                            반영 계산서 {impacts.length}장 · 산식 보기
+                            <span className="ml-2 text-gray-300">
+                              {impacts.map(im => `${im.role === 'sales' ? '매출' : '매입'} ${im.to === '(주)한국에이원' ? im.from : im.to}`).join(' · ')}
+                            </span>
+                          </summary>
+                          <div className="mt-2 flex flex-wrap gap-3">
+                            {impacts.map(im => (
+                              <div key={im.invoiceId} className="min-w-[18rem]">
+                                <p className="text-xs text-gray-500">
+                                  <span className="inline-block rounded bg-gray-100 px-1.5 py-0.5 mr-1.5 font-medium">
+                                    {im.role === 'sales' ? '매출' : '매입'}
+                                  </span>
+                                  {im.from} <span className="text-gray-300">→</span> {im.to}
                                 </p>
-                              )}
-                              {im.breakdown && <DepBreakdownNote bd={im.breakdown} />}
-                            </div>
-                          ))}
-                        </div>
+                                {im.badge && (
+                                  <p className={`mt-1 inline-block rounded border px-1.5 py-0.5 text-xs font-medium leading-snug ${BADGE_TONE[im.badge.tone]}`}>
+                                    {im.badge.text}
+                                  </p>
+                                )}
+                                {im.breakdown && <DepBreakdownNote bd={im.breakdown} />}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
                       </td>
                     </tr>
                   )}
