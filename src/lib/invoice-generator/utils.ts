@@ -2,7 +2,6 @@
  * 계산서 생성 공통 헬퍼
  * - makeInvoice: InvoiceToCreate 생성
  * - calcCombinedMargin: 마진 합산 + 3사 배분
- * - separateALMargins: AL35B 전용 기본 마진 계산
  */
 import { calcMarginFromContract, splitMargin } from '@/lib/margin'
 import type { DeliveryForInvoice, InvoiceToCreate, InvoiceType } from './types'
@@ -67,16 +66,6 @@ export function calcCombinedMargin(deliveries: DeliveryForInvoice[]) {
     totalMargin += m.total_margin
   }
   return { totalMargin, ...splitMargin(totalMargin) }
-}
-
-/** AL35B 전용: 전체 마진 → 3사 배분 */
-export function separateALMargins(deliveries: DeliveryForInvoice[]) {
-  let mainTotal = 0
-  for (const d of deliveries) {
-    const m = calcMarginFromContract(d.contract, d.quantity_kg)
-    mainTotal += m.total_margin
-  }
-  return { main: { total: mainTotal, ...splitMargin(mainTotal) } }
 }
 
 /**

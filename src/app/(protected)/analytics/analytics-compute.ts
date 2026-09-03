@@ -93,8 +93,10 @@ export function buildAllAnalytics(
       : d.contract
     const m      = calcMarginFromContract(contractForCalc, d.quantity_kg)
     const isAL35 = d.product?.name.toUpperCase() === 'AL35B'
+    // 금화→A1 공급가(AL35B). 계산서(al-series.ts)는 그룹 총액에서 한 번만 1/3을 떼므로
+    // 여기서도 절사 없이 누적한다 — 톤당 floor를 쓰면 톤수만큼 절사분이 쌓여 어긋난다
     const gmSell = isAL35
-      ? (m.cost_price_krw + Math.floor((m.sell_price_krw - m.cost_price_krw) / 3)) * m.quantity_ton
+      ? (m.cost_price_krw + (m.sell_price_krw - m.cost_price_krw) / 3) * m.quantity_ton
       : 0
     const dep    = d.depreciation_amount ?? 0
 

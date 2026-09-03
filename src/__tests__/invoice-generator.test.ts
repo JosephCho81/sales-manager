@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { makeInvoice, calcCombinedMargin, separateALMargins } from '@/lib/invoice-generator/utils'
+import { makeInvoice, calcCombinedMargin } from '@/lib/invoice-generator/utils'
 import { genSoggae, genBuntan } from '@/lib/invoice-generator/coal'
 import { genFeSi } from '@/lib/invoice-generator/fesi'
 import { genALSeries } from '@/lib/invoice-generator/al-series'
@@ -102,15 +102,6 @@ describe('calcCombinedMargin', () => {
     const d1 = makeDelivery({ id: 'd1' })
     const d2 = makeDelivery({ id: 'd2' })
     expect(calcCombinedMargin([d1, d2]).totalMargin).toBe(2_000_000)
-  })
-})
-
-// ── separateALMargins ─────────────────────────────────────
-describe('separateALMargins', () => {
-  it('main.total = totalMargin, 3사 항등성', () => {
-    const { main } = separateALMargins([makeDelivery()])
-    expect(main.total).toBe(1_000_000)
-    expect(main.korea_a1 + main.geumhwa + main.raseong).toBe(main.total)
   })
 })
 
@@ -469,11 +460,11 @@ describe('genALSeries', () => {
       expect(genALSeries([d], '2024-02')).toHaveLength(4)
     })
 
-    it('금화→한국에이원 = 원가 + 마진1/3 (AL35 전용 공식)', () => {
-      // (1_800_000 + floor(100_000/3)) × 10 = 1_833_333 × 10 = 18_333_330
+    it('금화→한국에이원 = 매입총액 + 마진 1/3 (AL35 전용 공식)', () => {
+      // 매출 19,000,000 − 매입 18,000,000 = 1,000,000 → 금화 333,333
       const invoices = genALSeries([d], '2024-02')
       const gm2a1 = invoices.find(i => i.from_company === '금화' && i.to_company === '(주)한국에이원')!
-      expect(gm2a1.supply_amount).toBe(18_333_330)
+      expect(gm2a1.supply_amount).toBe(18_333_333)
     })
 
     it('나성 커미션 = main.raseong', () => {
@@ -519,16 +510,34 @@ describe('genALSeries', () => {
         expect(c.supply_amount).toBe(91_166_213)
       })
 
-      it('금화→한국에이원 = 건별 (원가 + floor(톤당마진/3)) 합산', () => {
-        // (236,500+37,833)×202.905 + (330,000+6,666)×130.846
+      it('금화→한국에이원 = 매입총액 + 마진 1/3', () => {
+        // 91,166,213 + 8,548,879
         const gm = invoices.find(i => i.from_company === '금화')!
-        expect(gm.supply_amount).toBe(99_714_937)
+        expect(gm.supply_amount).toBe(99_715_092)
       })
 
-      it('나성 커미션 = 건별 마진 합산의 1/3 배분 나머지', () => {
-        // 23,029,718 + 2,616,920 = 25,646,638 → raseong
+      it('나성 커미션 = 마진 1/3', () => {
+        // (116,812,850 − 91,166,213) / 3 = 8,548,879
         const rs = invoices.find(i => i.to_company === '(주)나성')!
-        expect(rs.supply_amount).toBe(8_548_880)
+        expect(rs.supply_amount).toBe(8_548_879)
+      })
+
+      // 계산서를 이 사이트 기준으로 발행하므로 세 회사 몫이 정확히 1/3이어야 한다.
+      // 예전 금화 공식((원가+floor(톤당마진/3))×톤)은 톤당 절사분이 쌓여 155원 어긋났다.
+      it('세 회사 실수령 마진이 정확히 1/3씩', () => {
+        const sales = invoices.find(i => i.invoice_type === 'sales')!
+        const hwarim = invoices.find(i => i.from_company === '화림')!
+        const gm = invoices.find(i => i.from_company === '금화')!
+        const rs = invoices.find(i => i.to_company === '(주)나성')!
+
+        const geumhwa = gm.supply_amount - hwarim.supply_amount
+        const raseong = rs.supply_amount
+        const koreaA1 = sales.supply_amount - gm.supply_amount - rs.supply_amount
+
+        expect(geumhwa).toBe(8_548_879)
+        expect(raseong).toBe(8_548_879)
+        expect(koreaA1).toBe(8_548_879)
+        expect(geumhwa + raseong + koreaA1).toBe(sales.supply_amount - hwarim.supply_amount)
       })
 
       it('계산서 장수·묶음은 단일 계약 때와 동일 (4장, delivery_ids 2건)', () => {

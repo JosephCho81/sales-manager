@@ -11,7 +11,8 @@
  * 날짜 기준: 선택월(ym)이 아닌 배송월(deliveryYM)
  */
 import { shiftMonths, monthEnd, workingDayFrom, workingDayOnOrAfter } from '@/lib/date'
-import { makeInvoice, separateALMargins } from './utils'
+import { splitMargin } from '@/lib/margin'
+import { makeInvoice } from './utils'
 import type { DeliveryForInvoice, InvoiceToCreate } from './types'
 
 export function genALSeries(
@@ -46,34 +47,27 @@ export function genALSeries(
     return s + cost * d.quantity_kg / 1000
   }, 0)
 
-  const { main } = separateALMargins(deliveries)
-
-  // AL35B 전용: 금화→A1 계산서 금액
-  // (원가 + floor(톤당마진/3)) × 톤 방식으로 계산 후 반올림
-  const geumhwaAL35Supply = isAL35
-    ? deliveries.reduce((s, d) => {
-        const cost = d.contract.currency === 'USD' && d.contract.reference_exchange_rate
-          ? d.contract.cost_price * d.contract.reference_exchange_rate
-          : d.contract.cost_price
-        const sell = d.contract.currency === 'USD' && d.contract.reference_exchange_rate
-          ? d.contract.sell_price * d.contract.reference_exchange_rate
-          : d.contract.sell_price
-        return s + (cost + Math.floor((sell - cost) / 3)) * d.quantity_kg / 1000
-      }, 0)
-    : 0
+  // 3사 배분은 **계산서에 실제로 적히는 금액(반올림 후)의 차액**을 나눈다.
+  //   - 라인별 마진(Math.round)의 합으로 나누면 매출−매입과 1원 어긋난다
+  //   - 금화 몫만 (원가 + floor(톤당마진/3)) × 톤으로 따로 계산하면 톤당 절사분이
+  //     톤수만큼 쌓여 금화가 손해를 본다 (2026-07 AL35B: 155원)
+  // 세 계산서가 서로 물려 있으므로 반드시 같은 총액에서 한 번만 나눠야 한다.
+  const sellSupply = Math.round(sellTotal)
+  const costSupply = Math.round(costTotal)
+  const main       = splitMargin(sellSupply - costSupply)
 
   return [
     // 1. 동국제강→한국에이원 역발행 (매출)
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '동국제강', to: '(주)한국에이원', supply: sellTotal, vat: hasVat,
+      from: '동국제강', to: '(주)한국에이원', supply: sellSupply, vat: hasVat,
       basisDate: wBasisM, deadline: wDue1N, paymentDue: wEndN,
       type: 'sales', memo: '동국제강 역발행 — 매출',
     }),
     // 2. 화림→금화 원가
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
-      from: '화림', to: '금화', supply: costTotal, vat: hasVat,
+      from: '화림', to: '금화', supply: costSupply, vat: hasVat,
       basisDate: wBasisM, deadline: wDue1N, paymentDue: wDue1N2,
       type: 'cost', memo: '화림 원가 — 당월말 기준, 익월1일 발행 (익익월1일 대금)',
     }),
@@ -81,12 +75,12 @@ export function genALSeries(
     makeInvoice({
       yearMonth: ym, deliveryYearMonth: deliveryYM, productId: pid, deliveryIds: ids,
       from: '금화', to: '(주)한국에이원',
-      supply: isAL35 ? geumhwaAL35Supply : costTotal,
+      supply: isAL35 ? costSupply + main.geumhwa : costSupply,
       vat: hasVat,
       basisDate: wEndN, deadline: wDue1N2, paymentDue: wDue1N2,
       type: 'cost',
       memo: isAL35
-        ? '금화→(주)한국에이원 — 원가+마진1/3 (AL35 매매)'
+        ? '금화→(주)한국에이원 — 원가+마진 1/3 (AL35 매매)'
         : '금화→(주)한국에이원 원가 — 익월말 기준',
     }),
     // 4. 한국에이원→금화 커미션 (AL65만)
