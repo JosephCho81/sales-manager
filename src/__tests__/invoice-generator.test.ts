@@ -949,6 +949,57 @@ describe('generateInvoices 월별 감가 라우팅', () => {
     expect(sales.supply_amount).toBe(2_000_000)
   })
 
+  // 통보가 며칠에 걸쳐 나눠 오는 달(2026-08 소괴탄·분탄: 현지 9/3, 9/6 …)에는 한 납품월에
+  // 감가 행이 여러 건 생긴다. DB의 UNIQUE(product_id, year_month)가 이를 막고 있었고(022에서 제거),
+  // 계산은 원래부터 합산이어야 한다 — 한 건으로 몰아 넣은 것과 1원도 달라지면 안 된다
+  describe('같은 품목·납품월 감가 여러 건', () => {
+    it('SOGGAE 통과형 3건 — 합산 1건과 완전히 동일', () => {
+      const mk = (ym: string) => makeDelivery({
+        product_name: 'SOGGAE', product_id: 'soggae', year_month: ym, quantity_kg: 214_140,
+        contract: { sell_price: 345_000, cost_price: 340_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const three = generateInvoices([mk('2026-08')], '2026-09', [
+        { product_id: 'soggae', year_month: '2026-08', amount: 100_000, sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+        { product_id: 'soggae', year_month: '2026-08', amount: 100_000, sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+        { product_id: 'soggae', year_month: '2026-08', amount: 12_078,  sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+      ])
+      const one = generateInvoices([mk('2026-08')], '2026-09', [
+        { product_id: 'soggae', year_month: '2026-08', amount: 212_078, sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+      ])
+      expect(three.map(i => [i.invoice_type, i.supply_amount, i.vat_amount]))
+        .toEqual(one.map(i => [i.invoice_type, i.supply_amount, i.vat_amount]))
+      expect(three.find(i => i.invoice_type === 'sales')!.supply_amount).toBe(73_666_222)
+
+      // 회수월에도 3건이 함께 돌아온다
+      const recovered = generateInvoices([mk('2026-10')], '2026-11', [
+        { product_id: 'soggae', year_month: '2026-08', amount: 100_000, sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+        { product_id: 'soggae', year_month: '2026-08', amount: 100_000, sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+        { product_id: 'soggae', year_month: '2026-08', amount: 12_078,  sales_deduct_ym: '2026-08', cost_deduct_ym: '2026-10' },
+      ])
+      expect(recovered.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(72_595_522)
+      expect(recovered.filter(i => i.invoice_type === 'commission').map(i => i.supply_amount))
+        .toEqual([427_592, 427_594])
+    })
+
+    it('BUNTAN 보관형 3건 — 매입만 합산 차감, 매출·커미션 불변', () => {
+      const d = makeDelivery({
+        product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-08',
+        contract: { sell_price: 200_000, cost_price: 180_000, currency: 'KRW', reference_exchange_rate: null },
+      })
+      const deps = [30_000, 50_000, 20_000].map(amount => ({
+        product_id: 'prod-b', year_month: '2026-08', amount,
+        sales_deduct_ym: null, cost_deduct_ym: '2026-08',
+      }))
+      const withDeps = generateInvoices([d], '2026-09', deps)
+      const noDeps   = generateInvoices([d], '2026-09')
+      expect(withDeps.find(i => i.invoice_type === 'cost')!.supply_amount).toBe(1_700_000)
+      expect(withDeps.find(i => i.invoice_type === 'sales')!.supply_amount)
+        .toBe(noDeps.find(i => i.invoice_type === 'sales')!.supply_amount)
+      expect(withDeps.filter(i => i.invoice_type === 'commission').map(i => i.supply_amount))
+        .toEqual(noDeps.filter(i => i.invoice_type === 'commission').map(i => i.supply_amount))
+    })
+  })
+
   describe('cost_vat_actual 전달', () => {
     const d = makeDelivery({
       product_name: 'BUNTAN', product_id: 'prod-b', year_month: '2026-07',

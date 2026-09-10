@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseMonthlyDepInput, sumUnsettled, sumUnrecovered,
   depKind, depSettlement, splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
-  salesDepTargetIds, depImpactsFor,
+  salesDepTargetIds, depImpactsFor, vatActualConflicts,
 } from '@/lib/depreciation'
 import type { MonthlyDepreciation } from '@/types'
 
@@ -84,6 +84,43 @@ describe('depKind / 누계', () => {
   it('빈 배열 → 0', () => {
     expect(sumUnsettled([])).toBe(0)
     expect(sumUnrecovered([])).toBe(0)
+  })
+})
+
+describe('vatActualConflicts', () => {
+  const row = (over: Partial<{ product_id: string; cost_deduct_ym: string | null; cost_vat_actual: number | null }>) => ({
+    product_id: 'prod-b', cost_deduct_ym: '2026-08', cost_vat_actual: null, ...over,
+  })
+
+  it('같은 품목·차감월에 실물 세액이 2건 이상이면 충돌 — 계산서 한 장의 세액은 합칠 수 없다', () => {
+    expect(vatActualConflicts([
+      row({ cost_vat_actual: 111 }),
+      row({ cost_vat_actual: 222 }),
+      row({ cost_vat_actual: 333 }),
+    ])).toEqual([{ product_id: 'prod-b', cost_deduct_ym: '2026-08', count: 3 }])
+  })
+
+  it('한 건만 입력됐거나 품목·차감월이 다르면 충돌 아님', () => {
+    expect(vatActualConflicts([
+      row({ cost_vat_actual: 111 }),
+      row({ cost_vat_actual: null }),
+      row({ product_id: 'other', cost_vat_actual: 222 }),
+      row({ cost_deduct_ym: '2026-09', cost_vat_actual: 333 }),
+    ])).toEqual([])
+  })
+
+  it('회수 없는 감가(cost_deduct_ym null)는 매입 계산서가 없어 충돌 대상 아님', () => {
+    expect(vatActualConflicts([
+      row({ cost_deduct_ym: null, cost_vat_actual: 111 }),
+      row({ cost_deduct_ym: null, cost_vat_actual: 222 }),
+    ])).toEqual([])
+  })
+
+  it('언더스코어가 든 product_id도 차감월을 정확히 분리', () => {
+    expect(vatActualConflicts([
+      row({ product_id: 'prod_b_1', cost_vat_actual: 1 }),
+      row({ product_id: 'prod_b_1', cost_vat_actual: 2 }),
+    ])).toEqual([{ product_id: 'prod_b_1', cost_deduct_ym: '2026-08', count: 2 }])
   })
 })
 

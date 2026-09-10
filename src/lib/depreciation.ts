@@ -135,6 +135,31 @@ export function sumUnrecovered(
     .reduce((s, d) => s + Number(d.amount), 0)
 }
 
+/**
+ * 같은 품목·매입 차감월에 실물 부가세(cost_vat_actual)가 둘 이상 입력된 조합.
+ *
+ * cost_vat_actual은 매입 계산서 **한 장**의 세액이라 합산할 수 없다. 한 달에 감가가
+ * 여러 건이면(통보가 나눠 오는 달) 그중 한 건에만 넣어야 하고, 둘 이상이면
+ * `costDepFor()`가 어느 값이 그 장의 세액인지 판단할 수 없어 계산값으로 되돌린다.
+ * 조용히 무시되면 실물과 1원 어긋난 계산서가 나가므로 화면에서 경고한다.
+ */
+export function vatActualConflicts(
+  deps: Array<Pick<MonthlyDepreciation, 'product_id' | 'cost_deduct_ym' | 'cost_vat_actual'>>,
+): Array<{ product_id: string; cost_deduct_ym: string; count: number }> {
+  const count = new Map<string, number>()
+  for (const d of deps) {
+    if (d.cost_deduct_ym === null || d.cost_vat_actual === null || d.cost_vat_actual === undefined) continue
+    const key = `${d.product_id}_${d.cost_deduct_ym}`
+    count.set(key, (count.get(key) ?? 0) + 1)
+  }
+  return Array.from(count.entries())
+    .filter(([, n]) => n > 1)
+    .map(([key, n]) => {
+      const i = key.lastIndexOf('_')
+      return { product_id: key.slice(0, i), cost_deduct_ym: key.slice(i + 1), count: n }
+    })
+}
+
 // ── 실입금 차액 → 공급가/부가세 역산 ───────────────────────
 
 export type ShortfallSplit =

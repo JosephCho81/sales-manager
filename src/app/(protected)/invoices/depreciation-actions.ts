@@ -98,7 +98,10 @@ export async function upsertMonthlyDepreciation(input: {
     : supabase.from('monthly_depreciations').insert(row).select('id')
   const { data, error } = await q
   if (error) {
-    if (error.code === '23505') return { error: '해당 품목·월의 감가가 이미 있습니다. 기존 항목을 수정하세요.' }
+    // 같은 품목·납품월 여러 건은 022에서 허용됐다 — 여기 걸리면 마이그레이션 미적용이다
+    if (error.code === '23505') {
+      return { error: '같은 품목·납품월 감가를 한 건으로 막는 제약이 DB에 남아 있습니다. 022_dep_allow_multiple_per_month.sql을 적용하세요.' }
+    }
     return { error: error.message }
   }
   if (!data || data.length === 0) return { error: input.id ? STALE_WRITE_ERROR : '감가 저장 결과를 읽지 못했습니다.' }
@@ -209,7 +212,7 @@ export async function recordPaymentShortfall(input: {
     .select('id')
   if (depErr) {
     if (depErr.code === '23505') {
-      return { error: `${depInput.year_month} 해당 품목 감가가 이미 등록돼 있습니다. 감가 패널에서 기존 항목을 확인하세요.` }
+      return { error: '같은 품목·납품월 감가를 한 건으로 막는 제약이 DB에 남아 있습니다. 022_dep_allow_multiple_per_month.sql을 적용하세요.' }
     }
     return { error: `감가 기록 실패: ${depErr.message}` }
   }

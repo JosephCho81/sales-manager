@@ -4,7 +4,7 @@ import { Fragment, useState } from 'react'
 import { useCanEdit } from '@/components/RoleProvider'
 import { useRouter } from 'next/navigation'
 import { fmtKrw } from '@/lib/margin'
-import { depSettlement, sumUnsettled, sumUnrecovered, depImpactsFor, type DepSettlement } from '@/lib/depreciation'
+import { depSettlement, sumUnsettled, sumUnrecovered, depImpactsFor, vatActualConflicts, type DepSettlement } from '@/lib/depreciation'
 import { depDefaultDeliveryMonth } from '@/lib/invoice-generator'
 import { toMessage } from '@/lib/error'
 import type { MonthlyDepreciation } from '@/types'
@@ -84,6 +84,8 @@ export default function DepreciationPanel({
   const productMap = new Map(products.map(p => [p.id, p]))
   const unsettled  = sumUnsettled(deps)
   const unrecovered = sumUnrecovered(deps)
+  // 한 달에 감가가 여러 건인 경우 실물 부가세는 한 건에만 — 둘 이상이면 조용히 무시된다
+  const vatConflicts = vatActualConflicts(deps)
 
   // 품목이 정해지면 그 품목의 발행 offset으로 기본 납품월을 잡는다 (분탄 M−1, AL30 M−2)
   const defaultYm = pid
@@ -142,9 +144,12 @@ export default function DepreciationPanel({
     })
   }
 
+  // 같은 품목·납품월에 여러 건이 오므로(통보가 나눠 오는 달) 입력순으로 tie-break —
+  // 순서가 흔들리면 어느 행을 수정·삭제하는지 헷갈린다
   const sorted = [...deps].sort((a, b) =>
     b.year_month.localeCompare(a.year_month) ||
-    (productMap.get(a.product_id)?.label ?? '').localeCompare(productMap.get(b.product_id)?.label ?? ''),
+    (productMap.get(a.product_id)?.label ?? '').localeCompare(productMap.get(b.product_id)?.label ?? '') ||
+    (a.created_at ?? '').localeCompare(b.created_at ?? ''),
   )
 
   return (
@@ -153,7 +158,7 @@ export default function DepreciationPanel({
         <h3 className="text-sm font-bold text-gray-900">
           감가 관리
           <span className="ml-1 font-normal text-xs text-gray-400">
-            — 품목·납품월 단위. 저장하면 해당 월 계산서가 자동 재생성됩니다
+            — 품목·납품월 단위. 통보가 나눠 오면 같은 달에 여러 건 등록해도 됩니다(합산 반영)
           </span>
         </h3>
         <p className="text-sm flex gap-4">
@@ -165,6 +170,14 @@ export default function DepreciationPanel({
           </span>
         </p>
       </div>
+
+      {vatConflicts.length > 0 && (
+        <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded">
+          {vatConflicts.map(c => `${productMap.get(c.product_id)?.label ?? c.product_id} ${c.cost_deduct_ym} (${c.count}건)`).join(', ')}
+          — 같은 매입 계산서에 실물 부가세가 여러 건 입력됐습니다. 계산서 한 장의 세액이라 합칠 수 없어
+          자동 계산값으로 발행됩니다. 한 건만 남기고 나머지는 비우세요.
+        </p>
+      )}
 
       {sorted.length > 0 && (
         <div className="overflow-x-auto mt-3">
