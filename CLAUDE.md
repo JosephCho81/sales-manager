@@ -58,7 +58,7 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **커미션** → `CommissionClient.tsx` + `commission/actions.ts`
 - **납품 폼 로직** → `deliveries/useDeliveryForm.ts` (상태·저장), `DeliveryForm.tsx` (UI만)
 - **계약 폼 검증** → `contracts/validate.ts`
-- **월별 감가는 품목 무관 공통 구조** → `monthly_depreciations` 테이블(품목×납품월×통보건), 검증·규칙 `lib/depreciation.ts`, UI는 `invoices/DepreciationPanel.tsx` 하나(품목 선택 + 통보일/귀속월/금액)
+- **월별 감가는 품목 무관 공통 구조** → `monthly_depreciations` 테이블(품목×납품월×통보건), 검증·규칙 `lib/depreciation.ts`, UI는 `invoices/DepreciationPanel.tsx` 하나(품목 선택 + 감가 대상일/귀속월/금액)
   **반영 위치는 담당자가 고르지 않는다 — 품목이 정한다.** `DEP_POLICIES`(lib/depreciation.ts)가 품목별로 매출 감액 여부·매입 차감처·회수월 선택 가능 여부를 갖고 있고, `depDeductMonths()`가 그걸로 `sales_deduct_ym`·`cost_deduct_ym` 두 컬럼을 만든다. 서버 액션이 클라이언트가 보낸 값이 아니라 이 결과를 저장한다
   - 예전엔 보관형/통과형·계산서 회수/통과형·별도 정산 3지 라디오를 담당자가 골랐다. **되돌리지 말 것** — 용어가 화면에서 이해되지 않았고(사용자 피드백 2026-09-11), 뒤바뀌면 커미션이 조용히 틀린다. 세 유형은 두 컬럼 조합에 붙인 이름일 뿐 별개의 정산 수단이 아니다
   - **분탄** `sales=null, cost=year_month`: 동창 매입만 차감, 렘코 매출·커미션은 총액 유지 → 차감액이 통장에 남아 연말 렘코 정리
@@ -67,7 +67,9 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
     - `cost_deduct_ym` NULL의 의미가 015("미지정 = 당월 차감")에서 뒤집혔다(021). 코드에 `cost_deduct_ym ?? year_month` 폴백을 **다시 넣지 말 것** — 넣으면 렘코 매입에서 조용히 이중 차감된다. `MonthlyDepInput`·`MonthlyDepForAnalytics`의 두 월 필드를 필수로 둔 이유도 같다
   - **AL-30 / AL-40** `sales=year_month, cost=합의한 회수월`: 현대제철이 감액 역발행해 마진·커미션이 그달에 −, 회수월 화림 매입에서 + 로 복구. **회수월만이 화면에서 고를 수 있는 유일한 값**이다(`costMonthChosen: true`)
   - **연말 정리 잔액** → `carryBalances()`가 계산서에 반영되지 않고 쌓인 금액을 거래처별로 모은다(소괴탄 = 받을 돈, 분탄 = 돌려줄 돈, 순액 = 차액). 연말에 **감가가 아닌 다른 명목의 계산서 한 장**으로 정리하며, 그 계산서는 시스템이 만들지 않는다. `pendingRecovery()`는 그와 달리 계산서로 회수되는 건(화림)의 대기 잔액이다
-  - **같은 품목·납품월에 감가가 여러 건 올 수 있다**(현지 통보가 며칠에 걸쳐 나뉨 — 2026-08 소괴탄·분탄 9/3·9/6). 014의 `UNIQUE (product_id, year_month)`가 2건째부터 막고 있었고 **022에서 제거**했다. 반영은 원래부터 합산(`index.ts`의 `slice()`, 배지·산식, analytics 모두 행 단위) — 다시 유니크 제약을 걸지 말 것. 어느 행이 어느 통보분인지는 `notified_on`(023)으로 구분한다
+  - **같은 품목·납품월에 감가가 여러 건 올 수 있다**(매출처가 "몇월 몇일분"으로 나눠 내려보냄 — 2026-09 소괴탄 9/3·9/6). 014의 `UNIQUE (product_id, year_month)`가 2건째부터 막고 있었고 **022에서 제거**했다. 반영은 원래부터 합산(`index.ts`의 `slice()`, 배지·산식, analytics 모두 행 단위) — 다시 유니크 제약을 걸지 말 것
+  - **`target_delivery_date`(023·024)는 매출처가 지정한 "몇월 몇일분"이다.** 통보받은 날이 아니다(023의 `notified_on`이라는 이름이 틀려 024에서 바꿨다). 그 월은 `year_month`와 항상 같으므로 **서버가 대상일에서 `year_month`를 유도한다** — 담당자에게 같은 값을 두 번 묻지 않는다. 분탄처럼 월 단위로 일괄 통보되는 감가는 대상일이 NULL이고 귀속월만 받는다
+  - **입고는 월말에 일괄 입력한다.** 그래서 감가가 납품 기록보다 먼저 들어오는 게 정상이다 — "귀속월에 납품이 없으면 저장 거부" 같은 검증을 넣지 말 것(사용자 확인 2026-09-11)
   - 단 `cost_vat_actual`은 계산서 **한 장**의 세액이라 합산 불가 — 같은 차감월 감가 중 한 건에만 넣는다. 둘 이상이면 `costDepFor()`가 계산값으로 폴백하고, 패널이 `vatActualConflicts()`로 빨간 경고를 띄운다. 매입 차감이 없는 품목(소괴탄)은 넣을 계산서가 없어 입력칸 자체를 숨긴다
   - 이 구분을 계산서 생성부에 전달하는 게 `DepSlice.marginAmount`(types.ts) — **amount는 계산서에서 뺄 금액, marginAmount는 3사 배분에 반영할 금액**. 분탄은 0. 기본값을 두면 한쪽이 조용히 틀리므로 필수 필드다
   - 자동 반영 지원 품목은 `supportsDepreciation()`(index.ts) = `depPolicyFor()`가 규칙을 돌려주는 품목 = 소괴탄·분탄·AL-30·AL-40. AL35B·AL65B·FeSi는 매입 계산서가 여러 장/건별이라 어느 장에서 뺄지 미확정 — UI에서 비활성 + 서버 액션이 거부한다. **규칙을 열려면 `DEP_POLICIES`에 항목을 추가하면 된다**(목록을 따로 두면 규칙과 어긋난다)

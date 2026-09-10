@@ -237,7 +237,7 @@ describe('parsePaidAmount', () => {
 const AL30 = 'p-al30'
 const dep2605: MonthlyDepreciation = {
   id: 'd1', product_id: AL30, year_month: '2026-05', amount: 56_179,
-  memo: null, notified_on: null, settled_at: null,
+  memo: null, target_delivery_date: null, settled_at: null,
   sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07',
   cost_vat_actual: null,
   created_at: '2026-07-31T00:00:00Z',

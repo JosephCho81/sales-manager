@@ -50,8 +50,11 @@ export async function upsertMonthlyDepreciation(input: {
   year_month: string
   amount: string | number
   memo?: string | null
-  /** 현지 감가 통보일 (YYYY-MM-DD). 표시용 — 계산서 금액에 영향 없음 */
-  notified_on?: string | null
+  /**
+   * 감가 대상 납품일 (YYYY-MM-DD) — 매출처가 "몇월 몇일분"으로 지정해 내려보낸 날짜.
+   * 값이 있으면 `year_month`를 이 날짜의 월로 강제한다 (같은 값을 두 번 받지 않는다).
+   */
+  target_delivery_date?: string | null
   /**
    * 화림 매입에서 회수할 납품월. 규칙이 회수월 선택을 허용하는 품목(AL30·AL40)에서만 쓰인다.
    * 그 외 품목은 무시하고 규칙이 정한 값을 쓴다 — 클라이언트가 보낸 값으로
@@ -77,21 +80,25 @@ export async function upsertMonthlyDepreciation(input: {
     return { error: `${prod.display_name ?? prod.name}은(는) 아직 감가 자동 반영을 지원하지 않습니다. 반영 규칙 확정 후 사용하세요.` }
   }
 
+  // "몇월 몇일분"이 오면 귀속 납품월은 그 날짜의 월이다 — 같은 값을 두 번 받지 않는다
+  const targetDate = input.target_delivery_date?.trim() || null
+  if (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    return { error: '감가 대상일 형식이 잘못되었습니다 (YYYY-MM-DD).' }
+  }
+  const yearMonth = targetDate ? targetDate.slice(0, 7) : input.year_month
+
   // 반영 위치는 클라이언트가 아니라 품목 규칙이 정한다. 화면에서 고를 수 있는 건
   // 회수월 하나뿐이고, 그것도 규칙이 허용하는 품목에서만 반영된다
-  const months = depDeductMonths(policy, input.year_month, input.cost_deduct_ym)
+  const months = depDeductMonths(policy, yearMonth, input.cost_deduct_ym)
   const parsed = parseMonthlyDepInput({
     ...input,
+    year_month: yearMonth,
     sales_deduct_ym: months.sales_deduct_ym,
     cost_deduct_ym: months.cost_deduct_ym,
     no_cost_deduct: months.cost_deduct_ym === null,
   })
   if (!parsed.ok) return { error: parsed.error }
 
-  const notifiedOn = input.notified_on?.trim() || null
-  if (notifiedOn !== null && !/^\d{4}-\d{2}-\d{2}$/.test(notifiedOn)) {
-    return { error: '통보일 형식이 잘못되었습니다 (YYYY-MM-DD).' }
-  }
 
   // 매출이 감액된 달보다 회수가 앞설 수 없다 — 뒤바뀌면 회수 계산서가 먼저 나간다
   if (parsed.sales_deduct_ym && parsed.cost_deduct_ym !== null && parsed.cost_deduct_ym < parsed.sales_deduct_ym) {
@@ -103,7 +110,7 @@ export async function upsertMonthlyDepreciation(input: {
     year_month: parsed.year_month,
     amount: parsed.amount,
     memo: parsed.memo,
-    notified_on: notifiedOn,
+    target_delivery_date: targetDate,
     sales_deduct_ym: parsed.sales_deduct_ym,
     cost_deduct_ym: parsed.cost_deduct_ym,
     cost_vat_actual: parsed.cost_vat_actual,
@@ -121,9 +128,9 @@ export async function upsertMonthlyDepreciation(input: {
     if (error.code === '23505') {
       return { error: '같은 품목·납품월 감가를 한 건으로 막는 제약이 DB에 남아 있습니다. 022_dep_allow_multiple_per_month.sql을 적용하세요.' }
     }
-    // 통보일 컬럼은 023에서 추가됐다 — 코드가 먼저 배포되면 여기로 떨어진다
+    // 대상일 컬럼은 023·024에서 만들어졌다 — 코드가 먼저 배포되면 여기로 떨어진다
     if (error.code === '42703') {
-      return { error: `저장에 필요한 컬럼이 DB에 없습니다(${error.message}). 023_dep_notified_on.sql을 적용하세요.` }
+      return { error: `저장에 필요한 컬럼이 DB에 없습니다(${error.message}). 023·024 마이그레이션을 적용하세요.` }
     }
     return { error: error.message }
   }

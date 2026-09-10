@@ -38,6 +38,9 @@ export type DepProduct = {
  * 이 페이지의 주인공은 계산서 목록이지 감가가 아니다. 그래서 패널 전체가 기본 접힘이고,
  * 펼쳐도 먼저 보이는 건 잔액과 입력 폼이다. 등록된 감가 내역은 그 안에서 한 번 더 접는다.
  *
+ * 감가 대상일은 매출처(동국제강·현대제철)가 "몇월 몇일분"으로 지정해 내려보내는 날짜다.
+ * 그 월이 곧 귀속 납품월이라 담당자가 같은 값을 두 번 넣지 않게 자동으로 채운다.
+ *
  * 품목 선택은 여전히 명시적이다 — 2026-08 소괴탄 감가 212,078원이 분탄 product_id로
  * 저장돼 동창 매입에서 차감된 사고가 품목 선택 없는 전용 패널 때문이었다.
  */
@@ -61,7 +64,7 @@ export default function DepreciationPanel({
   const firstPid  = supported[0]?.id ?? ''
 
   const [pid, setPid]           = useState(firstPid)
-  const [notified, setNotified] = useState('')
+  const [target, setTarget]     = useState('')
   const [ym, setYm]             = useState('')
   const [costYm, setCostYm]     = useState('')
   const [amount, setAmount]     = useState('')
@@ -97,12 +100,13 @@ export default function DepreciationPanel({
 
   // 품목이 정해지면 그 품목의 발행 offset으로 기본 납품월을 잡는다 (분탄 M−1, AL30 M−2)
   const defaultYm = pid ? depDefaultDeliveryMonth(nameOf(pid), invoiceMonth) : ''
-  const effYm     = ym || defaultYm
+  // "몇월 몇일분"이 있으면 귀속 납품월은 그 날짜의 월이다 — 같은 값을 두 번 넣지 않는다
+  const effYm     = target ? target.slice(0, 7) : (ym || defaultYm)
   const effCostYm = costYm || effYm
 
   function reset() {
     setEditId(null); setEditUpdatedAt(null)
-    setPid(firstPid); setNotified('')
+    setPid(firstPid); setTarget('')
     setYm(''); setCostYm(''); setAmount(''); setMemo(''); setVat('')
   }
 
@@ -110,7 +114,7 @@ export default function DepreciationPanel({
     setEditId(d.id)
     setEditUpdatedAt(d.updated_at ?? null)
     setPid(d.product_id)
-    setNotified(d.notified_on ?? '')
+    setTarget(d.target_delivery_date ?? '')
     setYm(d.year_month)
     setCostYm(d.cost_deduct_ym ?? '')
     setAmount(String(Number(d.amount)))
@@ -150,7 +154,7 @@ export default function DepreciationPanel({
       year_month: effYm,
       amount,
       memo,
-      notified_on: notified || null,
+      target_delivery_date: target || null,
       // 반영 위치는 서버가 품목 규칙으로 정한다. 회수월은 규칙이 허용하는 품목에서만 쓰인다
       cost_deduct_ym: formPolicy?.costMonthChosen ? effCostYm : null,
       cost_vat_actual: vat,
@@ -158,7 +162,7 @@ export default function DepreciationPanel({
   }
 
   // 품목 단위로 묶어 접는다 — 감가가 쌓이면 행만 늘어나 어느 품목이 얼마인지 안 보인다.
-  // 같은 품목 안에서는 최근 납품월 먼저, 같은 달이면 통보 순서대로
+  // 같은 품목 안에서는 최근 납품월 먼저, 같은 달이면 대상일 순서대로
   const groups = products
     .map(p => ({
       product: p,
@@ -166,7 +170,7 @@ export default function DepreciationPanel({
         .filter(d => d.product_id === p.id)
         .sort((a, b) =>
           b.year_month.localeCompare(a.year_month) ||
-          (a.notified_on ?? '').localeCompare(b.notified_on ?? '') ||
+          (a.target_delivery_date ?? '').localeCompare(b.target_delivery_date ?? '') ||
           (a.created_at ?? '').localeCompare(b.created_at ?? '')),
     }))
     .filter(g => g.rows.length > 0)
@@ -233,6 +237,10 @@ export default function DepreciationPanel({
             <div className="mt-4">
               <p className="text-xs font-bold text-gray-500 mb-2">
                 {editId ? '감가 수정' : '감가 입력'}
+                <span className="ml-1 font-normal text-gray-400">
+                  — 매출처가 &quot;몇월 몇일분&quot;으로 내려보낸 날짜를 대상일에 넣으면 귀속 납품월은 자동입니다.
+                  분탄처럼 월 단위로 일괄 통보되면 대상일을 비우고 귀속 납품월만 고르세요.
+                </span>
               </p>
               <div className="flex items-end gap-2 flex-wrap">
                 <div>
@@ -247,14 +255,17 @@ export default function DepreciationPanel({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">통보일</label>
-                  <input type="date" value={notified} onChange={e => setNotified(e.target.value)}
+                  <label className="block text-xs text-gray-400 mb-1">감가 대상일</label>
+                  <input type="date" value={target} onChange={e => setTarget(e.target.value)}
                     className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">귀속 납품월</label>
-                  <input type="month" value={effYm} onChange={e => setYm(e.target.value)}
-                    className="border border-gray-300 rounded-md px-2 py-1.5 text-sm" />
+                  <label className="block text-xs text-gray-400 mb-1">
+                    귀속 납품월{target ? ' (대상일에서 자동)' : ''}
+                  </label>
+                  <input type="month" value={effYm} disabled={!!target}
+                    onChange={e => setYm(e.target.value)}
+                    className="border border-gray-300 rounded-md px-2 py-1.5 text-sm disabled:bg-gray-100 disabled:text-gray-500" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">감가 금액(원)</label>
@@ -347,7 +358,7 @@ export default function DepreciationPanel({
                             <table className="w-full text-xs">
                               <thead>
                                 <tr className="text-gray-400">
-                                  <th className="py-1.5 text-left font-medium whitespace-nowrap">통보일</th>
+                                  <th className="py-1.5 text-left font-medium whitespace-nowrap">감가 대상일</th>
                                   <th className="py-1.5 pl-3 text-left font-medium whitespace-nowrap">귀속 납품월</th>
                                   <th className="py-1.5 pl-3 text-right font-medium whitespace-nowrap">감가액</th>
                                   <th className="py-1.5 pl-3 text-left font-medium whitespace-nowrap">반영 위치</th>
@@ -363,7 +374,7 @@ export default function DepreciationPanel({
                                     <Fragment key={d.id}>
                                       <tr className="border-t border-gray-100">
                                         <td className="py-2 tabular-nums whitespace-nowrap">
-                                          {d.notified_on ?? <span className="text-gray-300">미입력</span>}
+                                          {d.target_delivery_date ?? <span className="text-gray-300">월 단위</span>}
                                         </td>
                                         <td className="py-2 pl-3 tabular-nums whitespace-nowrap">{d.year_month}</td>
                                         <td className="py-2 pl-3 text-right tabular-nums font-medium whitespace-nowrap">

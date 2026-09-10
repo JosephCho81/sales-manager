@@ -5,8 +5,11 @@ export interface MonthlyDepreciation {
   year_month: string
   amount: number
   memo: string | null
-  /** 현지 감가 통보일 'YYYY-MM-DD' (023). 표시·식별용 — 계산서 금액에 영향 없음 */
-  notified_on: string | null
+  /**
+   * 감가 대상 납품일 'YYYY-MM-DD' (023·024) — 매출처가 "몇월 몇일분"으로 지정해 내려보낸 날짜.
+   * 월은 `year_month`와 항상 같다. NULL = 월 단위 일괄 통보(분탄)
+   */
+  target_delivery_date: string | null
   /** 렘코 연말 정리 또는 화림 회수 완료 시각. null = 미정산 */
   settled_at: string | null
   /** 매출 입금이 감액된 납품월. null = 매출 영향 없음(분탄) */

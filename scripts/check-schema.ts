@@ -20,7 +20,7 @@ const CHECKS: { migration: string; table: string; column: string }[] = [
   { migration: '019 낙관적잠금',  table: 'monthly_depreciations', column: 'updated_at' },
   { migration: '020 실물대사',    table: 'invoice_instructions',  column: 'reconciled_at' },
   { migration: '020 실물대사',    table: 'invoice_instructions',  column: 'actual_supply_amount' },
-  { migration: '023 감가통보일',  table: 'monthly_depreciations', column: 'notified_on' },
+  { migration: '024 감가대상일',  table: 'monthly_depreciations', column: 'target_delivery_date' },
 ]
 
 function loadEnvLocal(): void {
