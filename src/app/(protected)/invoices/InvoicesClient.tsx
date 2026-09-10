@@ -13,7 +13,7 @@ import {
   type InvoiceRow,
   type CommissionForInvoice,
 } from '@/lib/invoice-generator'
-import { depKind } from '@/lib/depreciation'
+import { carryBalances, pendingRecovery } from '@/lib/depreciation'
 import { useCanEdit } from '@/components/RoleProvider'
 import { regenerateInvoices, updatePaidDate } from './actions'
 import InvoiceTable from './InvoiceTable'
@@ -82,8 +82,11 @@ export default function InvoicesClient({
   // products 전체 목록을 먼저 채워 UUID fallback 방지
   const productMap = new Map<string, string>()
   const productOrderMap = new Map<string, number>()
+  // 감가 규칙 조회는 표시명이 아니라 DB name으로 한다 (depPolicyFor의 접두어 매칭)
+  const productNameMap = new Map<string, string>()
   for (const p of products) {
     productMap.set(p.id, p.display_name ?? p.name)
+    productNameMap.set(p.id, p.name)
     const idx = PRODUCT_ORDER.indexOf(p.name.toUpperCase())
     productOrderMap.set(p.id, idx >= 0 ? idx : 999)
   }
@@ -248,28 +251,25 @@ export default function InvoicesClient({
         </div>
       )}
 
-      {/* 미회수 감가 배너 — 매출 입금에서 이미 차감됐으나 매입에서 아직 회수 못 한 금액.
-          어느 달을 보든 눈에 들어와야 "회수 잊어버림"이 구조적으로 불가능해진다 */}
+      {/* 미정산 감가 요약 한 줄 — 어느 달을 보든 남아 있어야 "회수 잊어버림"을 막는다.
+          내역과 금액 구성은 아래 감가 관리 패널에 있으므로 여기서는 숫자만, 조용하게.
+          빨간 경고로 두면 이 페이지의 주인공인 계산서 표보다 먼저 눈에 들어온다 */}
       {(() => {
-        const unrec = initialMonthlyDeps.filter(d => d.settled_at === null && depKind(d) === 'passthrough')
-        if (unrec.length === 0) return null
-        const sum = unrec.reduce((s, d) => s + Number(d.amount), 0)
+        const rows = initialMonthlyDeps.map(d => ({
+          amount: Number(d.amount),
+          settled_at: d.settled_at,
+          productName: productNameMap.get(d.product_id) ?? '',
+        }))
+        const parts = [
+          ...carryBalances(rows).map(c =>
+            `${c.party} 연말 정리 ${fmtKrw(Math.abs(c.net))} ${c.net >= 0 ? '받을 돈' : '돌려줄 돈'}`),
+          ...pendingRecovery(rows).map(p => `${p.party} 매입 회수 대기 ${fmtKrw(p.amount)}`),
+        ]
+        if (parts.length === 0) return null
         return (
-          <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2.5">
-            <p className="text-sm font-bold text-red-700">
-              미회수 감가 {fmtKrw(sum)} <span className="font-normal text-xs">(공급가액 기준)</span>
-            </p>
-            <ul className="mt-1 space-y-0.5">
-              {unrec.map(d => (
-                <li key={d.id} className="text-xs text-red-700">
-                  {d.year_month} {productMap.get(d.product_id) ?? d.product_id} — {fmtKrw(Number(d.amount))}
-                  {d.cost_deduct_ym
-                    ? ` · ${d.cost_deduct_ym} 납품분 매입 계산서에서 회수 예정`
-                    : ' · 계산서 회수 없음 — 계약 종료 후 공급처와 현금 정산'}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <p className="mb-4 text-xs text-gray-500 tabular-nums">
+            미정산 감가 <span className="text-gray-700">{parts.join(' · ')}</span>
+          </p>
         )
       })()}
 
