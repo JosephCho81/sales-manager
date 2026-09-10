@@ -332,7 +332,7 @@ export default function InvoicesClient({
         </div>
       </div>
 
-      {/* 감가 관리 — 품목 무관. 보관형(분탄) / 통과형(소괴탄·AL-30) 모두 여기서 입력한다 */}
+      {/* 감가 관리 — 품목 무관. 반영 위치는 품목 규칙(DEP_POLICIES)이 정한다 */}
       <DepreciationPanel
         products={depProducts}
         deps={initialMonthlyDeps}

@@ -4,8 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { STALE_WRITE_ERROR } from '@/lib/optimistic'
-import { parseMonthlyDepInput, parsePaidAmount, splitShortfall } from '@/lib/depreciation'
-import { supportsDepreciation } from '@/lib/invoice-generator'
+import { parseMonthlyDepInput, parsePaidAmount, splitShortfall, depPolicyFor, depDeductMonths } from '@/lib/depreciation'
 import { regenerateInvoices } from './actions'
 
 /**
@@ -51,17 +50,19 @@ export async function upsertMonthlyDepreciation(input: {
   year_month: string
   amount: string | number
   memo?: string | null
-  sales_deduct_ym?: string | null
+  /** 현지 감가 통보일 (YYYY-MM-DD). 표시용 — 계산서 금액에 영향 없음 */
+  notified_on?: string | null
+  /**
+   * 화림 매입에서 회수할 납품월. 규칙이 회수월 선택을 허용하는 품목(AL30·AL40)에서만 쓰인다.
+   * 그 외 품목은 무시하고 규칙이 정한 값을 쓴다 — 클라이언트가 보낸 값으로
+   * 렘코 매입 계산서에 감가가 붙는 일이 없어야 한다.
+   */
   cost_deduct_ym?: string | null
-  /** true = 매입 계산서에서 회수하지 않음 (계약 종료 후 현금 정산) */
-  no_cost_deduct?: boolean
   cost_vat_actual?: string | number | null
 }): Promise<{ error?: string; success?: true }> {
   const auth = await requireOwner()
   if ('error' in auth) return { error: auth.error }
   if (!input.product_id) return { error: '품목이 지정되지 않았습니다.' }
-  const parsed = parseMonthlyDepInput(input)
-  if (!parsed.ok) return { error: parsed.error }
 
   const supabase = createAdminClient()
 
@@ -71,11 +72,28 @@ export async function upsertMonthlyDepreciation(input: {
     .from('products').select('name, display_name').eq('id', input.product_id).maybeSingle()
   if (pErr) return { error: `품목 조회 실패: ${pErr.message}` }
   if (!prod) return { error: '품목을 찾을 수 없습니다.' }
-  if (!supportsDepreciation(prod.name)) {
+  const policy = depPolicyFor(prod.name)
+  if (!policy) {
     return { error: `${prod.display_name ?? prod.name}은(는) 아직 감가 자동 반영을 지원하지 않습니다. 반영 규칙 확정 후 사용하세요.` }
   }
 
-  // 통과형(매출 감액)은 회수가 감액보다 앞설 수 없다 — 뒤바뀌면 회수 계산서가 먼저 나간다
+  // 반영 위치는 클라이언트가 아니라 품목 규칙이 정한다. 화면에서 고를 수 있는 건
+  // 회수월 하나뿐이고, 그것도 규칙이 허용하는 품목에서만 반영된다
+  const months = depDeductMonths(policy, input.year_month, input.cost_deduct_ym)
+  const parsed = parseMonthlyDepInput({
+    ...input,
+    sales_deduct_ym: months.sales_deduct_ym,
+    cost_deduct_ym: months.cost_deduct_ym,
+    no_cost_deduct: months.cost_deduct_ym === null,
+  })
+  if (!parsed.ok) return { error: parsed.error }
+
+  const notifiedOn = input.notified_on?.trim() || null
+  if (notifiedOn !== null && !/^\d{4}-\d{2}-\d{2}$/.test(notifiedOn)) {
+    return { error: '통보일 형식이 잘못되었습니다 (YYYY-MM-DD).' }
+  }
+
+  // 매출이 감액된 달보다 회수가 앞설 수 없다 — 뒤바뀌면 회수 계산서가 먼저 나간다
   if (parsed.sales_deduct_ym && parsed.cost_deduct_ym !== null && parsed.cost_deduct_ym < parsed.sales_deduct_ym) {
     return { error: '매입 회수월은 매출 감액월보다 앞설 수 없습니다.' }
   }
@@ -85,6 +103,7 @@ export async function upsertMonthlyDepreciation(input: {
     year_month: parsed.year_month,
     amount: parsed.amount,
     memo: parsed.memo,
+    notified_on: notifiedOn,
     sales_deduct_ym: parsed.sales_deduct_ym,
     cost_deduct_ym: parsed.cost_deduct_ym,
     cost_vat_actual: parsed.cost_vat_actual,
@@ -101,6 +120,10 @@ export async function upsertMonthlyDepreciation(input: {
     // 같은 품목·납품월 여러 건은 022에서 허용됐다 — 여기 걸리면 마이그레이션 미적용이다
     if (error.code === '23505') {
       return { error: '같은 품목·납품월 감가를 한 건으로 막는 제약이 DB에 남아 있습니다. 022_dep_allow_multiple_per_month.sql을 적용하세요.' }
+    }
+    // 통보일 컬럼은 023에서 추가됐다 — 코드가 먼저 배포되면 여기로 떨어진다
+    if (error.code === '42703') {
+      return { error: `저장에 필요한 컬럼이 DB에 없습니다(${error.message}). 023_dep_notified_on.sql을 적용하세요.` }
     }
     return { error: error.message }
   }
@@ -171,8 +194,15 @@ export async function recordPaymentShortfall(input: {
   const { data: prod, error: pErr } = await supabase
     .from('products').select('name, display_name').eq('id', inv.product_id).maybeSingle()
   if (pErr) return { error: `품목 조회 실패: ${pErr.message}` }
-  if (!prod || !supportsDepreciation(prod.name)) {
+  const policy = prod ? depPolicyFor(prod.name) : null
+  if (!policy) {
     return { error: `${prod?.display_name ?? '이 품목'}은(는) 아직 감가 자동 반영을 지원하지 않습니다. 차액 원인을 먼저 확인하세요.` }
+  }
+  // 이 기능은 "매출이 감액 역발행돼 덜 들어온 차액을 매입에서 회수"하는 흐름 전용이다.
+  // 매출을 깎지 않는 품목(분탄)이나 매입에서 회수하지 않는 품목(소괴탄 — 렘코 계산서에
+  // 감가를 붙일 수 없다)에 쓰면 계산서와 어긋난 감가가 남는다
+  if (!policy.salesParty || !policy.costParty) {
+    return { error: `${prod?.display_name ?? '이 품목'}의 실입금 차액은 감가로 자동 처리할 수 없습니다. 감가 관리에서 직접 입력하세요.` }
   }
 
   const total  = Number(inv.total_amount)
@@ -186,12 +216,14 @@ export async function recordPaymentShortfall(input: {
   const split = splitShortfall(parsed.diff, Number(inv.vat_amount) > 0)
   if (!split.ok) return { error: split.error }
 
+  const months = depDeductMonths(policy, inv.delivery_year_month, input.costDeductYM)
   const depInput = parseMonthlyDepInput({
     year_month: inv.delivery_year_month,
     amount: split.supply,
     memo: input.memo ?? `${inv.from_company} 입금 차감 — 실입금 ${parsed.amount.toLocaleString('ko-KR')}원`,
-    sales_deduct_ym: inv.delivery_year_month,
-    cost_deduct_ym: input.costDeductYM,
+    sales_deduct_ym: months.sales_deduct_ym,
+    cost_deduct_ym: months.cost_deduct_ym,
+    no_cost_deduct: months.cost_deduct_ym === null,
   })
   if (!depInput.ok) return { error: depInput.error }
   if (depInput.cost_deduct_ym !== null && depInput.cost_deduct_ym < depInput.year_month) {

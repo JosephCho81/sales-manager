@@ -2,10 +2,12 @@
  * 월별 감가 — 입력 검증·누계·계산서 배지 판정 순수 함수
  * 돈 입력은 결정적 검증: 음수/0/소수/비숫자 거부, 월 형식 강제
  *
- * 감가 두 유형 (혼동 시 이중 차감으로 이어짐 — docs/al30-depreciation-2026-05.md)
- *   보관형(hold)        : 매입만 차감, 매출 총액 유지 → 감가액이 통장에 남음 (분탄, 렘코 반환)
- *   통과형(passthrough) : 매출 계산서가 감액 발행(현대 통보 없이)되고 나중 매입에서 회수
- *                         → 매출·마진·커미션이 그달에 줄고, 회수월에 되돌아옴 (AL30, 화림 회수)
+ * 감가가 계산서에 반영되는 방식은 두 컬럼으로만 표현된다.
+ *   sales_deduct_ym : 그달 매출 계산서가 감액 발행됐는가 (마진·커미션도 같이 움직인다)
+ *   cost_deduct_ym  : 어느 달 매입 계산서에서 차감하는가. null = 어느 계산서도 건드리지 않음
+ *
+ * 두 값은 담당자가 고르는 게 아니라 품목의 거래 구조로 정해진다 — DEP_POLICIES 참조.
+ * 상세 배경은 docs/al30-depreciation-2026-05.md
  */
 import type { MonthlyDepreciation } from '@/types'
 
@@ -20,7 +22,7 @@ export type MonthlyDepInputRaw = {
   /** 매입 계산서에서 차감할 납품월. 미지정 시 year_month(당월 차감) */
   cost_deduct_ym?: string | null
   /**
-   * true면 매입 계산서에서 회수하지 않는다 — 계약 종료 후 현금으로 정산하는 경우.
+   * true면 어느 매입 계산서에서도 차감하지 않는다 — 렘코가 매입처인 품목(소괴탄).
    * 빈 문자열(= 기본값 사용)과 구분해야 하므로 별도 플래그로 받는다.
    */
   no_cost_deduct?: boolean
@@ -35,7 +37,7 @@ export type ParsedMonthlyDep =
       amount: number
       memo: string | null
       sales_deduct_ym: string | null
-      /** null = 매입 계산서에서 회수하지 않음(별도 정산) */
+      /** null = 어느 매입 계산서에서도 차감하지 않음 (연말 별도 정리) */
       cost_deduct_ym: string | null
       cost_vat_actual: number | null
     }
@@ -93,6 +95,157 @@ export function parseMonthlyDepInput(raw: MonthlyDepInputRaw): ParsedMonthlyDep 
   }
 }
 
+// ── 품목별 감가 반영 규칙 ──────────────────────────────────
+
+/**
+ * 감가가 어느 계산서에 어떻게 반영되는지는 품목의 거래 구조로 이미 정해져 있다.
+ * 담당자에게 "보관형이냐 통과형이냐"를 묻지 않고 이 표에서 끌어낸다 — 유형을 손으로
+ * 고르게 하면 뒤바뀐 순간 커미션이 조용히 틀린다.
+ *
+ * 렘코는 상장을 준비 중이라, 최종 납품처 감가를 렘코가 부담한 형태로 계산서에 찍히면
+ * 총액매출이 순액매출로 잡혀 매출 규모가 달라진다. 그래서 **렘코가 상대인 계산서에는
+ * 감가를 붙이지 않는다** — 소괴탄 감가는 어느 계산서에서도 차감하지 않고 잔액으로 쌓아
+ * 연말에 별도 명목의 계산서 한 장으로 정리한다. 분탄은 동창 매입에서 차감한 금액이
+ * 통장에 남으므로 같은 잔액에 반대 방향으로 들어간다.
+ */
+export type DepPolicy = {
+  /** DB products.name 접두어 (AL40은 'AL40고품위알믹스'로 저장돼 있다) */
+  product: string
+  /** 매출 계산서를 감액 발행하는 거래처. null = 매출 총액 유지 */
+  salesParty: string | null
+  /** 감가를 차감할 매입처. null = 매입 계산서를 건드리지 않는다 */
+  costParty: string | null
+  /** 매입 차감월이 건별 합의인가. false면 귀속 납품월과 같은 달에 차감 */
+  costMonthChosen: boolean
+  /** 계산서에 반영되지 않고 쌓이는 잔액의 상대 거래처. null = 잔액 없음 */
+  carryParty: string | null
+  /** 잔액 방향 — receive: 우리가 받을 돈, pay: 우리가 돌려줄 돈 */
+  carryDirection: 'receive' | 'pay' | null
+  /** 입력 화면에 그대로 뿌리는 평문 설명 */
+  summary: string
+}
+
+const DEP_POLICIES: readonly DepPolicy[] = [
+  {
+    product: 'BUNTAN',
+    salesParty: null,
+    costParty: '동창',
+    costMonthChosen: false,
+    carryParty: '렘코',
+    carryDirection: 'pay',
+    summary: '동창 매입 계산서에서 같은 달에 차감합니다. 렘코 매출과 커미션은 총액 그대로 두고, 차감한 금액은 연말에 렘코와 정리합니다.',
+  },
+  {
+    product: 'SOGGAE',
+    salesParty: '동국제강',
+    costParty: null,
+    costMonthChosen: false,
+    carryParty: '렘코',
+    carryDirection: 'receive',
+    summary: '동국제강이 감가를 뺀 금액으로 역발행하므로 매출과 커미션이 그달에 줄어듭니다. 렘코 매입은 전액 그대로 지급하고, 그 차액은 연말에 렘코와 정리합니다.',
+  },
+  {
+    product: 'AL30',
+    salesParty: '현대제철',
+    costParty: '화림',
+    costMonthChosen: true,
+    carryParty: null,
+    carryDirection: null,
+    summary: '현대제철이 감가를 뺀 금액으로 역발행하므로 매출과 커미션이 그달에 줄고, 지정한 달의 화림 매입 계산서에서 되돌아옵니다.',
+  },
+  {
+    product: 'AL40',
+    salesParty: '현대제철',
+    costParty: '화림',
+    costMonthChosen: true,
+    carryParty: null,
+    carryDirection: null,
+    summary: '현대제철이 감가를 뺀 금액으로 역발행하므로 매출과 커미션이 그달에 줄고, 지정한 달의 화림 매입 계산서에서 되돌아옵니다.',
+  },
+] as const
+
+/**
+ * 품목의 감가 규칙. null이면 감가 자동 반영을 지원하지 않는 품목이다
+ * (AL35B·AL65B·FeSi — 매입 계산서가 여러 장이거나 입고 건별이라 어느 장에서 뺄지 미확정).
+ */
+export function depPolicyFor(productName: string): DepPolicy | null {
+  const n = productName.toUpperCase()
+  return DEP_POLICIES.find(p => n === p.product || n.startsWith(p.product)) ?? null
+}
+
+/**
+ * 규칙 + 귀속 납품월 → 실제 저장할 두 컬럼.
+ *
+ * 담당자가 고를 수 있는 건 회수월 하나뿐이고, 그것도 규칙이 허용하는 품목에서만이다.
+ * 렘코가 매입처인 품목(소괴탄)은 어떤 입력이 들어와도 cost_deduct_ym이 null로 고정된다 —
+ * 여기서 값이 새면 렘코 매입 계산서 적요에 "감가 차감"이 찍혀 나간다.
+ */
+export function depDeductMonths(
+  policy: DepPolicy,
+  yearMonth: string,
+  /** 규칙이 회수월 선택을 허용할 때만 쓰인다. 비면 귀속 납품월 */
+  costMonthInput?: string | null,
+): { sales_deduct_ym: string | null; cost_deduct_ym: string | null } {
+  return {
+    sales_deduct_ym: policy.salesParty ? yearMonth : null,
+    cost_deduct_ym: policy.costParty === null
+      ? null
+      : policy.costMonthChosen
+        ? (costMonthInput?.trim() || yearMonth)
+        : yearMonth,
+  }
+}
+
+/** 감가 한 건이 계산서에 어떻게 반영됐는지 한 줄로 — 목록에 유형 대신 놓는다 */
+export function depEffectLine(
+  policy: DepPolicy | null,
+  d: Pick<MonthlyDepreciation, 'sales_deduct_ym' | 'cost_deduct_ym'>,
+): string {
+  if (!policy) return '자동 반영 미지원'
+  const parts: string[] = []
+  if (d.sales_deduct_ym) parts.push(`${policy.salesParty} 매출 ${d.sales_deduct_ym}분 감액`)
+  if (d.cost_deduct_ym) parts.push(`${policy.costParty} 매입 ${d.cost_deduct_ym}분 차감`)
+  if (policy.carryParty) {
+    parts.push(policy.carryDirection === 'pay'
+      ? `${policy.carryParty}에 연말 반환`
+      : `${policy.carryParty}에서 연말 회수`)
+  }
+  return parts.join(' · ')
+}
+
+// ── 연말 정리 잔액 ─────────────────────────────────────────
+
+export type CarryBalance = {
+  party: string
+  /** 우리가 받을 돈 */
+  receive: number
+  /** 우리가 돌려줄 돈 */
+  pay: number
+  /** receive − pay. 양수면 받을 돈, 음수면 줄 돈 */
+  net: number
+}
+
+/**
+ * 계산서에 반영되지 않고 쌓여 연말에 별도 명목으로 정리할 잔액.
+ * 정산완료(settled_at) 처리된 건은 빠진다.
+ */
+export function carryBalances(
+  rows: Array<{ amount: number | string; settled_at: string | null; productName: string }>,
+): CarryBalance[] {
+  const acc = new Map<string, CarryBalance>()
+  for (const r of rows) {
+    if (r.settled_at !== null) continue
+    const policy = depPolicyFor(r.productName)
+    if (!policy?.carryParty) continue
+    const cur = acc.get(policy.carryParty) ?? { party: policy.carryParty, receive: 0, pay: 0, net: 0 }
+    if (policy.carryDirection === 'receive') cur.receive += Number(r.amount)
+    else cur.pay += Number(r.amount)
+    cur.net = cur.receive - cur.pay
+    acc.set(policy.carryParty, cur)
+  }
+  return Array.from(acc.values()).sort((a, b) => a.party.localeCompare(b.party))
+}
+
 // ── 유형 판정 ──────────────────────────────────────────────
 
 export type DepKind = 'hold' | 'passthrough'
@@ -103,36 +256,24 @@ export function depKind(d: Pick<MonthlyDepreciation, 'sales_deduct_ym'>): DepKin
 }
 
 /**
- * 정산 방식 — 화면 라벨과 입력 폼이 이걸로 갈린다.
- *   hold    : 매입만 차감하고 보관 → 나중에 공급처로 반환 (분탄)
- *   recover : 매출 감액 후 지정한 회수월 매입 계산서에서 되찾음 (AL-30)
- *   manual  : 매출만 감액하고 계산서로는 회수하지 않음 — 계약 종료 후 현금 정산 (소괴탄)
+ * 매입 계산서에서 아직 회수되지 않은 감가 — 매입처별 합계.
+ *
+ * 연말에 별도로 정리하는 잔액(carryBalances)과는 다르다. 이쪽은 계산서로 회수되는 건이
+ * 회수월을 기다리고 있는 상태이고, 회수가 끝나면 정산완료로 닫는다.
  */
-export type DepSettlement = 'hold' | 'recover' | 'manual'
-
-export function depSettlement(
-  d: Pick<MonthlyDepreciation, 'sales_deduct_ym' | 'cost_deduct_ym'>,
-): DepSettlement {
-  if (!d.sales_deduct_ym) return 'hold'
-  return d.cost_deduct_ym ? 'recover' : 'manual'
-}
-
-/** 보관형 미정산 누계 (렘코 반환 예정액) */
-export function sumUnsettled(
-  deps: Array<Pick<MonthlyDepreciation, 'amount' | 'settled_at' | 'sales_deduct_ym'>>,
-): number {
-  return deps
-    .filter(d => d.settled_at === null && depKind(d) === 'hold')
-    .reduce((s, d) => s + Number(d.amount), 0)
-}
-
-/** 통과형 미회수 누계 (매출에서 이미 차감됐으나 매입에서 아직 회수 못 한 금액) */
-export function sumUnrecovered(
-  deps: Array<Pick<MonthlyDepreciation, 'amount' | 'settled_at' | 'sales_deduct_ym'>>,
-): number {
-  return deps
-    .filter(d => d.settled_at === null && depKind(d) === 'passthrough')
-    .reduce((s, d) => s + Number(d.amount), 0)
+export function pendingRecovery(
+  rows: Array<{ amount: number | string; settled_at: string | null; productName: string }>,
+): Array<{ party: string; amount: number }> {
+  const acc = new Map<string, number>()
+  for (const r of rows) {
+    if (r.settled_at !== null) continue
+    const policy = depPolicyFor(r.productName)
+    if (!policy?.costParty || policy.carryParty !== null) continue
+    acc.set(policy.costParty, (acc.get(policy.costParty) ?? 0) + Number(r.amount))
+  }
+  return Array.from(acc.entries())
+    .map(([party, amount]) => ({ party, amount }))
+    .sort((a, b) => a.party.localeCompare(b.party))
 }
 
 /**

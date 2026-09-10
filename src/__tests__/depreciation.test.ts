@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  parseMonthlyDepInput, sumUnsettled, sumUnrecovered,
-  depKind, depSettlement, splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
+  parseMonthlyDepInput, carryBalances, pendingRecovery,
+  depKind, depPolicyFor, depDeductMonths, depEffectLine,
+  splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
   salesDepTargetIds, depImpactsFor, vatActualConflicts,
 } from '@/lib/depreciation'
 import type { MonthlyDepreciation } from '@/types'
@@ -61,29 +62,95 @@ describe('parseMonthlyDepInput', () => {
 const hold = { amount: 100_000, settled_at: null, sales_deduct_ym: null }
 const pass = { amount: 56_179,  settled_at: null, sales_deduct_ym: '2026-05' }
 
-describe('depKind / 누계', () => {
-  it('sales_deduct_ym 유무로 보관형·통과형 구분', () => {
+describe('depKind', () => {
+  it('sales_deduct_ym 유무로 매출 감액 여부 구분 — 마진·커미션이 움직이는 기준', () => {
     expect(depKind(hold)).toBe('hold')
     expect(depKind(pass)).toBe('passthrough')
   })
+})
 
-  it('sumUnsettled — 보관형 미정산만 합산 (통과형 제외)', () => {
-    expect(sumUnsettled([
-      hold,
-      { amount: 50_000, settled_at: '2026-10-01T00:00:00Z', sales_deduct_ym: null },
-      { amount: 30_000, settled_at: null, sales_deduct_ym: null },
-      pass,
-    ])).toBe(130_000)
+// ── 품목별 반영 규칙 ───────────────────────────────────────
+describe('depPolicyFor / depDeductMonths', () => {
+  it('분탄 — 매출 총액 유지, 동창 매입에서 같은 달 차감', () => {
+    const p = depPolicyFor('BUNTAN')!
+    expect(p.salesParty).toBeNull()
+    expect(p.costParty).toBe('동창')
+    expect(depDeductMonths(p, '2026-07')).toEqual({
+      sales_deduct_ym: null, cost_deduct_ym: '2026-07',
+    })
   })
 
-  it('sumUnrecovered — 통과형 미회수만 합산', () => {
-    expect(sumUnrecovered([hold, pass])).toBe(56_179)
-    expect(sumUnrecovered([{ ...pass, settled_at: '2026-09-30T00:00:00Z' }])).toBe(0)
+  it('소괴탄 — 동국 매출은 감액, 매입은 어느 계산서도 건드리지 않는다 (렘코 상장)', () => {
+    const p = depPolicyFor('SOGGAE')!
+    expect(p.salesParty).toBe('동국제강')
+    expect(p.costParty).toBeNull()
+    // 회수월을 억지로 넣어도 무시된다 — 렘코 매입 계산서에 감가가 붙으면 안 된다
+    expect(depDeductMonths(p, '2026-08', '2026-12')).toEqual({
+      sales_deduct_ym: '2026-08', cost_deduct_ym: null,
+    })
   })
 
-  it('빈 배열 → 0', () => {
-    expect(sumUnsettled([])).toBe(0)
-    expect(sumUnrecovered([])).toBe(0)
+  it('AL-30·AL-40 — 현대 매출 감액 + 지정한 달 화림 매입에서 회수', () => {
+    for (const name of ['AL30', 'AL40고품위알믹스']) {
+      const p = depPolicyFor(name)!
+      expect(p.costMonthChosen).toBe(true)
+      expect(depDeductMonths(p, '2026-05', '2026-07')).toEqual({
+        sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07',
+      })
+      // 회수월을 안 고르면 귀속 납품월에서 차감
+      expect(depDeductMonths(p, '2026-05', '').cost_deduct_ym).toBe('2026-05')
+    }
+  })
+
+  it('규칙 없는 품목은 null — 감가 자동 반영 미지원', () => {
+    for (const name of ['AL35B', 'AL65B', 'FESI75', 'FESI60']) {
+      expect(depPolicyFor(name)).toBeNull()
+    }
+  })
+
+  it('depEffectLine — 유형 단어 대신 반영 위치를 평문으로', () => {
+    expect(depEffectLine(depPolicyFor('BUNTAN'), { sales_deduct_ym: null, cost_deduct_ym: '2026-07' }))
+      .toBe('동창 매입 2026-07분 차감 · 렘코에 연말 반환')
+    expect(depEffectLine(depPolicyFor('SOGGAE'), { sales_deduct_ym: '2026-08', cost_deduct_ym: null }))
+      .toBe('동국제강 매출 2026-08분 감액 · 렘코에서 연말 회수')
+    expect(depEffectLine(depPolicyFor('AL30'), { sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07' }))
+      .toBe('현대제철 매출 2026-05분 감액 · 화림 매입 2026-07분 차감')
+    expect(depEffectLine(null, { sales_deduct_ym: null, cost_deduct_ym: null })).toBe('자동 반영 미지원')
+  })
+})
+
+// ── 연말 정리 잔액 / 회수 대기 ─────────────────────────────
+describe('carryBalances / pendingRecovery', () => {
+  // 실제 미정산 4건 (2026-09 기준)
+  const rows = [
+    { amount: 212_078, settled_at: null, productName: 'SOGGAE' },
+    { amount: 180_851, settled_at: null, productName: 'BUNTAN' },
+    { amount: 56_411,  settled_at: null, productName: 'BUNTAN' },
+    { amount: 56_179,  settled_at: null, productName: 'AL30' },
+  ]
+
+  it('렘코 잔액 — 소괴탄은 받을 돈, 분탄은 돌려줄 돈, 순액은 차액', () => {
+    expect(carryBalances(rows)).toEqual([
+      { party: '렘코', receive: 212_078, pay: 237_262, net: -25_184 },
+    ])
+  })
+
+  it('AL-30은 화림 계산서로 회수되므로 연말 잔액이 아니라 회수 대기', () => {
+    expect(pendingRecovery(rows)).toEqual([{ party: '화림', amount: 56_179 }])
+  })
+
+  it('분탄은 동창에서 이미 차감됐으므로 회수 대기가 아니다', () => {
+    expect(pendingRecovery([rows[1]])).toEqual([])
+  })
+
+  it('정산완료 건은 양쪽 모두에서 빠진다', () => {
+    const settled = rows.map(r => ({ ...r, settled_at: '2026-12-31T00:00:00Z' }))
+    expect(carryBalances(settled)).toEqual([])
+    expect(pendingRecovery(settled)).toEqual([])
+  })
+
+  it('규칙 없는 품목은 잔액에 잡히지 않는다', () => {
+    expect(carryBalances([{ amount: 1, settled_at: null, productName: 'AL35B' }])).toEqual([])
   })
 })
 
@@ -170,7 +237,7 @@ describe('parsePaidAmount', () => {
 const AL30 = 'p-al30'
 const dep2605: MonthlyDepreciation = {
   id: 'd1', product_id: AL30, year_month: '2026-05', amount: 56_179,
-  memo: null, settled_at: null,
+  memo: null, notified_on: null, settled_at: null,
   sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07',
   cost_vat_actual: null,
   created_at: '2026-07-31T00:00:00Z',
@@ -387,8 +454,8 @@ describe('depBadgeFor short', () => {
 })
 
 
-// ── 계산서 회수 없는 통과형 (계약 종료 후 현금 정산) ────────
-describe('별도 정산 감가 (cost_deduct_ym = null)', () => {
+// ── 매입 계산서를 건드리지 않는 감가 (소괴탄 — 렘코 상장) ──
+describe('연말 정리 감가 (cost_deduct_ym = null)', () => {
   it('no_cost_deduct — 매입 차감월을 null로 파싱', () => {
     const r = parseMonthlyDepInput({
       year_month: '2026-08', amount: 212_078,
@@ -410,12 +477,6 @@ describe('별도 정산 감가 (cost_deduct_ym = null)', () => {
     expect(r.ok && r.cost_deduct_ym).toBe('2026-08')
   })
 
-  it('depSettlement — hold / recover / manual 구분', () => {
-    expect(depSettlement({ sales_deduct_ym: null, cost_deduct_ym: '2026-08' })).toBe('hold')
-    expect(depSettlement({ sales_deduct_ym: '2026-05', cost_deduct_ym: '2026-07' })).toBe('recover')
-    expect(depSettlement({ sales_deduct_ym: '2026-08', cost_deduct_ym: null })).toBe('manual')
-  })
-
   it('매입 계산서에는 배지가 붙지 않는다 — 차감할 달이 없다', () => {
     const manual: MonthlyDepreciation = {
       ...dep2605, id: 'dm', product_id: 'soggae', year_month: '2026-08',
@@ -433,12 +494,9 @@ describe('별도 정산 감가 (cost_deduct_ym = null)', () => {
     expect(sales.short).toBe('감가 −212,078원 반영 발행')
   })
 
-  it('미회수 누계에 계속 잡힌다 (정산완료 전까지)', () => {
-    const manual: MonthlyDepreciation = {
-      ...dep2605, id: 'dm', product_id: 'soggae', year_month: '2026-08',
-      amount: 212_078, sales_deduct_ym: '2026-08', cost_deduct_ym: null,
-    }
-    expect(sumUnrecovered([manual])).toBe(212_078)
-    expect(sumUnrecovered([{ ...manual, settled_at: '2026-12-31T00:00:00Z' }])).toBe(0)
+  it('연말 정리 잔액에 계속 잡힌다 (정산완료 전까지)', () => {
+    const row = { amount: 212_078, settled_at: null as string | null, productName: 'SOGGAE' }
+    expect(carryBalances([row])[0].receive).toBe(212_078)
+    expect(carryBalances([{ ...row, settled_at: '2026-12-31T00:00:00Z' }])).toEqual([])
   })
 })

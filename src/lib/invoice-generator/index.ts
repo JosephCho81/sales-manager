@@ -9,6 +9,7 @@
  *   FESI75 / FESI60 → fesi.ts (입고 건별)
  */
 import { shiftMonths } from '@/lib/date'
+import { depPolicyFor } from '@/lib/depreciation'
 import { genALSeries } from './al-series'
 import { genSoggae, genBuntan } from './coal'
 import { genFeSi } from './fesi'
@@ -29,18 +30,16 @@ const PRODUCT_ORDER = ['AL35B', 'AL65B', 'SOGGAE', 'BUNTAN', 'AL40고품위알�
 export { PRODUCT_ORDER }
 
 /**
- * 월별 감가를 계산서에 자동 반영하는 품목 (DB product.name 기준).
+ * 월별 감가를 계산서에 자동 반영하는 품목 — 반영 규칙(DEP_POLICIES, lib/depreciation.ts)이
+ * 정의된 품목이 곧 지원 품목이다. 목록을 따로 두면 규칙과 어긋난 품목이 입력만 받아지고
+ * 감가가 빠진 계산서가 조용히 나간다.
  *
- * 여기 없는 품목(AL35B·AL65B·FeSi)은 감가 반영 구조가 확정되지 않았다 —
- * 매입 계산서가 여러 장이거나(AL35B: 화림→금화, 금화→한국에이원) 입고 건별 발행(FeSi)이라
- * 어느 장에서 빼야 하는지가 데이터로 결정되지 않는다. 입력만 받아두면 반영 안 된 계산서가
- * 조용히 나가므로, 규칙이 확정될 때까지 UI에서 입력을 막는다.
+ * 규칙이 없는 품목(AL35B·AL65B·FeSi)은 매입 계산서가 여러 장이거나(AL35B: 화림→금화,
+ * 금화→한국에이원) 입고 건별 발행(FeSi)이라 어느 장에서 빼야 하는지가 데이터로 결정되지
+ * 않는다. 규칙이 확정될 때까지 UI와 서버 액션 모두에서 입력을 막는다.
  */
-const DEP_SUPPORTED = ['SOGGAE', 'BUNTAN', 'AL30', 'AL40'] as const
-
 export function supportsDepreciation(productName: string): boolean {
-  const n = productName.toUpperCase()
-  return DEP_SUPPORTED.some(p => n === p || n.startsWith(p))
+  return depPolicyFor(productName) !== null
 }
 
 /** 지급월(invoice_month) → 감가 입력 기본 납품월. 소괴탄·분탄 offset 1, AL30·AL40 offset 2 */
