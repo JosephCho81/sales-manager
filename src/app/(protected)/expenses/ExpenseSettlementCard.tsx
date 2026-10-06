@@ -1,15 +1,9 @@
 'use client'
 
-import { type Dispatch, type SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { fmtKrw } from '@/lib/margin'
 import { EXPENSE_PAYERS, type Expense, type ExpensePayer } from '@/types'
-import type { PayerSettlement, Transfer } from './expense-settlement'
-
-const PAYER_FULL_LABELS: Record<ExpensePayer, string> = {
-  korea_a1: '(주)한국에이원',
-  raseong: '(주)나성',
-  geumhwa: '금화',
-}
+import { PAYER_FULL_LABELS, type PayerSettlement, type Transfer, type Validation } from './expense-settlement'
 
 /** 미정산 합계 + 3사 정산(낼/받을) + 업체 간 송금 안내 + 업체별 지불 세부 */
 export default function ExpenseSettlementCard({
@@ -17,6 +11,7 @@ export default function ExpenseSettlementCard({
   settlement,
   transfers,
   unassignedTotal,
+  transferMessage,
   detailPayer,
   setDetailPayer,
   detailRows,
@@ -25,11 +20,24 @@ export default function ExpenseSettlementCard({
   settlement: Record<ExpensePayer, PayerSettlement>
   transfers: Transfer[]
   unassignedTotal: number
+  transferMessage: Validation<string>
   detailPayer: ExpensePayer | null
   setDetailPayer: Dispatch<SetStateAction<ExpensePayer | null>>
   detailRows: Expense[]
 }) {
   const detailTotal = detailRows.reduce((s, r) => s + r.amount, 0)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+
+  async function handleCopy() {
+    if (!transferMessage.ok) return
+    try {
+      await navigator.clipboard.writeText(transferMessage.payload)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('failed')
+    }
+    setTimeout(() => setCopyStatus('idle'), 2000)
+  }
 
   return (
     <div className="card p-4 sm:p-5 mb-6 border-2 border-amber-100 bg-amber-50">
@@ -75,7 +83,20 @@ export default function ExpenseSettlementCard({
       {/* 업체 간 송금 안내 */}
       {(transfers.length > 0 || unassignedTotal > 0) && (
         <div className="mt-3 bg-white rounded-lg border border-amber-200 p-3">
-          <p className="text-xs font-semibold text-gray-700 mb-2">정산 송금</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-700">정산 송금</p>
+            {transfers.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                disabled={!transferMessage.ok}
+                title={transferMessage.ok ? '단톡방에 붙여넣을 송금 안내 문구 복사' : transferMessage.error}
+                className="text-xs px-2 py-0.5 rounded border border-amber-300 text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {copyStatus === 'copied' ? '복사됨' : copyStatus === 'failed' ? '복사 실패' : '복사'}
+              </button>
+            )}
+          </div>
           {transfers.length === 0 ? (
             <p className="text-xs text-gray-400 py-1 text-center">업체 간 송금할 내역이 없습니다.</p>
           ) : (

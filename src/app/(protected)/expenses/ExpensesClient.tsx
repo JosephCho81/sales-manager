@@ -11,7 +11,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
   const {
     rows, form, setForm,
     saving, error,
-    unsettledTotal, settlement, transfers, unassignedTotal,
+    unsettledTotal, settlement, transfers, unassignedTotal, transferMessage,
     detailPayer, setDetailPayer, detailRows,
     editingId, editForm, setEditForm, startEdit, handleUpdate,
     handleSave, handleToggle, handlePayerChange, handleDelete,
@@ -38,6 +38,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
         settlement={settlement}
         transfers={transfers}
         unassignedTotal={unassignedTotal}
+        transferMessage={transferMessage}
         detailPayer={detailPayer}
         setDetailPayer={setDetailPayer}
         detailRows={detailRows}

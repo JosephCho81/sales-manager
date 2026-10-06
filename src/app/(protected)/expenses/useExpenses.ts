@@ -5,9 +5,9 @@ import { toMessage } from '@/lib/error'
 import { insertExpense, toggleSettled, updateExpense, updatePayer, deleteExpense } from './actions'
 import { type Expense, type ExpensePayer } from '@/types'
 import {
-  computeSettlement, computeUnassignedTotal, computeTransfers,
+  computeSettlement, computeUnassignedTotal, computeTransfers, buildTransferMessage,
   validateExpenseInput, validateExpenseEdit,
-  type PayerSettlement, type Transfer,
+  type PayerSettlement, type Transfer, type Validation,
 } from './expense-settlement'
 
 export type { PayerSettlement, Transfer }
@@ -32,6 +32,7 @@ interface ExpensesReturn {
   settlement: Record<ExpensePayer, PayerSettlement>
   transfers: Transfer[]
   unassignedTotal: number
+  transferMessage: Validation<string>
   detailPayer: ExpensePayer | null
   setDetailPayer: Dispatch<SetStateAction<ExpensePayer | null>>
   detailRows: Expense[]
@@ -68,6 +69,11 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
   const unassignedTotal = useMemo(() => computeUnassignedTotal(unsettledRows), [unsettledRows])
 
   const transfers = useMemo(() => computeTransfers(settlement), [settlement])
+
+  const transferMessage = useMemo(
+    () => buildTransferMessage(unsettledRows, transfers, unassignedTotal),
+    [unsettledRows, transfers, unassignedTotal]
+  )
 
   const detailRows = useMemo(
     () => (detailPayer ? unsettledRows.filter(r => r.payer === detailPayer) : []),
@@ -164,7 +170,7 @@ export function useExpenses(initialRows: Expense[]): ExpensesReturn {
 
   return {
     rows, form, setForm, saving, error,
-    unsettledTotal, settlement, transfers, unassignedTotal,
+    unsettledTotal, settlement, transfers, unassignedTotal, transferMessage,
     detailPayer, setDetailPayer, detailRows,
     editingId, editForm, setEditForm, startEdit, handleUpdate,
     handleSave, handleToggle, handlePayerChange, handleDelete,

@@ -3,6 +3,7 @@
  * 3사(한국에이원/나성/금화) 1/3 균등 부담 기준으로 낼/받을 금액과 송금 매칭을 계산하고,
  * 저장 전 입력(날짜/내역/금액/지불업체)을 결정적으로 검증한다.
  */
+import { fmtKrw } from '@/lib/margin'
 import { EXPENSE_PAYERS, type Expense, type ExpensePayer } from '@/types'
 
 export interface PayerSettlement {
@@ -98,4 +99,49 @@ export function computeTransfers(settlement: Record<ExpensePayer, PayerSettlemen
     if (creditors[j].amt === 0) j++
   }
   return result
+}
+
+// ── 송금 안내 문구 (단톡 복사용) ─────────────────────────────
+
+export const PAYER_FULL_LABELS: Record<ExpensePayer, string> = {
+  korea_a1: '(주)한국에이원',
+  raseong: '(주)나성',
+  geumhwa: '금화',
+}
+
+/** 받는 쪽 계좌 — 나성은 안내하지 않는다 */
+const PAYER_ACCOUNTS: Partial<Record<ExpensePayer, string>> = {
+  korea_a1: '신한은행 110-260-158230 최성호',
+  geumhwa: '카카오뱅크 3333-21-3654106',
+}
+
+function fmtDateKo(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return `${y}년 ${m}월 ${d}일`
+}
+
+/**
+ * 미정산 건 기준 송금 안내 문구. 기간은 미정산 건의 최초~최종 날짜.
+ * 지불 업체 미지정분이 있으면 송금액이 틀리므로 문구를 만들지 않는다.
+ */
+export function buildTransferMessage(
+  unsettledRows: Expense[], transfers: Transfer[], unassignedTotal: number,
+): Validation<string> {
+  if (unassignedTotal > 0) {
+    return { ok: false, error: '지불 업체 미지정 건이 있어 복사할 수 없습니다. 먼저 지불 업체를 지정해 주세요.' }
+  }
+  if (transfers.length === 0 || unsettledRows.length === 0) {
+    return { ok: false, error: '송금할 내역이 없습니다.' }
+  }
+  const dates = unsettledRows.map(r => r.date).sort()
+  const lines = [
+    '[비용 정산]',
+    `기간: ${fmtDateKo(dates[0])} ~ ${fmtDateKo(dates[dates.length - 1])}`,
+    ...transfers.map(t => `${PAYER_FULL_LABELS[t.from]} → ${PAYER_FULL_LABELS[t.to]} ${fmtKrw(t.amount)} 입금`),
+  ]
+  const receivers = EXPENSE_PAYERS.filter(p => PAYER_ACCOUNTS[p] && transfers.some(t => t.to === p))
+  if (receivers.length > 0) {
+    lines.push('', ...receivers.map(p => `${PAYER_FULL_LABELS[p].replace('(주)', '')} 계좌: ${PAYER_ACCOUNTS[p]}`))
+  }
+  return { ok: true, payload: lines.join('\n') }
 }

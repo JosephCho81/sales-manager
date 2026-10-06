@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   splitExpense, computeSettlement, computeUnassignedTotal, computeTransfers,
-  validateExpenseInput, validateExpenseEdit,
+  validateExpenseInput, validateExpenseEdit, buildTransferMessage,
 } from '@/app/(protected)/expenses/expense-settlement'
 import type { Expense, ExpensePayer } from '@/types'
 
@@ -107,5 +107,53 @@ describe('validateExpenseEdit (수정 — 지불 업체 불필요)', () => {
       ok: true,
       payload: { date: '2026-06-01', description: '내역', amount: 2000 },
     })
+  })
+})
+
+describe('buildTransferMessage', () => {
+  function expOn(date: string, amount: number, payer: ExpensePayer | null): Expense {
+    return { ...exp(amount, payer), date }
+  }
+
+  it('기간은 미정산 최초~최종 날짜, 받는 업체 계좌만 붙인다', () => {
+    const rows = [
+      expOn('2026-09-15', 200000, 'korea_a1'),
+      expOn('2026-09-01', 100000, 'korea_a1'),
+      expOn('2026-09-30', 1000, 'raseong'),
+    ]
+    const transfers = computeTransfers(computeSettlement(rows))
+    const r = buildTransferMessage(rows, transfers, computeUnassignedTotal(rows))
+    expect(r).toEqual({
+      ok: true,
+      payload: [
+        '[비용 정산]',
+        '기간: 2026년 9월 1일 ~ 2026년 9월 30일',
+        '(주)나성 → (주)한국에이원 99,333원 입금',
+        '금화 → (주)한국에이원 100,334원 입금',
+        '',
+        '한국에이원 계좌: 신한은행 110-260-158230 최성호',
+      ].join('\n'),
+    })
+  })
+
+  it('금화가 받으면 금화 계좌, 나성이 받으면 계좌 생략', () => {
+    const transfers = [
+      { from: 'korea_a1' as const, to: 'geumhwa' as const, amount: 5000 },
+      { from: 'korea_a1' as const, to: 'raseong' as const, amount: 3000 },
+    ]
+    const r = buildTransferMessage([expOn('2026-09-01', 1, 'geumhwa')], transfers, 0)
+    expect(r.ok && r.payload).toContain('금화 계좌: 카카오뱅크 3333-21-3654106')
+    expect(r.ok && r.payload).not.toContain('한국에이원 계좌')
+    expect(r.ok && r.payload).not.toContain('나성 계좌')
+  })
+
+  it('지불 업체 미지정분이 있으면 거부', () => {
+    const rows = [expOn('2026-09-01', 3000, 'korea_a1'), expOn('2026-09-02', 3000, null)]
+    const r = buildTransferMessage(rows, computeTransfers(computeSettlement(rows)), computeUnassignedTotal(rows))
+    expect(r.ok).toBe(false)
+  })
+
+  it('송금 내역이 없으면 거부', () => {
+    expect(buildTransferMessage([], [], 0).ok).toBe(false)
   })
 })
