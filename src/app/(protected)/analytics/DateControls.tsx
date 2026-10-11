@@ -23,9 +23,9 @@ export default function DateControls({
   filterProduct, filterBuyer, onFilterChange, availableProducts,
 }: Props) {
   return (
-    <div className="card p-3 mb-3">
-      {/* 모드 탭 */}
-      <div className="flex gap-1 mb-2">
+    <div className="card p-3 mb-3 flex items-center gap-2 flex-wrap">
+      {/* 모드 탭 — 세그먼트 컨트롤 */}
+      <div className="flex gap-0.5 p-0.5 bg-gray-100 rounded-md">
         {([
           { key: 'month', label: '단일월' },
           { key: 'range', label: '기간' },
@@ -34,10 +34,10 @@ export default function DateControls({
           <button
             key={key}
             onClick={() => setActiveMode(key)}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
               activeMode === key
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-white text-blue-700 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
             }`}
           >
             {label}
@@ -46,7 +46,7 @@ export default function DateControls({
       </div>
 
       {/* 날짜 입력 + 조회 */}
-      <div className="flex items-end gap-2 flex-wrap mb-2">
+      <div className="flex items-center gap-2">
         {activeMode === 'month' && (
           <input
             type="month"
@@ -63,7 +63,7 @@ export default function DateControls({
               onChange={e => setFromVal(e.target.value)}
               className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-gray-400 text-sm pb-0.5">~</span>
+            <span className="text-gray-400 text-sm">~</span>
             <input
               type="month"
               value={toVal}
@@ -91,8 +91,8 @@ export default function DateControls({
         </button>
       </div>
 
-      {/* 필터 — 변경 즉시 서버 이동 */}
-      <div className="flex items-center gap-2 flex-wrap">
+      {/* 필터 — 변경 즉시 서버 이동이라 조회 버튼과 떨어뜨려 오른쪽에 둔다 */}
+      <div className="flex items-center gap-2 ml-auto">
         <select
           value={filterProduct}
           onChange={e => onFilterChange(e.target.value, filterBuyer)}
