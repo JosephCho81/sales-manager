@@ -21,6 +21,8 @@ import InvoiceCardList from './InvoiceCardList'
 import DepreciationPanel, { type DepProduct } from './DepreciationPanel'
 import PaymentDialog from './PaymentDialog'
 import ReconcileDialog from './ReconcileDialog'
+import HometaxDialog from './HometaxDialog'
+import { hometaxIssuers, type CompanyInfo } from '@/lib/hometax'
 import { summarizeReconciliation } from '@/lib/reconcile'
 
 type GS = { supply: number; vat: number; total: number }
@@ -47,6 +49,8 @@ export default function InvoicesClient({
   products,
   initialMonthlyDeps,
   uncoveredHolidayYears,
+  companies,
+  companiesError,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
@@ -56,6 +60,9 @@ export default function InvoicesClient({
   initialMonthlyDeps: MonthlyDepreciation[]
   /** 공휴일이 등록되지 않은 연도 — 지급일이 조용히 틀릴 수 있어 경고한다 */
   uncoveredHolidayYears: number[]
+  /** 거래처 사업자정보 (홈택스 엑셀용) */
+  companies: CompanyInfo[]
+  companiesError: string | null
 }) {
   const router        = useRouter()
   const canEdit = useCanEdit()
@@ -65,6 +72,7 @@ export default function InvoicesClient({
   const [selectedMonth, setSelectedMonth] = useState(yearMonth)
   const [payTarget, setPayTarget] = useState<InvoiceRow | null>(null)
   const [reconcileTarget, setReconcileTarget] = useState<InvoiceRow | null>(null)
+  const [hometaxOpen, setHometaxOpen] = useState(false)
   const autoGenRef = useRef(false)
 
   // 감가 저장 등 router.refresh() 후 서버에서 재생성된 계산서를 state에 반영
@@ -189,6 +197,12 @@ export default function InvoicesClient({
               className="btn-secondary text-xs disabled:opacity-40"
             >
               재생성
+            </button>
+          )}
+          {/* 읽기 전용 다운로드라 viewer(나성)도 받을 수 있다 */}
+          {hometaxIssuers(invoices).length > 0 && (
+            <button onClick={() => setHometaxOpen(true)} className="btn-secondary text-xs ml-auto">
+              홈택스 엑셀
             </button>
           )}
         </div>
@@ -374,6 +388,17 @@ export default function InvoicesClient({
           invoice={reconcileTarget}
           onClose={() => setReconcileTarget(null)}
           onDone={() => { setReconcileTarget(null); router.refresh() }}
+        />
+      )}
+
+      {hometaxOpen && (
+        <HometaxDialog
+          yearMonth={yearMonth}
+          invoices={invoices}
+          companies={companies}
+          companiesError={companiesError}
+          productMap={productMap}
+          onClose={() => setHometaxOpen(false)}
         />
       )}
 

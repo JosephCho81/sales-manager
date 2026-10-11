@@ -4,6 +4,8 @@ import { hydrateHolidays, fetchHolidays, uncoveredHolidayYears } from '@/lib/hol
 import { getCurrentYearMonth } from '@/lib/date'
 import ProductsClient from './ProductsClient'
 import HolidayPanel from './HolidayPanel'
+import CompanyPanel from './CompanyPanel'
+import { fetchCompanies } from '@/lib/companies'
 import FetchErrorView from '@/components/FetchErrorView'
 import type { Product } from '@/types'
 
@@ -12,9 +14,10 @@ export const dynamic = 'force-dynamic'
 export default async function ProductsPage() {
   try {
     const supabase = createAdminClient()
-    const [{ data, error }, holidays] = await Promise.all([
+    const [{ data, error }, holidays, companies] = await Promise.all([
       supabase.from('products').select('*').order('display_name'),
       fetchHolidays(),
+      fetchCompanies(),
     ])
 
     if (error) throw new Error(error.message)
@@ -27,6 +30,7 @@ export default async function ProductsPage() {
       <>
         <ProductsClient initialProducts={(data ?? []) as unknown as Product[]} />
         <HolidayPanel holidays={holidays} uncoveredYears={uncovered} />
+        <CompanyPanel companies={companies} />
       </>
     )
   } catch (e) {

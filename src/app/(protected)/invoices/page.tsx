@@ -4,6 +4,7 @@ import FetchErrorView from '@/components/FetchErrorView'
 import InvoicesClient from './InvoicesClient'
 import { fetchInvoiceInputs } from './invoice-data'
 import { hydrateHolidays, uncoveredHolidayYears } from '@/lib/holidays'
+import { fetchCompanies } from '@/lib/companies'
 import { type InvoiceRow } from '@/lib/invoice-generator'
 import type { MonthlyDepreciation } from '@/types'
 
@@ -27,7 +28,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
     await hydrateHolidays()
     const uncoveredYears = uncoveredHolidayYears(yearMonth)
 
-    const [inputs, iRes, pRes, mdRes] = await Promise.all([
+    const [inputs, iRes, pRes, mdRes, companiesRes] = await Promise.all([
       // 입고·환율·커미션 — 재생성 액션과 동일한 조회 경로 공유
       fetchInvoiceInputs(yearMonth),
 
@@ -48,6 +49,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         .from('monthly_depreciations')
         .select('*')
         .order('year_month', { ascending: true }),
+
+      // 거래처 사업자정보 — 홈택스 엑셀 전용. 025 미적용이어도 지급일정은 떠야 하므로 실패를 삼키고 대화상자에서 알린다
+      fetchCompanies().then(
+        companies => ({ companies, error: null }),
+        (e: unknown) => ({ companies: [], error: toMessage(e) }),
+      ),
     ])
 
     if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
@@ -64,6 +71,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         products={(pRes.data ?? []) as Array<{ id: string; name: string; display_name: string | null }>}
         initialMonthlyDeps={(mdRes.data ?? []) as unknown as MonthlyDepreciation[]}
         uncoveredHolidayYears={uncoveredYears}
+        companies={companiesRes.companies}
+        companiesError={companiesRes.error}
       />
     )
   } catch (e) {

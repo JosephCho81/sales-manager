@@ -97,16 +97,5 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **낙관적 잠금** → `updated_at`(019, 트리거 자동 갱신) + `.eq('updated_at', edit.updatedAt)`. 계약·입고·품목·비용·감가의 **전체 수정**에만 건다. 실패 시 `STALE_WRITE_ERROR`. 단일 필드 토글(정산완료·활성화·지불업체)은 마지막 값이 곧 의도라 걸지 않는다
 - **실물 계산서 대사** → `invoice_instructions.actual_supply_amount/actual_vat_amount/reconciled_at`(020), 순수 판정은 `lib/reconcile.ts`, UI는 합계 숫자 옆 인라인 마커(`InvoiceTable.tsx`의 `ReconcileMark` — 미대사 ⊙ / 일치 ✓ / 차이 ⊙+금액) → `ReconcileDialog.tsx`. 합계 칸 **아래** 블록으로 붙이면 열이 두 줄로 늘어나 표가 깨진다. **재생성 시 보존 대상**이므로 `actions.ts:replaceInvoices`의 보존 쿼리(`is_paid.eq.true,reconciled_at.not.is.null`)와 복원 update에 새 필드를 빠뜨리지 말 것 — 빠뜨리면 재생성 한 번에 대사 기록이 통째로 사라진다. 부가세만 어긋나면 그 값이 곧 `monthly_depreciations.cost_vat_actual`에 넣을 값이다
 - **마이그레이션은 수동** → CLI 연동 없음. `supabase/migrations/*.sql`을 Supabase SQL Editor에서 번호순 실행해야 하고, **새 컬럼에 의존하는 코드는 적용 후에 배포**한다. 적용 상태 점검은 `npm run check:schema`(읽기 전용) — 019 미적용 시 모든 수정이 낙관적 잠금 실패로, 020 미적용 시 계산서 재생성이 실패로 나타난다
+- **홈택스 엑셀 일괄발급** → 지급일정 "홈택스 엑셀"(`invoices/HometaxDialog.tsx`) → `invoices/hometax/route.ts`가 DB 재조회·검증 후 xlsx 생성. 변환·검증은 `lib/hometax.ts`(순수), 양식 1~6행 원문은 `lib/hometax-template.ts`, 사업자정보는 `companies`(025, 품목 설정 `CompanyPanel`). **대상은 한국에이원이 지급하는 커미션뿐** — 매출·매입 행은 from/to의 공급자 의미가 품목마다 달라 넣지 않는다. 금액은 발행 지시 값 그대로(라인별 VAT 보존, 재계산 금지). 실물 대사(✓) 끝난 건은 중복 발급 방지로 제외. 국세청 발급/조회 공식 API는 없음, 유료 API 미사용
 - **테스트** → `src/__tests__/` (`npm test`). 계산 로직 `margin.test.ts`·`invoice-generator.test.ts`, 지급일·공휴일 `date.test.ts`, 실물 대사 `reconcile.test.ts`
-
-## LLM Wiki
-
-This project maintains an LLM-curated wiki at `wiki/` following Andrej Karpathy's "LLM Wiki" pattern (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
-
-Before answering questions that rely on knowledge accumulated in this project, read `wiki/index.md` (or the relevant shard under `wiki/indexes/` if the wiki has been sharded) and use its one-line summaries to find the pages you need. Cite with `[[wikilinks]]`. If the index does not surface good candidates, fall back to `wiki_search.py` from the `llm-wiki` skill for BM25-ranked retrieval.
-
-To add a new source, follow the `llm-wiki` skill's ingest workflow: decide placement under `wiki/sources/`, `wiki/entities/`, `wiki/concepts/`, or `wiki/synthesis/`; identify touched pages and make surgical `str_replace` updates rather than rewrites; update the index; append a one-line entry to `wiki/log.md`.
-
-Scaling discipline: atomic pages (400-line soft cap, 800-line hard cap), sharded indexes past ~150 pages or 300 index lines, required YAML frontmatter on every page, `[[wikilinks]]` for every cross-reference.
-
-Full conventions live in `wiki/SCHEMA.md`. Treat it as authoritative when it disagrees with this summary.

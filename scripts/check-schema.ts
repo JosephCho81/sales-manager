@@ -21,6 +21,7 @@ const CHECKS: { migration: string; table: string; column: string }[] = [
   { migration: '020 실물대사',    table: 'invoice_instructions',  column: 'reconciled_at' },
   { migration: '020 실물대사',    table: 'invoice_instructions',  column: 'actual_supply_amount' },
   { migration: '024 감가대상일',  table: 'monthly_depreciations', column: 'target_delivery_date' },
+  { migration: '025 거래처정보',  table: 'companies',             column: 'biz_no' },
 ]
 
 function loadEnvLocal(): void {
