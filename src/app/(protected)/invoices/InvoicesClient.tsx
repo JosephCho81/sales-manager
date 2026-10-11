@@ -202,44 +202,36 @@ export default function InvoicesClient({
               재생성
             </button>
           )}
+          {/* 실물 대사 현황 — 계산서 표를 밀어내지 않게 버튼 줄의 작은 칩으로, 안내는 눌렀을 때만 */}
+          {invoices.length > 0 && (() => {
+            const r = summarizeReconciliation(invoices)
+            const done = r.reconciled === r.total
+            return (
+              <details className="relative ml-auto">
+                <summary className={`cursor-pointer list-none rounded border px-2 py-1 text-xs tabular-nums ${
+                  r.mismatched > 0 ? 'border-red-300 bg-red-50 font-bold text-red-700'
+                  : done           ? 'border-green-300 bg-green-50 text-green-700'
+                  :                  'border-gray-200 text-gray-500'
+                }`}>
+                  대사 {r.reconciled}/{r.total}
+                  {r.mismatched > 0 && <> · 차이 {r.mismatched}건 ({r.diffTotal > 0 ? '+' : ''}{fmtKrw(r.diffTotal)})</>}
+                </summary>
+                <p className="absolute right-0 z-20 mt-1 w-64 rounded border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600 shadow">
+                  {done
+                    ? (r.mismatched > 0 ? '차이 나는 계산서의 ⊙ 표시를 눌러 확인하세요.' : '이 달 실물 계산서와 전부 일치합니다.')
+                    : <>합계 금액 옆 <b className="text-gray-400">⊙</b> 표시를 눌러 실물 세금계산서의 공급가액·부가세를 입력하세요.</>}
+                </p>
+              </details>
+            )
+          })()}
           {/* 읽기 전용 다운로드라 viewer(나성)도 받을 수 있다 */}
           {hometaxIssuers(invoices, hometaxIssuerLock).length > 0 && (
-            <button onClick={() => setHometaxOpen(true)} className="btn-secondary text-xs ml-auto">
+            <button onClick={() => setHometaxOpen(true)} className="btn-secondary text-xs">
               홈택스 엑셀
             </button>
           )}
         </div>
       </div>
-
-      {/* 실물 대사 현황 — "아직 안 본 달"과 "차이 나는 줄"이 한눈에 드러나야 한다 */}
-      {invoices.length > 0 && (() => {
-        const r = summarizeReconciliation(invoices)
-        const done = r.reconciled === r.total
-        return (
-          <div className={`mb-4 rounded border px-3 py-2 ${
-            r.mismatched > 0 ? 'border-red-300 bg-red-50'
-            : done           ? 'border-green-300 bg-green-50'
-            :                  'border-gray-200 bg-gray-50'
-          }`}>
-            <p className={`text-sm font-medium ${
-              r.mismatched > 0 ? 'text-red-700' : done ? 'text-green-700' : 'text-gray-600'
-            }`}>
-              실물 대사 {r.reconciled}/{r.total}건
-              {r.mismatched > 0 && (
-                <span className="ml-2 tabular-nums font-bold">
-                  차이 {r.mismatched}건 (합계 {r.diffTotal > 0 ? '+' : ''}{fmtKrw(r.diffTotal)})
-                </span>
-              )}
-              {done && r.mismatched === 0 && <span className="ml-2">전부 일치</span>}
-            </p>
-            {r.reconciled < r.total && (
-              <p className="mt-0.5 text-xs text-gray-500">
-                합계 금액 옆 <b className="text-gray-400">⊙</b> 표시를 눌러 실물 세금계산서의 공급가액·부가세를 입력하세요.
-              </p>
-            )}
-          </div>
-        )
-      })()}
 
       {/* 공휴일 미등록 경고 — 지급일 휴일 보정이 틀어질 수 있다 */}
       {uncoveredHolidayYears.length > 0 && (
