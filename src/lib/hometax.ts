@@ -83,6 +83,8 @@ export type HometaxRow = {
   supply: number
   vat: number
   item: string
+  /** 지급예정일 YYYY-MM-DD — 파일에는 안 들어가고 기본 선택에만 쓴다 */
+  dueDate: string | null
 }
 
 export type HometaxPlan = {
@@ -167,7 +169,7 @@ export function planHometaxExport(p: {
       continue
     }
     if (supplier && buyer) {
-      rows.push({ invoiceId: inv.id, writeDate: date.replaceAll('-', ''), supplier, buyer, supply, vat, item })
+      rows.push({ invoiceId: inv.id, writeDate: date.replaceAll('-', ''), supplier, buyer, supply, vat, item, dueDate: inv.payment_due_date })
     }
   }
 
@@ -181,6 +183,14 @@ export function planHometaxExport(p: {
   if (rows.length > HOMETAX_MAX_ROWS) errors.push(`홈택스는 한 번에 ${HOMETAX_MAX_ROWS}건까지만 올릴 수 있습니다.`)
 
   return { rows, skipped, errors }
+}
+
+/**
+ * 대화상자를 열었을 때 기본으로 체크할 계산서 — 지급예정일이 오늘 이후면 아직 발행할 때가 아니라 뺀다.
+ * 예정일이 없으면 판단할 근거가 없으니 체크해 둔다. 담당자는 언제든 다시 체크할 수 있다.
+ */
+export function defaultHometaxSelection(rows: HometaxRow[], today: string): Set<string> {
+  return new Set(rows.filter(r => !r.dueDate || r.dueDate <= today).map(r => r.invoiceId))
 }
 
 /**

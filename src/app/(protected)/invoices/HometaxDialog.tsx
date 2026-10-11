@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { fmtKrw } from '@/lib/margin'
 import { toMessage } from '@/lib/error'
-import { hometaxIssuers, planHometaxExport, type CompanyInfo } from '@/lib/hometax'
+import { defaultHometaxSelection, hometaxIssuers, planHometaxExport, type CompanyInfo } from '@/lib/hometax'
+import { getTodayDate } from '@/lib/date'
 import type { InvoiceRow } from '@/lib/invoice-generator'
 
 /**
@@ -34,8 +35,9 @@ export default function HometaxDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const today = getTodayDate()
   const all = planHometaxExport({ invoices, issuer, companies, productNames: productMap })
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(all.rows.map(r => r.invoiceId)))
+  const [selected, setSelected] = useState<Set<string>>(() => defaultHometaxSelection(all.rows, today))
   const plan = planHometaxExport({ invoices, issuer, companies, productNames: productMap, invoiceIds: selected })
   const errors = companiesError ? [companiesError] : plan.errors
   // 금액 오류 등으로 목록에서 빠진 건 — 고른 것만 받을 수 있으니 막지 않고 알려만 둔다
@@ -44,7 +46,7 @@ export default function HometaxDialog({
   function pickIssuer(name: string) {
     setIssuer(name)
     const next = planHometaxExport({ invoices, issuer: name, companies, productNames: productMap })
-    setSelected(new Set(next.rows.map(r => r.invoiceId)))
+    setSelected(defaultHometaxSelection(next.rows, today))
   }
 
   function toggle(id: string) {
@@ -81,7 +83,7 @@ export default function HometaxDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="card w-full max-w-lg p-4 bg-white" onClick={e => e.stopPropagation()}>
+      <div className="card w-full max-w-xl p-4 bg-white" onClick={e => e.stopPropagation()}>
         <h3 className="text-sm font-bold text-gray-900">홈택스 엑셀 일괄발급 파일</h3>
         <p className="text-xs text-gray-500 mt-0.5">
           {yearMonth} 커미션 계산서 · 받은 파일을 홈택스 <b>엑셀 일괄발급</b>에 올리면 됩니다
@@ -106,6 +108,7 @@ export default function HometaxDialog({
                     onChange={() => setSelected(allChecked ? new Set() : new Set(all.rows.map(r => r.invoiceId)))} />
                 </th>
                 <th className="text-left font-normal pb-1">작성일자</th>
+                <th className="text-left font-normal pb-1">지급예정일</th>
                 <th className="text-left font-normal pb-1">품목</th>
                 <th className="text-right font-normal pb-1">공급가액</th>
                 <th className="text-right font-normal pb-1">세액</th>
@@ -119,18 +122,22 @@ export default function HometaxDialog({
                     <input type="checkbox" checked={selected.has(r.invoiceId)} readOnly className="pointer-events-none" />
                   </td>
                   <td className="py-1">{r.writeDate.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')}</td>
+                  <td className="py-1">{r.dueDate ?? '-'}</td>
                   <td className="py-1">{r.item}</td>
                   <td className="py-1 text-right">{fmtKrw(r.supply)}</td>
                   <td className="py-1 text-right">{fmtKrw(r.vat)}</td>
                 </tr>
               ))}
               <tr className="font-semibold">
-                <td className="pt-1" colSpan={3}>선택 {plan.rows.length}건 · 합계 {fmtKrw(sum.supply + sum.vat)}</td>
+                <td className="pt-1" colSpan={4}>선택 {plan.rows.length}건 · 합계 {fmtKrw(sum.supply + sum.vat)}</td>
                 <td className="pt-1 text-right">{fmtKrw(sum.supply)}</td>
                 <td className="pt-1 text-right">{fmtKrw(sum.vat)}</td>
               </tr>
             </tbody>
           </table>
+        )}
+        {all.rows.some(r => r.dueDate && r.dueDate > today) && (
+          <p className="mt-1 text-xs text-gray-500">지급예정일이 아직 안 된 건은 체크를 빼 두었습니다. 필요하면 눌러서 넣으세요.</p>
         )}
         {plan.rows.length > 0 && (
           <p className="mt-1 text-xs text-gray-500">

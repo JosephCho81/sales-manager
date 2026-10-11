@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isValidBizNo, hometaxBytes, hometaxIssuers, hometaxItemName, planHometaxExport, hometaxSheetRows,
+  isValidBizNo, hometaxBytes, hometaxIssuers, hometaxItemName, planHometaxExport, hometaxSheetRows, defaultHometaxSelection,
   type CompanyInfo,
 } from '@/lib/hometax'
 import { HOMETAX_HEADERS, HOMETAX_REQUIRED_COLS } from '@/lib/hometax-template'
@@ -162,6 +162,18 @@ describe('planHometaxExport', () => {
   it('바이트 한도 초과는 에러', () => {
     const plan = planHometaxExport({ ...base, companies: [company('(주)나성', VALID_A, { ceo_name: '가'.repeat(16) }), companies[1]], invoices: [inv()] })
     expect(plan.errors.join()).toContain('성명')
+  })
+})
+
+describe('defaultHometaxSelection', () => {
+  it('지급예정일이 오늘 이후인 건은 기본 해제, 당일·지난 건·예정일 없는 건은 체크', () => {
+    const plan = planHometaxExport({ issuer: '(주)나성', companies, productNames, invoices: [
+      inv({ id: 'past', payment_due_date: '2026-10-08' }),
+      inv({ id: 'today', payment_due_date: '2026-10-12' }),
+      inv({ id: 'al30', payment_due_date: '2026-11-02' }),
+      inv({ id: 'none', payment_due_date: null }),
+    ] })
+    expect([...defaultHometaxSelection(plan.rows, '2026-10-12')].sort()).toEqual(['none', 'past', 'today'])
   })
 })
 
