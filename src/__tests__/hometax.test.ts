@@ -109,6 +109,21 @@ describe('planHometaxExport', () => {
     expect(plan.rows.map(r => r.invoiceId)).toEqual(['i1'])
   })
 
+  it('선택한 계산서만 넣고, 고르지 않은 건의 오류는 막지 않는다', () => {
+    const plan = planHometaxExport({ ...base, invoiceIds: new Set(['i1']), invoices: [
+      inv(), inv({ id: 'bad', total_amount: 1 }),
+    ] })
+    expect(plan.errors).toEqual([])
+    expect(plan.rows.map(r => r.invoiceId)).toEqual(['i1'])
+  })
+  it('아무것도 고르지 않았거나 대상이 아닌 id를 고르면 에러', () => {
+    expect(planHometaxExport({ ...base, invoiceIds: new Set(), invoices: [inv()] }).errors)
+      .toEqual(['받을 계산서를 하나 이상 선택하세요.'])
+    const plan = planHometaxExport({ ...base, invoiceIds: new Set(['i1', 'other']), invoices: [
+      inv(), inv({ id: 'other', to_company: '(주)금화' }),
+    ] })
+    expect(plan.errors[0]).toMatch(/1건이/)
+  })
   it('실물 대사가 끝난 건은 중복 발급 방지로 건너뛴다', () => {
     const plan = planHometaxExport({ ...base, invoices: [inv(), inv({ id: 'done', reconciled_at: '2026-10-09T00:00:00Z' })] })
     expect(plan.rows.map(r => r.invoiceId)).toEqual(['i1'])

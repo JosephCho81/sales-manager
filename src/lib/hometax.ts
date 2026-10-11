@@ -120,10 +120,13 @@ export function planHometaxExport(p: {
   issuer: string
   companies: CompanyInfo[]
   productNames: Map<string, string>
+  /** 담당자가 고른 계산서만. 없으면 대상 전체 */
+  invoiceIds?: ReadonlySet<string>
 }): HometaxPlan {
   const byName = new Map(p.companies.map(c => [c.name, c]))
-  const targets = p.invoices.filter(inv =>
+  const allTargets = p.invoices.filter(inv =>
     inv.invoice_type === 'commission' && inv.from_company === COMMISSION_PAYER && inv.to_company === p.issuer)
+  const targets = p.invoiceIds ? allTargets.filter(inv => p.invoiceIds!.has(inv.id)) : allTargets
 
   const errors: string[] = []
   const skipped: HometaxPlan['skipped'] = []
@@ -166,7 +169,12 @@ export function planHometaxExport(p: {
     }
   }
 
-  if (targets.length === 0) errors.push(`이 달에 '${p.issuer}' 커미션 계산서가 없습니다.`)
+  if (p.invoiceIds) {
+    const unknown = [...p.invoiceIds].filter(id => !allTargets.some(inv => inv.id === id)).length
+    if (unknown > 0) errors.push(`선택한 계산서 중 ${unknown}건이 이 달 '${p.issuer}' 커미션 계산서가 아닙니다. 화면을 새로고침하세요.`)
+  }
+  if (allTargets.length === 0) errors.push(`이 달에 '${p.issuer}' 커미션 계산서가 없습니다.`)
+  else if (targets.length === 0) errors.push('받을 계산서를 하나 이상 선택하세요.')
   else if (rows.length === 0 && errors.length === 0) errors.push('발행할 계산서가 없습니다 (모두 이미 발행됨).')
   if (rows.length > HOMETAX_MAX_ROWS) errors.push(`홈택스는 한 번에 ${HOMETAX_MAX_ROWS}건까지만 올릴 수 있습니다.`)
 

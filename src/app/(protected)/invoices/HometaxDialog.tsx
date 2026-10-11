@@ -32,14 +32,35 @@ export default function HometaxDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const plan = planHometaxExport({ invoices, issuer, companies, productNames: productMap })
+  const all = planHometaxExport({ invoices, issuer, companies, productNames: productMap })
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(all.rows.map(r => r.invoiceId)))
+  const plan = planHometaxExport({ invoices, issuer, companies, productNames: productMap, invoiceIds: selected })
   const errors = companiesError ? [companiesError] : plan.errors
+  // 금액 오류 등으로 목록에서 빠진 건 — 고른 것만 받을 수 있으니 막지 않고 알려만 둔다
+  const excludedErrors = all.errors.filter(e => !plan.errors.includes(e))
+
+  function pickIssuer(name: string) {
+    setIssuer(name)
+    const next = planHometaxExport({ invoices, issuer: name, companies, productNames: productMap })
+    setSelected(new Set(next.rows.map(r => r.invoiceId)))
+  }
+
+  function toggle(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const allChecked = all.rows.length > 0 && all.rows.every(r => selected.has(r.invoiceId))
 
   async function download() {
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch(`/invoices/hometax?month=${yearMonth}&issuer=${encodeURIComponent(issuer)}`)
+      const res = await fetch(`/invoices/hometax?month=${yearMonth}&issuer=${encodeURIComponent(issuer)}&ids=${[...selected].join(',')}`)
       if (!res.ok) throw new Error(await res.text())
       const blob = await res.blob()
       const a = document.createElement('a')
@@ -67,17 +88,21 @@ export default function HometaxDialog({
         <div className="mt-3 flex gap-1.5">
           {issuers.map(name => (
             <button key={name}
-              onClick={() => setIssuer(name)}
+              onClick={() => pickIssuer(name)}
               className={`rounded-md border px-3 py-1.5 text-sm ${issuer === name ? 'border-blue-500 bg-blue-50 font-bold text-blue-700' : 'border-gray-300 text-gray-600'}`}>
               {name} 발행분
             </button>
           ))}
         </div>
 
-        {plan.rows.length > 0 && (
+        {all.rows.length > 0 && (
           <table className="mt-3 w-full text-sm">
             <thead>
               <tr className="text-xs text-gray-400 border-b border-gray-100">
+                <th className="w-6 pb-1">
+                  <input type="checkbox" checked={allChecked} aria-label="전체 선택"
+                    onChange={() => setSelected(allChecked ? new Set() : new Set(all.rows.map(r => r.invoiceId)))} />
+                </th>
                 <th className="text-left font-normal pb-1">작성일자</th>
                 <th className="text-left font-normal pb-1">품목</th>
                 <th className="text-right font-normal pb-1">공급가액</th>
@@ -85,8 +110,12 @@ export default function HometaxDialog({
               </tr>
             </thead>
             <tbody className="tabular-nums">
-              {plan.rows.map(r => (
-                <tr key={r.invoiceId} className="border-b border-gray-50">
+              {all.rows.map(r => (
+                <tr key={r.invoiceId} onClick={() => toggle(r.invoiceId)}
+                  className={`border-b border-gray-50 cursor-pointer ${selected.has(r.invoiceId) ? '' : 'text-gray-400'}`}>
+                  <td className="py-1">
+                    <input type="checkbox" checked={selected.has(r.invoiceId)} readOnly className="pointer-events-none" />
+                  </td>
                   <td className="py-1">{r.writeDate.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3')}</td>
                   <td className="py-1">{r.item}</td>
                   <td className="py-1 text-right">{fmtKrw(r.supply)}</td>
@@ -94,7 +123,7 @@ export default function HometaxDialog({
                 </tr>
               ))}
               <tr className="font-semibold">
-                <td className="pt-1" colSpan={2}>{plan.rows.length}건 · 합계 {fmtKrw(sum.supply + sum.vat)}</td>
+                <td className="pt-1" colSpan={3}>선택 {plan.rows.length}건 · 합계 {fmtKrw(sum.supply + sum.vat)}</td>
                 <td className="pt-1 text-right">{fmtKrw(sum.supply)}</td>
                 <td className="pt-1 text-right">{fmtKrw(sum.vat)}</td>
               </tr>
@@ -107,9 +136,15 @@ export default function HometaxDialog({
           </p>
         )}
 
-        {plan.skipped.length > 0 && (
+        {excludedErrors.length > 0 && !companiesError && (
+          <ul className="mt-2 text-xs text-amber-700 space-y-0.5">
+            {excludedErrors.map(e => <li key={e}>목록 제외 — {e}</li>)}
+          </ul>
+        )}
+
+        {all.skipped.length > 0 && (
           <p className="mt-2 text-xs text-gray-500">
-            제외 {plan.skipped.length}건 — 실물 대사(✓)가 끝난 계산서는 이미 발행된 것으로 보고 넣지 않습니다.
+            제외 {all.skipped.length}건 — 실물 대사(✓)가 끝난 계산서는 이미 발행된 것으로 보고 넣지 않습니다.
           </p>
         )}
 
@@ -124,7 +159,7 @@ export default function HometaxDialog({
           <button onClick={onClose} className="btn-secondary text-xs">닫기</button>
           <button onClick={download} disabled={busy || errors.length > 0}
             className="btn-primary text-xs disabled:opacity-40">
-            {busy ? '만드는 중…' : '엑셀 파일 받기'}
+            {busy ? '만드는 중…' : `선택 ${plan.rows.length}건 엑셀 받기`}
           </button>
         </div>
       </div>
