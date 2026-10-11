@@ -5,6 +5,8 @@ import InvoicesClient from './InvoicesClient'
 import { fetchInvoiceInputs } from './invoice-data'
 import { hydrateHolidays, uncoveredHolidayYears } from '@/lib/holidays'
 import { fetchCompanies } from '@/lib/companies'
+import { getSession } from '@/lib/auth'
+import { hometaxIssuerLockFor } from '@/lib/account'
 import { type InvoiceRow } from '@/lib/invoice-generator'
 import type { MonthlyDepreciation } from '@/types'
 
@@ -57,6 +59,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       ),
     ])
 
+    const session = await getSession()
+
     if (iRes.error)  throw new Error(`계산서 조회 실패: ${iRes.error.message}`)
     if (pRes.error)  throw new Error(`품목 조회 실패: ${pRes.error.message}`)
     if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
@@ -73,6 +77,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
         uncoveredHolidayYears={uncoveredYears}
         companies={companiesRes.companies}
         companiesError={companiesRes.error}
+        hometaxIssuerLock={session ? hometaxIssuerLockFor(session.username) : null}
       />
     )
   } catch (e) {

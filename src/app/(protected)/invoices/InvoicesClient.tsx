@@ -51,6 +51,7 @@ export default function InvoicesClient({
   uncoveredHolidayYears,
   companies,
   companiesError,
+  hometaxIssuerLock,
 }: {
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
@@ -63,6 +64,8 @@ export default function InvoicesClient({
   /** 거래처 사업자정보 (홈택스 엑셀용) */
   companies: CompanyInfo[]
   companiesError: string | null
+  /** 나성 계정처럼 자기 회사 발행분만 받는 경우 그 회사 */
+  hometaxIssuerLock: string | null
 }) {
   const router        = useRouter()
   const canEdit = useCanEdit()
@@ -200,7 +203,7 @@ export default function InvoicesClient({
             </button>
           )}
           {/* 읽기 전용 다운로드라 viewer(나성)도 받을 수 있다 */}
-          {hometaxIssuers(invoices).length > 0 && (
+          {hometaxIssuers(invoices, hometaxIssuerLock).length > 0 && (
             <button onClick={() => setHometaxOpen(true)} className="btn-secondary text-xs ml-auto">
               홈택스 엑셀
             </button>
@@ -397,6 +400,7 @@ export default function InvoicesClient({
           invoices={invoices}
           companies={companies}
           companiesError={companiesError}
+          issuerLock={hometaxIssuerLock}
           productMap={productMap}
           onClose={() => setHometaxOpen(false)}
         />

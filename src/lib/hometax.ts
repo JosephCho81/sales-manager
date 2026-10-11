@@ -65,10 +65,12 @@ export function hometaxBytes(s: string): number {
 }
 
 /** 이 달 발행 지시 중 엑셀로 낼 수 있는 공급자(커미션 수취 회사) 목록 */
-export function hometaxIssuers(invoices: InvoiceRow[]): string[] {
+export function hometaxIssuers(invoices: InvoiceRow[], lock: string | null = null): string[] {
   const set = new Set<string>()
   for (const inv of invoices) {
-    if (inv.invoice_type === 'commission' && inv.from_company === COMMISSION_PAYER) set.add(inv.to_company)
+    if (inv.invoice_type !== 'commission' || inv.from_company !== COMMISSION_PAYER) continue
+    if (lock && inv.to_company !== lock) continue
+    set.add(inv.to_company)
   }
   return [...set].sort()
 }

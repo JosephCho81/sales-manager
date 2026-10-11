@@ -31,6 +31,19 @@ export function displayNameFor(username: string): string {
   return DISPLAY_NAMES[username] ?? username
 }
 
+/**
+ * 홈택스 엑셀을 자기 회사 발행분만 받을 수 있는 계정. 여기 없는 계정은 전 회사 가능.
+ * 나성 계정이 금화 발행분(금화 사업자정보·금액)을 받지 않게 한다 — route.ts가 강제한다.
+ */
+const HOMETAX_ISSUER_LOCK: Readonly<Record<string, string>> = {
+  kim: '(주)나성',
+}
+
+/** 이 계정이 받을 수 있는 발행 회사가 하나로 정해져 있으면 그 회사, 아니면 null */
+export function hometaxIssuerLockFor(username: string): string | null {
+  return HOMETAX_ISSUER_LOCK[username] ?? null
+}
+
 /** 내부 이메일 → 아이디 (헤더 표시용) */
 export function emailToUsername(email: string | null | undefined): string {
   if (!email) return ''

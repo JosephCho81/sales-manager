@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/auth'
+import { hometaxIssuerLockFor } from '@/lib/account'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchCompanies } from '@/lib/companies'
 import { planHometaxExport, hometaxSheetRows } from '@/lib/hometax'
@@ -21,6 +22,9 @@ export async function GET(req: Request) {
   const issuer = url.searchParams.get('issuer') ?? ''
   const ids = (url.searchParams.get('ids') ?? '').split(',').filter(Boolean)
   if (!YM_RE.test(month) || !issuer || ids.length === 0) return new Response('월·발행 회사·선택한 계산서가 올바르지 않습니다.', { status: 400 })
+
+  const lock = hometaxIssuerLockFor(session.username)
+  if (lock && issuer !== lock) return new Response(`이 계정은 ${lock} 발행분만 받을 수 있습니다.`, { status: 403 })
 
   const supabase = createAdminClient()
   const [iRes, pRes, companies] = await Promise.all([

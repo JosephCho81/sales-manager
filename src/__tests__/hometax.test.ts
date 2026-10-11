@@ -5,6 +5,7 @@ import {
 } from '@/lib/hometax'
 import { HOMETAX_HEADERS, HOMETAX_REQUIRED_COLS } from '@/lib/hometax-template'
 import type { InvoiceRow } from '@/lib/invoice-generator'
+import { hometaxIssuerLockFor } from '@/lib/account'
 
 // 검증번호가 맞는 실존 형식 번호 (테스트 전용)
 const VALID_A = '2208162517'
@@ -77,6 +78,11 @@ describe('hometaxIssuers', () => {
       inv({ id: 'h', from_company: '화림', to_company: '(주)한국에이원' }),
     ])
     expect(list).toEqual(['(주)나성', '금화'])
+  })
+  it('발행 회사가 정해진 계정(나성)은 자기 회사만', () => {
+    const invoices = [inv(), inv({ id: 'g', to_company: '(주)금화' })]
+    expect(hometaxIssuers(invoices, hometaxIssuerLockFor('kim'))).toEqual(['(주)나성'])
+    expect(hometaxIssuers(invoices, hometaxIssuerLockFor('cho'))).toEqual(['(주)금화', '(주)나성'])
   })
 })
 

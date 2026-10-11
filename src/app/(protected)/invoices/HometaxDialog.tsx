@@ -15,6 +15,7 @@ export default function HometaxDialog({
   invoices,
   companies,
   companiesError,
+  issuerLock,
   productMap,
   onClose,
 }: {
@@ -23,11 +24,12 @@ export default function HometaxDialog({
   companies: CompanyInfo[]
   /** 025 미적용 등으로 사업자정보를 못 읽었을 때 */
   companiesError: string | null
+  issuerLock: string | null
   /** product_id → 표시명 (서버와 같은 display_name ?? name) */
   productMap: Map<string, string>
   onClose: () => void
 }) {
-  const issuers = hometaxIssuers(invoices)
+  const issuers = hometaxIssuers(invoices, issuerLock)
   const [issuer, setIssuer] = useState(issuers.includes('(주)나성') ? '(주)나성' : issuers[0] ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
