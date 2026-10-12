@@ -180,8 +180,8 @@ export default function InvoicesClient({
     <div>
       {/* 헤더 */}
       <div className="mb-6">
-        <h2 className="text-xl font-bold text-gray-900">지급 일정 관리</h2>
-        <p className="text-sm text-gray-500 mt-0.5">선택 월의 계산서 발행일 및 지급 예정일</p>
+        <h2 className="text-xl font-bold text-gray-900">결제 일정 관리</h2>
+        <p className="text-sm text-gray-500 mt-0.5">선택 월의 계산서 발행일 및 결제 예정일</p>
 
         <div className="flex items-center gap-2 mt-3">
           <input

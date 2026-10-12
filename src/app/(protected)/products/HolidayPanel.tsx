@@ -55,7 +55,7 @@ export default function HolidayPanel({
         <div className="mt-3 rounded border border-amber-300 bg-amber-50 px-3 py-2">
           <p className="text-sm font-bold text-amber-800">{uncoveredYears.join('·')}년 미등록</p>
           <p className="text-xs text-amber-700 mt-0.5">
-            해당 연도 지급일의 휴일 보정이 틀릴 수 있습니다. 등록 후 지급 일정 화면에서 재생성하세요.
+            해당 연도 지급일의 휴일 보정이 틀릴 수 있습니다. 등록 후 결제 일정 화면에서 재생성하세요.
           </p>
         </div>
       )}

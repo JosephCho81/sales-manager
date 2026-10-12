@@ -264,7 +264,7 @@ export default function DeliveryForm({
       {/* 분탄 — 건별 감가 대신 월별 감가 안내 */}
       {isCoal && !isSoggae && form.depreciation_amount === '' && form.contract_id && (
         <p className="mb-5 text-xs text-gray-400">
-          분탄 감가는 지급 일정 페이지의 &ldquo;감가 정산&rdquo; 패널에서 월별로 입력합니다.
+          분탄 감가는 결제 일정 페이지의 &ldquo;감가 정산&rdquo; 패널에서 월별로 입력합니다.
         </p>
       )}
 

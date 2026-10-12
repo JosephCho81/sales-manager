@@ -47,7 +47,7 @@ export default function CompanyPanel({ companies }: { companies: CompanyInfo[] }
     <div className="card p-5 mt-8">
       <h3 className="text-base font-bold text-gray-800">거래처 사업자정보</h3>
       <p className="text-xs text-gray-500 mt-1">
-        지급 일정의 <b>홈택스 엑셀</b> 파일에 들어갑니다. 사업자등록증 그대로 한 번만 입력하면 됩니다.
+        결제 일정의 <b>홈택스 엑셀</b> 파일에 들어갑니다. 사업자등록증 그대로 한 번만 입력하면 됩니다.
       </p>
 
       <ul className="mt-4 divide-y divide-gray-100 border border-gray-100 rounded">
