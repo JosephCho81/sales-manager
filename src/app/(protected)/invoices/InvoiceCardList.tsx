@@ -103,7 +103,7 @@ export default function InvoiceCardList({
               )}
               {groupUnpaid > 0 && (
                 <span className="ml-auto text-xs text-red-500 font-semibold whitespace-nowrap">
-                  미지급 {fmtKrw(groupUnpaid)}
+                  미결제 {fmtKrw(groupUnpaid)}
                 </span>
               )}
             </div>
@@ -173,7 +173,7 @@ export default function InvoiceCardList({
                       })()}
                     </div>
                     <div className="text-right">
-                      <p className="text-xs text-gray-400">지급예정일</p>
+                      <p className="text-xs text-gray-400">결제예정일</p>
                       <p className="text-sm font-semibold text-gray-700">
                         {inv.payment_due_date ?? '—'}
                       </p>

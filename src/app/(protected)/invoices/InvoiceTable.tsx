@@ -195,7 +195,7 @@ export default function InvoiceTable({
                     </td>
                     <td colSpan={2} className="px-4 py-2 text-right">
                       {groupUnpaid > 0 && (
-                        <span className="text-xs text-red-500 font-medium">미지급 {fmtKrw(groupUnpaid)}</span>
+                        <span className="text-xs text-red-500 font-medium">미결제 {fmtKrw(groupUnpaid)}</span>
                       )}
                     </td>
                   </tr>
@@ -208,8 +208,8 @@ export default function InvoiceTable({
                     <th className="px-4 py-1.5 text-center font-medium">VAT</th>
                     <th className="px-4 py-1.5 text-center font-medium">합계</th>
                     <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">발행기준일</th>
-                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">지급예정일</th>
-                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">지급완료일</th>
+                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">결제예정일</th>
+                    <th className="px-4 py-1.5 text-center font-medium whitespace-nowrap">결제완료일</th>
                   </tr>
 
                   {/* 계산서 행 */}
@@ -294,7 +294,7 @@ export default function InvoiceTable({
                               {inv.paid_at && (
                                 <button
                                   onClick={() => onSetPaidDate(inv.id, null)}
-                                  title="지급완료 취소"
+                                  title="결제완료 취소"
                                   className="shrink-0 px-1 text-xs text-gray-400 hover:text-red-500"
                                 >
                                   ✕

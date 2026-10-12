@@ -305,8 +305,8 @@ export default function InvoicesClient({
           <tbody>
             {[
               { label: '전체 금액',   shortLabel: '전체',   accent: 'border-l-gray-400',  labelCls: 'text-gray-700',  totalColor: 'text-gray-900',  stats: [costStats.all,    salesStats.all,    commRecvStats.all,    commPayStats.all]    },
-              { label: '미지급 잔액', shortLabel: '미지급', accent: 'border-l-red-400',   labelCls: 'text-red-600',   totalColor: 'text-red-600',   stats: [costStats.unpaid, salesStats.unpaid, commRecvStats.unpaid, commPayStats.unpaid] },
-              { label: '지급 완료',   shortLabel: '완료',   accent: 'border-l-green-500', labelCls: 'text-green-700', totalColor: 'text-green-700', stats: [costStats.paid,   salesStats.paid,   commRecvStats.paid,   commPayStats.paid]   },
+              { label: '미결제 잔액', shortLabel: '미결제', accent: 'border-l-red-400',   labelCls: 'text-red-600',   totalColor: 'text-red-600',   stats: [costStats.unpaid, salesStats.unpaid, commRecvStats.unpaid, commPayStats.unpaid] },
+              { label: '결제 완료',   shortLabel: '완료',   accent: 'border-l-green-500', labelCls: 'text-green-700', totalColor: 'text-green-700', stats: [costStats.paid,   salesStats.paid,   commRecvStats.paid,   commPayStats.paid]   },
             ].map(row => (
               <tr key={row.label} className="border-t border-gray-200">
                 <td className={`pl-2 pr-2 md:pl-3 md:pr-4 py-2 md:py-3 bg-gray-50 text-sm font-bold whitespace-nowrap border-l-4 ${row.accent} ${row.labelCls}`}>
