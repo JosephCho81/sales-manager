@@ -3,9 +3,27 @@ import {
   parseMonthlyDepInput, carryBalances, pendingRecovery,
   depKind, depPolicyFor, depDeductMonths, depEffectLine,
   splitShortfall, parsePaidAmount, depBadgeFor, depBreakdownFor,
-  salesDepTargetIds, depImpactsFor, vatActualConflicts,
+  salesDepTargetIds, depImpactsFor, vatActualConflicts, legacyDeliveryDepAllowed,
 } from '@/lib/depreciation'
 import type { MonthlyDepreciation } from '@/types'
+
+describe('legacyDeliveryDepAllowed — 입고 건별 감가 차단 (2026-10 소괴탄 렘코 매입 차감 회귀)', () => {
+  it('신규 입고에 감가 금액이 오면 거부', () => {
+    expect(legacyDeliveryDepAllowed(83_108, null)).toBe(false)
+  })
+  it('기존 값이 없던 입고 수정에 감가 추가도 거부', () => {
+    expect(legacyDeliveryDepAllowed('83108', null)).toBe(false)
+  })
+  it('과거 값을 그대로 두거나 지우는 건 허용', () => {
+    expect(legacyDeliveryDepAllowed(111_165, 111_165)).toBe(true)
+    expect(legacyDeliveryDepAllowed(null, 111_165)).toBe(true)
+    expect(legacyDeliveryDepAllowed(0, 111_165)).toBe(true)
+    expect(legacyDeliveryDepAllowed(undefined, null)).toBe(true)
+  })
+  it('과거 값을 다른 금액으로 바꾸는 건 거부', () => {
+    expect(legacyDeliveryDepAllowed(120_000, 111_165)).toBe(false)
+  })
+})
 
 describe('parseMonthlyDepInput', () => {
   it('정상 입력 — 숫자 문자열/콤마 허용, memo trim, 차감월 기본값=당월', () => {

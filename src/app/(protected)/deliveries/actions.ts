@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { requireOwner } from '@/lib/auth'
 import { logAudit } from '@/lib/audit'
 import { STALE_WRITE_ERROR, type EditTarget } from '@/lib/optimistic'
+import { legacyDeliveryDepAllowed } from '@/lib/depreciation'
 
 const DELIVERY_SELECT = `
   id, year_month, invoice_month, delivery_date, product_id, contract_id,
@@ -18,6 +19,17 @@ export async function upsertDelivery(payload: Record<string, unknown>, edit?: Ed
   if ('error' in auth) return { error: auth.error }
 
   const supabase = createAdminClient()
+
+  let currentDep: number | null = null
+  if (edit) {
+    const { data: cur, error: curErr } = await supabase
+      .from('deliveries').select('depreciation_amount').eq('id', edit.id).maybeSingle()
+    if (curErr) return { error: curErr.message }
+    currentDep = cur?.depreciation_amount ?? null
+  }
+  if (!legacyDeliveryDepAllowed(payload.depreciation_amount, currentDep)) {
+    return { error: '입고 건별 감가는 더 이상 받지 않습니다. 결제 일정의 감가 패널에서 입력하세요.' }
+  }
 
   if (edit) {
     const { data, error } = await supabase

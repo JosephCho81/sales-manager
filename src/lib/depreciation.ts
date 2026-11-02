@@ -196,6 +196,16 @@ export function depDeductMonths(
   }
 }
 
+/**
+ * 입고 건별 감가(`deliveries.depreciation_amount`)는 매출·매입을 같이 깎는 구 방식이다.
+ * 소괴탄에 쓰면 렘코 매입까지 차감되고, 감가 패널에도 같은 금액을 넣으면 매출이 두 번 깎인다
+ * (2026-10 소괴탄 83,108원 사고). 새 값은 받지 않고, 과거 값의 유지·삭제만 허용한다.
+ */
+export function legacyDeliveryDepAllowed(next: unknown, current: number | null): boolean {
+  if (next === null || next === undefined || Number(next) === 0) return true
+  return current !== null && Number(next) === Number(current)
+}
+
 /** 감가 한 건이 계산서에 어떻게 반영됐는지 한 줄로 — 목록에 유형 대신 놓는다 */
 export function depEffectLine(
   policy: DepPolicy | null,
