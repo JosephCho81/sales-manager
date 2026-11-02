@@ -112,12 +112,14 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
     .insert(rows)
     .select('*')
   if (insErr) return { error: insErr.message }
-  await logAudit(user, { table: 'invoice_instructions', rowId: yearMonth, action: 'update', after: { year_month: yearMonth, count: rows.length } })
+  // 보존 대상 원본을 남겨 두어 복원이 실패해도 audit_log에서 되살릴 수 있게 한다
+  await logAudit(user, { table: 'invoice_instructions', rowId: yearMonth, action: 'update', before: { preserved: existing ?? [] }, after: { year_month: yearMonth, count: rows.length } })
 
   // paid_at + 대사 결과 복원
   if (paidMap.size > 0 && data) {
     type Row = { id: string; delivery_ids: string[] | null; product_id: string | null; from_company: string; to_company: string; invoice_type: string | null }
-    await Promise.all(
+    // 복원 실패를 무시하면 결제·대사 기록이 조용히 사라진다 — 결과를 확인해 알린다
+    const restored = await Promise.all(
       (data as Row[]).flatMap(row => {
         const key = row.invoice_type === 'commission' && row.product_id === null && row.delivery_ids?.[0]
           ? `c:${row.delivery_ids[0]}:${row.to_company}`
@@ -138,6 +140,10 @@ async function replaceInvoices(user: User, yearMonth: string, rows: InvoiceToCre
           .eq('id', row.id)
       })
     )
+    const failed = restored.filter(r => r.error)
+    if (failed.length > 0) {
+      return { error: `계산서는 재생성됐지만 결제·대사 기록 ${failed.length}건 복원 실패: ${failed[0].error!.message}. audit_log와 실물 계산서로 다시 입력해야 합니다.` }
+    }
 
     // 복원 반영 후 최종 상태 반환
     const { data: finalData } = await supabase

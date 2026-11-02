@@ -145,3 +145,32 @@ export function buildTransferMessage(
   }
   return { ok: true, payload: lines.join('\n') }
 }
+
+// ── 월별 지출 집계 (기간 필터 적용 후 행 기준) ──
+export type ExpenseMonthRow = {
+  ym: string
+  byPayer: Record<ExpensePayer, number>
+  /** 지불 업체 미지정 금액 */
+  unassigned: number
+  total: number
+  count: number
+}
+
+/** 월 내림차순. 정산 여부와 무관하게 "언제 얼마 썼는지"를 본다 */
+export function summarizeByMonth(rows: Pick<Expense, 'date' | 'amount' | 'payer'>[]): ExpenseMonthRow[] {
+  const map = new Map<string, ExpenseMonthRow>()
+  for (const r of rows) {
+    const ym = r.date.slice(0, 7)
+    let m = map.get(ym)
+    if (!m) {
+      m = { ym, byPayer: { korea_a1: 0, raseong: 0, geumhwa: 0 }, unassigned: 0, total: 0, count: 0 }
+      map.set(ym, m)
+    }
+    const amt = Number(r.amount)
+    if (r.payer) m.byPayer[r.payer] += amt
+    else m.unassigned += amt
+    m.total += amt
+    m.count += 1
+  }
+  return [...map.values()].sort((a, b) => b.ym.localeCompare(a.ym))
+}

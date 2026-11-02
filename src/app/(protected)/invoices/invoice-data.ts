@@ -8,6 +8,12 @@ export type InvoiceInputs = {
   fxRates: FxRateRaw[]
   commissions: CommissionForInvoice[]
   monthlyDeps: MonthlyDepInput[]
+  /**
+   * 이 달 계산서 입력의 변경 시각 — 품목별 (입고 등록·수정·삭제, 단가 수정, 감가 수정 / 커미션 등록은 product_id null).
+   * 저장된 계산서보다 나중이면 "입력이 바뀐 뒤 재생성 안 됨"이다. 계산 규칙이 나중에 바뀐
+   * 과거 발행분의 차이와 구분하려고 쓴다. FeSi 환율(fx_rates)은 시각 컬럼이 없어 빠진다
+   */
+  inputChanges: Array<{ product_id: string | null; at: string }>
 }
 
 /**
@@ -28,9 +34,9 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
       .from('deliveries')
       .select(`
         id, year_month, invoice_month, delivery_date, product_id,
-        quantity_kg, depreciation_amount,
+        quantity_kg, depreciation_amount, updated_at,
         product:products(id, name, display_name, vat),
-        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, updated_at)
       `)
       .eq('invoice_month', yearMonth)
       .order('created_at', { ascending: true }),
@@ -47,7 +53,7 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     // 3) 커미션 조회 — 동국제강=M-2, 현대제철=M-1 고정 오프셋
     supabase
       .from('commissions')
-      .select('id, year_month, company, commission_amount, memo')
+      .select('id, year_month, company, commission_amount, memo, created_at')
       .in('year_month', [dongkukCommMonth, hyundaiCommMonth])
       .order('created_at', { ascending: true }),
   ])
@@ -74,7 +80,7 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     const inList = ymList.map(m => `"${m}"`).join(',')
     const mdRes = await supabase
       .from('monthly_depreciations')
-      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym, cost_vat_actual')
+      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym, cost_vat_actual, updated_at')
       .or(`year_month.in.(${inList}),cost_deduct_ym.in.(${inList}),sales_deduct_ym.in.(${inList})`)
     // 조용히 빈 배열로 폴백하면 감가 누락된 총액 계산서가 발행됨 — 명시적 throw
     if (mdRes.error) throw new Error(`월별 감가 조회 실패: ${mdRes.error.message}`)
@@ -85,7 +91,27 @@ export async function fetchInvoiceInputs(yearMonth: string): Promise<InvoiceInpu
     }))
   }
 
+  // 삭제된 입고는 행이 없으니 감사 로그에서 찾는다 (deleteDelivery가 before에 행 전체를 남김)
+  const { data: delLog, error: delErr } = await supabase
+    .from('audit_log')
+    .select('created_at, before')
+    .eq('table_name', 'deliveries')
+    .eq('action', 'delete')
+    .eq('before->>invoice_month', yearMonth)
+  if (delErr) throw new Error(`감사 로그 조회 실패: ${delErr.message}`)
+
+  type Stamped = { product_id: string; updated_at?: string; contract?: { updated_at?: string } | null }
+  const inputChanges: InvoiceInputs['inputChanges'] = []
+  const push = (product_id: string | null, at: string | null | undefined) => { if (at) inputChanges.push({ product_id, at }) }
+  for (const d of deliveries as unknown as Stamped[]) { push(d.product_id, d.updated_at); push(d.product_id, d.contract?.updated_at) }
+  for (const d of monthlyDeps as unknown as Stamped[]) push(d.product_id, d.updated_at)
+  for (const c of commissions as unknown as Array<{ created_at?: string }>) push(null, c.created_at)
+  for (const r of (delLog ?? []) as Array<{ created_at: string; before: { product_id?: string } | null }>) {
+    push(r.before?.product_id ?? null, r.created_at)
+  }
+
   return {
+    inputChanges,
     deliveries,
     fxRates: (fxRes.data ?? []) as unknown as FxRateRaw[],
     commissions,

@@ -11,6 +11,8 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - `src/lib/holidays.ts` — **서버 전용**. `holidays` 테이블 조회 + `hydrateHolidays()`(date.ts에 주입) + `uncoveredHolidayYears()`
 - `src/lib/reconcile.ts` — 실물 계산서 대사 순수 판정(`diffInvoice`, `summarizeReconciliation`, `parseAmountInput`)
 - `src/lib/optimistic.ts` — 낙관적 잠금 공통(`STALE_WRITE_ERROR`, `EditTarget`)
+- `src/lib/delivery-batch.ts` — 입고 저장 행 조립·검증(톤→kg, 계약·기간 검증, 납품월/청구월 유도, 청구월 충돌, 중복 후보)
+- `src/lib/period.ts` + `components/PeriodFilterBar.tsx` — 목록 기간 필터(현재/월/기간/전체) 공용. 낙찰 단가·비용 정산이 쓴다
 - `src/lib/auth.ts` — **서버 전용**. `getSession()`(레이아웃용) / `requireOwner()`(쓰기 가드)
 - `src/lib/account.ts` — 아이디↔이메일 매핑, 표시 이름. 클라이언트에서도 import 가능
 - `src/lib/auth-actions.ts` — 로그아웃 서버 액션
@@ -21,7 +23,7 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 
 | 파일 | 역할 |
 |---|---|
-| `page.tsx` | 서버: 쿼리 파라미터 파싱(날짜+필터), Supabase 조회, 서버사이드 필터링, `buildAllAnalytics` 호출 후 Client에 전달. raw deliveries는 클라이언트에 전달하지 않음 |
+| `page.tsx` | 서버: 쿼리 파라미터 파싱(날짜+필터), Supabase 조회, 서버사이드 필터링, `buildAllAnalytics` 호출 후 Client에 전달. raw deliveries는 클라이언트에 전달하지 않음. **캐시 없음** — 예전 `unstable_cache`(2분)는 수정 시 무효화가 없어 11월 수정 후 다른 달을 갔다 와야 반영됐다. 다시 넣으려면 모든 mutation에 `revalidateTag`를 같이 걸 것 |
 | `analytics-compute.ts` | 순수 집계 함수. **서버 전용**: `buildAllAnalytics`, `extractAvailableProducts`. **클라이언트 호환**: `computeMargins` / `buildProductRows` / `buildMonthlyData` |
 | `AnalyticsClient.tsx` | 날짜/필터 URL 상태 관리. 필터 변경 시 즉시 서버 이동 (클라이언트 재계산 없음) |
 | `DateControls.tsx` | 날짜 모드 탭 + 날짜 입력 + 조회 버튼. 품목/납품처 필터는 `onFilterChange`로 즉시 이동 |
@@ -37,10 +39,10 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 | 경로 | Client 파일 | 역할 |
 |---|---|---|
 | `/commission` | `CommissionClient.tsx` | 커미션 입력(동국제강/현대제철 섹션), 1/3 배분 미리보기 |
-| `/contracts` | `ContractsClient.tsx` | 낙찰단가 계약 CRUD |
-| `/deliveries` | `DeliveriesClient.tsx` | 납품 건 CRUD, `MarginPreview.tsx` 포함 |
+| `/contracts` | `ContractsClient.tsx` | 낙찰단가 계약 CRUD. 목록 기본 필터 "현재"(종료일 ≥ 오늘 = 진행 중+시작 예정) / 기간 / 전체 |
+| `/deliveries` | `DeliveriesClient.tsx` | 납품 건 CRUD, `MarginPreview.tsx` 포함. `?month=`로 그 달만 서버 조회(예전 최근 200건 제한 제거) |
 | `/products` | `ProductsClient.tsx` | 품목 마스터 관리 + `HolidayPanel.tsx`(공휴일 CRUD) |
-| `/expenses` | `ExpensesClient.tsx` | 공동 비용 입력·3사 정산 |
+| `/expenses` | `ExpensesClient.tsx` | 공동 비용 입력·3사 정산. 월/기간/전체 필터 + 월별·지불업체별 합계(`ExpenseMonthlySummary.tsx`, `summarizeByMonth`). 필터는 목록·합계에만, 정산 카드는 항상 미정산 전체 기준. 비용 분류 칸은 없음(전부 접대비 — 사용자 확인 2026-11-02) |
 | `/invoices` | `InvoicesClient.tsx` | 계산서 발행 지시, `DepreciationPanel`·`PaymentDialog`·`ReconcileDialog` 포함 |
 | `/login` | `LoginForm.tsx` | 아이디 로그인. 인증은 서버 액션 `login/actions.ts` (쿠키 httpOnly 유지 목적) |
 
@@ -57,6 +59,9 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **집계 로직 버그** → `analytics-compute.ts` 집중
 - **커미션** → `CommissionClient.tsx` + `commission/actions.ts`
 - **납품 폼 로직** → `deliveries/useDeliveryForm.ts` (상태·저장), `DeliveryForm.tsx` (UI만)
+  - **새 입고는 품목의 유효 단가가 전부 한 줄씩 나오고 단가별 톤수를 넣어 한 번에 저장**한다(`createDeliveries`, 배열 insert 1문 → 일부만 저장 안 됨). 입고는 월말에 말일 날짜로 일괄 입력하므로 기본 날짜도 조회 월 말일. 수정은 1건 단위(`updateDelivery`)
+  - `year_month`·`invoice_month`는 **서버가 계약의 `invoice_month_offset`으로 유도**한다(`lib/delivery-batch.ts`). 클라이언트가 보낸 값을 저장하던 경로를 되살리지 말 것. 같은 품목·납품월에 청구월이 갈리면(이번 저장분 + 기존 입고) 저장 거부
+  - 같은 품목·단가·납품월에 이미 입고가 있으면 `duplicates`를 돌려주고 "추가분이 맞음" 확인 후에만 저장한다. 같은 달 추가분이 실제로 있을 수 있어 유니크 제약으로 막지 않는다(단가가 다른 2건은 정상)
 - **계약 폼 검증** → `contracts/validate.ts`
 - **월별 감가는 품목 무관 공통 구조** → `monthly_depreciations` 테이블(품목×납품월×통보건), 검증·규칙 `lib/depreciation.ts`, UI는 `invoices/DepreciationPanel.tsx` 하나(품목 선택 + 감가 대상일/귀속월/금액)
   **반영 위치는 담당자가 고르지 않는다 — 품목이 정한다.** `DEP_POLICIES`(lib/depreciation.ts)가 품목별로 매출 감액 여부·매입 차감처·회수월 선택 가능 여부를 갖고 있고, `depDeductMonths()`가 그걸로 `sales_deduct_ym`·`cost_deduct_ym` 두 컬럼을 만든다. 서버 액션이 클라이언트가 보낸 값이 아니라 이 결과를 저장한다
@@ -101,4 +106,8 @@ Next.js App Router + Supabase + Tailwind. 서버 컴포넌트(page.tsx)가 데�
 - **실물 계산서 대사** → `invoice_instructions.actual_supply_amount/actual_vat_amount/reconciled_at`(020), 순수 판정은 `lib/reconcile.ts`, UI는 합계 숫자 옆 인라인 마커(`InvoiceTable.tsx`의 `ReconcileMark` — 미대사 ⊙ / 일치 ✓ / 차이 ⊙+금액) → `ReconcileDialog.tsx`. 합계 칸 **아래** 블록으로 붙이면 열이 두 줄로 늘어나 표가 깨진다. **재생성 시 보존 대상**이므로 `actions.ts:replaceInvoices`의 보존 쿼리(`is_paid.eq.true,reconciled_at.not.is.null`)와 복원 update에 새 필드를 빠뜨리지 말 것 — 빠뜨리면 재생성 한 번에 대사 기록이 통째로 사라진다. 부가세만 어긋나면 그 값이 곧 `monthly_depreciations.cost_vat_actual`에 넣을 값이다
 - **마이그레이션은 수동** → CLI 연동 없음. `supabase/migrations/*.sql`을 Supabase SQL Editor에서 번호순 실행해야 하고, **새 컬럼에 의존하는 코드는 적용 후에 배포**한다. 적용 상태 점검은 `npm run check:schema`(읽기 전용) — 019 미적용 시 모든 수정이 낙관적 잠금 실패로, 020 미적용 시 계산서 재생성이 실패로 나타난다
 - **홈택스 엑셀 일괄발급** → 지급일정 "홈택스 엑셀"(`invoices/HometaxDialog.tsx`) → `invoices/hometax/route.ts`가 DB 재조회·검증 후 xlsx 생성. 변환·검증은 `lib/hometax.ts`(순수), 양식 1~6행 원문은 `lib/hometax-template.ts`, 사업자정보는 `companies`(025, 품목 설정 `CompanyPanel`). **대상은 한국에이원이 지급하는 커미션뿐** — 매출·매입 행은 from/to의 공급자 의미가 품목마다 달라 넣지 않는다. 금액은 발행 지시 값 그대로(라인별 VAT 보존, 재계산 금지). 실물 대사(✓) 끝난 건은 중복 발급 방지로 제외. 나성 계정(kim)은 나성 발행분만 — `account.ts`의 `HOMETAX_ISSUER_LOCK`, route.ts가 403으로 강제. 국세청 발급/조회 공식 API는 없음, 유료 API 미사용
-- **테스트** → `src/__tests__/` (`npm test`). 계산 로직 `margin.test.ts`·`invoice-generator.test.ts`, 지급일·공휴일 `date.test.ts`, 실물 대사 `reconcile.test.ts`
+- **결제 일정 자동 재생성** → 페이지가 이미 조회한 입력으로 계산서를 메모리에서 만들어 저장본과 비교한다(`diffInvoices`, `invoices/page.tsx:computeDrift`). 결제·대사 기록이 없는 달은 차이가 있으면 자동 재생성, 있는 달은 **생성 뒤 입력이 바뀐 품목(`inputChanges`)의 금액 차이만** 배너로 알리고 담당자가 누른다
+  - 이 조건을 넓히지 말 것 — 2026-04~07은 금화 AL 공식·석탄 커미션 지급일 규칙이 나중에 바뀌어 지금 계산과 다르지만, 저장값이 실제 발행·결제된 계산서다. 재생성하면 발행분과 어긋난다(2026-11-02 실데이터로 확인: 04~07 차이 있음·배너 0건, 08~11 차이 0)
+  - 입력 변경 시각은 입고·계약 `updated_at`, 감가 `updated_at`, 커미션 `created_at`, 입고 삭제는 `audit_log`(`before->>invoice_month`). FeSi 환율은 시각 컬럼이 없어 감지 안 됨
+  - `replaceInvoices`는 삭제→삽입→복원이 트랜잭션이 아니다. 복원 실패는 이제 오류로 알리고, 보존 대상 원본을 `audit_log.before.preserved`에 남긴다. 원자화하려면 DB 함수(RPC) 마이그레이션이 필요 — 적용 전 배포 금지
+- **테스트** → `src/__tests__/` (`npm test`). 계산 로직 `margin.test.ts`·`invoice-generator.test.ts`, 지급일·공휴일 `date.test.ts`, 실물 대사 `reconcile.test.ts`, 입고 일괄 저장 `delivery-batch.test.ts`, 기간 필터·비용 월별 합계 `period.test.ts`, 재생성 감지 `regen-check.test.ts`

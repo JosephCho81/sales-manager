@@ -12,6 +12,7 @@ import {
   type DeliveryRawForInvoice,
   type InvoiceRow,
   type CommissionForInvoice,
+  type InvoiceDrift,
 } from '@/lib/invoice-generator'
 import { carryBalances, pendingRecovery } from '@/lib/depreciation'
 import { useCanEdit } from '@/components/RoleProvider'
@@ -45,6 +46,8 @@ export default function InvoicesClient({
   yearMonth,
   initialDeliveries,
   initialInvoices,
+  drift,
+  changedAfterGen,
   initialCommissions,
   products,
   initialMonthlyDeps,
@@ -56,6 +59,10 @@ export default function InvoicesClient({
   yearMonth: string
   initialDeliveries: DeliveryRawForInvoice[]
   initialInvoices: InvoiceRow[]
+  /** 저장된 계산서와 현재 입력의 차이 (null = 판정 불가) */
+  drift: InvoiceDrift[] | null
+  /** 계산서 생성 뒤 입력(입고·단가·감가)이 바뀐 품목. null = 커미션 등록 */
+  changedAfterGen: Array<string | null>
   initialCommissions: CommissionForInvoice[]
   products: Array<{ id: string; name: string; display_name: string | null }>
   initialMonthlyDeps: MonthlyDepreciation[]
@@ -88,6 +95,15 @@ export default function InvoicesClient({
     initialCommissions.map(c => c.id),
     yearMonth,
   )
+  // 입고·감가·단가 수정으로 금액·날짜가 달라진 경우.
+  // 결제·대사 기록이 하나라도 있으면 맞춰 본 금액이 말없이 바뀌지 않도록 자동 재생성하지 않고 알린다.
+  // 그 달은 "생성 뒤 입력이 바뀐 품목"의 "금액" 차이만 알린다. 2026-05~07처럼 계산 규칙(금화 AL 공식,
+  // 석탄 커미션 지급일)이 나중에 바뀐 과거 발행분은 저장값이 실제 발행·결제된 계산서라 재생성하면 안 된다
+  const hasLockedRecords = initialInvoices.some(i => i.is_paid || i.reconciled_at)
+  const shownDrift = (drift ?? []).filter(d =>
+    !hasLockedRecords || (changedAfterGen.includes(d.product_id) && d.before !== d.after))
+  const hasDrift = shownDrift.length > 0
+  const autoRegen = needsRegen || (hasDrift && !hasLockedRecords)
 
   // 품목명 맵 (product_id → display_name)
   // products 전체 목록을 먼저 채워 UUID fallback 방지
@@ -129,21 +145,23 @@ export default function InvoicesClient({
       if (result.error) throw new Error(result.error)
 
       setInvoices((result.data ?? []) as unknown as InvoiceRow[])
+      router.refresh() // 변경 감지(drift) 판정을 새 계산서 기준으로 다시 받는다
     } catch (e) {
       setError(toMessage(e))
     } finally {
       setGenerating(false)
     }
-  }, [yearMonth])
+  }, [yearMonth, router])
 
-  // 자동 생성: 데이터는 있는데 계산서가 없거나 커미션 월이 오래된 경우
+  // 자동 생성: 계산서가 없음 / 커미션 월 stale / 입력이 바뀌었고 결제·대사 기록이 없음.
+  // 조회 전용 계정은 재생성 권한이 없으므로 시도하지 않는다(배너로만 알림)
   useEffect(() => {
-    if (!autoGenRef.current && needsRegen &&
+    if (canEdit && !autoGenRef.current && autoRegen &&
         (initialDeliveries.length > 0 || initialCommissions.length > 0)) {
       autoGenRef.current = true
       handleGenerate()
     }
-  }, [handleGenerate, needsRegen, initialDeliveries.length, initialCommissions.length])
+  }, [canEdit, handleGenerate, autoRegen, initialDeliveries.length, initialCommissions.length])
 
   // 지급완료일 업데이트 (optimistic update)
   async function handleSetPaidDate(id: string, paidDate: string | null) {
@@ -242,6 +260,32 @@ export default function InvoicesClient({
           <p className="mt-0.5 text-xs text-amber-700">
             설·추석·대체공휴일이 등록되지 않아 이 기간 지급일의 휴일 보정이 틀릴 수 있습니다.
             품목 설정 화면의 <b>공휴일 관리</b>에서 등록한 뒤 계산서를 재생성하세요.
+          </p>
+        </div>
+      )}
+
+      {/* 입력 변경 감지 — 자동 재생성하지 않은 경우(결제·대사 기록 있음 / 조회 전용)만 */}
+      {hasDrift && !generating && (hasLockedRecords || !canEdit) && (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm">
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-amber-800">
+              입고·감가 변경이 계산서에 반영되지 않았습니다 ({shownDrift.length}건)
+            </p>
+            {canEdit && (
+              <button onClick={handleGenerate} className="btn-secondary text-xs ml-auto">재생성</button>
+            )}
+          </div>
+          <ul className="mt-1 text-xs text-amber-800 tabular-nums">
+            {shownDrift.map((d, i) => (
+              <li key={i}>
+                {d.label}: {d.before === null ? '없음' : fmtKrw(d.before)} → {d.after === null ? '없음' : fmtKrw(d.after)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-amber-700">
+            {canEdit
+              ? '결제완료·대사 기록이 있는 달이라 자동으로 바꾸지 않았습니다. 재생성해도 결제·대사 기록은 보존됩니다.'
+              : '편집 권한자가 재생성해야 반영됩니다.'}
           </p>
         </div>
       )}

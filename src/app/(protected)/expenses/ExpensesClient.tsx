@@ -1,6 +1,13 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { useCanEdit } from '@/components/RoleProvider'
+import PeriodFilterBar from '@/components/PeriodFilterBar'
+import { dateInPeriod, type PeriodFilter } from '@/lib/period'
+import { getCurrentYearMonth, getTodayDate, shiftMonths } from '@/lib/date'
+import { fmtKrw } from '@/lib/margin'
+import { summarizeByMonth } from './expense-settlement'
+import ExpenseMonthlySummary from './ExpenseMonthlySummary'
 import { useExpenses } from './useExpenses'
 import { EXPENSE_PAYERS, EXPENSE_PAYER_LABELS, type Expense, type ExpensePayer } from '@/types'
 import ExpenseSettlementCard from './ExpenseSettlementCard'
@@ -18,6 +25,18 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
   } = useExpenses(initialRows)
 
   const canEdit = useCanEdit()
+
+  // 조회 기간 — 목록·월별 합계에만 적용. 3사 정산 카드는 기간과 무관하게 미정산 전체 기준
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const ym = getCurrentYearMonth()
+    return { mode: 'all', from: ym, to: ym }
+  })
+  const visibleRows = useMemo(() => {
+    const today = getTodayDate()
+    return rows.filter(r => dateInPeriod(r.date, period, today))
+  }, [rows, period])
+  const months = useMemo(() => summarizeByMonth(visibleRows), [visibleRows])
+  const visibleTotal = months.reduce((s, m) => s + m.total, 0)
 
   const rowProps = (row: Expense) => ({
     row,
@@ -116,14 +135,35 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
       </div>
       )}
 
+      {/* 기간별 지출 */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h3 className="text-sm font-semibold text-gray-700">지출 내역</h3>
+        <PeriodFilterBar
+          modes={[{ mode: 'month', label: '월' }, { mode: 'range', label: '기간' }, { mode: 'all', label: '전체' }]}
+          value={period}
+          onChange={next => setPeriod(p =>
+            // 기간 모드로 처음 바꿀 때 시작월을 6개월 전으로 펼쳐 준다
+            next.mode === 'range' && p.mode !== 'range' && next.from === next.to
+              ? { ...next, from: shiftMonths(next.to, -5) }
+              : next
+          )}
+        />
+        <span className="ml-auto text-xs text-gray-500 tabular-nums">
+          {visibleRows.length}건 · <b className="text-gray-800">{fmtKrw(visibleTotal)}</b>
+        </span>
+      </div>
+      <ExpenseMonthlySummary months={months} />
+
       {/* 비용 목록 */}
-      {rows.length === 0 ? (
-        <div className="card px-4 py-8 text-center text-sm text-gray-400">등록된 비용 항목이 없습니다.</div>
+      {visibleRows.length === 0 ? (
+        <div className="card px-4 py-8 text-center text-sm text-gray-400">
+          {rows.length === 0 ? '등록된 비용 항목이 없습니다.' : '선택한 기간에 비용 항목이 없습니다.'}
+        </div>
       ) : (
         <>
           {/* 모바일 카드 목록 */}
           <div className="sm:hidden flex flex-col gap-2">
-            {rows.map(row => <ExpenseCard key={row.id} {...rowProps(row)} />)}
+            {visibleRows.map(row => <ExpenseCard key={row.id} {...rowProps(row)} />)}
           </div>
 
           {/* 데스크톱 테이블 */}
@@ -142,7 +182,7 @@ export default function ExpensesClient({ initialRows }: { initialRows: Expense[]
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => <ExpenseTableRow key={row.id} {...rowProps(row)} />)}
+                  {visibleRows.map(row => <ExpenseTableRow key={row.id} {...rowProps(row)} />)}
                 </tbody>
               </table>
             </div>

@@ -1,5 +1,9 @@
 'use client'
 
+import { useState } from 'react'
+import PeriodFilterBar from '@/components/PeriodFilterBar'
+import { contractInPeriod, type PeriodFilter } from '@/lib/period'
+import { getCurrentYearMonth, getTodayDate, shiftMonths } from '@/lib/date'
 import { useCanEdit } from '@/components/RoleProvider'
 import { deleteContract } from './actions'
 import { fmtNum } from '@/lib/margin'
@@ -38,9 +42,15 @@ export default function ContractTable({
   onDeleted: (id: string) => void
 }) {
   const canEdit = useCanEdit()
-  const filtered = filterProductId
-    ? contracts.filter(c => c.product_id === filterProductId)
-    : contracts
+  // 기본은 "현재" — 지난 단가는 숨기고 진행 중·시작 예정만 보인다
+  const [period, setPeriod] = useState<PeriodFilter>(() => {
+    const ym = getCurrentYearMonth()
+    return { mode: 'current', from: shiftMonths(ym, -5), to: ym }
+  })
+  const today = getTodayDate()
+  const filtered = contracts.filter(c =>
+    (!filterProductId || c.product_id === filterProductId) && contractInPeriod(c, period, today)
+  )
 
   async function handleDelete(id: string) {
     if (!confirm('이 낙찰 단가를 삭제하시겠습니까?\n연결된 입고 데이터가 있으면 삭제되지 않습니다.')) return
@@ -52,7 +62,12 @@ export default function ContractTable({
   return (
     <>
       {/* 필터 */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <PeriodFilterBar
+          modes={[{ mode: 'current', label: '현재' }, { mode: 'range', label: '기간' }, { mode: 'all', label: '전체' }]}
+          value={period}
+          onChange={setPeriod}
+        />
         <label className="text-sm text-gray-600 font-medium">품목 필터:</label>
         <select className="input w-auto" value={filterProductId}
           onChange={e => onFilterChange(e.target.value)}>
@@ -84,7 +99,7 @@ export default function ContractTable({
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={9} className="table-td text-center text-gray-400 py-10">
-                  등록된 낙찰 단가가 없습니다.
+                  {period.mode === 'current' ? '진행 중이거나 시작 예정인 낙찰 단가가 없습니다.' : '조건에 맞는 낙찰 단가가 없습니다.'}
                 </td>
               </tr>
             )}

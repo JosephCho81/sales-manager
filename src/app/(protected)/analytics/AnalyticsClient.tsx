@@ -71,8 +71,11 @@ export default function AnalyticsClient({
   }, [activeMode, monthVal, fromVal, toVal, yearVal, filterProduct, filterBuyer])
 
   // 날짜 조회 버튼
+  // 같은 조건으로 다시 조회하면 push가 이동으로 보지 않으므로 refresh로 서버를 다시 부른다
   const navigate = useCallback(() => {
-    router.push(buildUrl())
+    const url = buildUrl()
+    if (url === window.location.pathname + window.location.search) router.refresh()
+    else router.push(url)
   }, [buildUrl, router])
 
   // 필터 변경 시 즉시 서버 이동 (버튼 클릭 불필요)

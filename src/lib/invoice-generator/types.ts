@@ -69,6 +69,8 @@ export type InvoiceRow = {
   reconcile_memo: string | null
   memo: string | null
   invoice_type: string | null
+  /** 생성 시각 — 재생성은 전부 새로 insert하므로 마지막 생성 시각이 된다 */
+  created_at?: string
 }
 
 // ── 월별 감가 차감분 ──

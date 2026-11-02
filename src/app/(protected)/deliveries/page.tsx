@@ -2,11 +2,17 @@ import { toMessage } from '@/lib/error'
 import FetchErrorView from '@/components/FetchErrorView'
 import { createAdminClient } from '@/lib/supabase/server'
 import DeliveriesClient from './DeliveriesClient'
+import { getCurrentYearMonth, shiftMonths } from '@/lib/date'
 import type { ProductRow, ContractRow, DeliveryRow } from './types'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DeliveriesPage() {
+type SearchParams = Promise<{ month?: string }>
+
+export default async function DeliveriesPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams
+  const month = params.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : getCurrentYearMonth()
+
   let products: ProductRow[] = []
   let contracts: ContractRow[] = []
   let deliveries: DeliveryRow[] = []
@@ -33,13 +39,16 @@ export default async function DeliveriesPage() {
           product:products(id, display_name, buyer),
           contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate, start_date, end_date)
         `)
-        .order('year_month', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(200),
-      // FeSi 실제 환율 (product_id + BL날짜 = delivery_date 로 매칭)
+        // 조회 월만 서버에서 — 예전엔 최근 200건을 받아 화면에서 걸러 오래된 달이 비어 보였다
+        .eq('year_month', month)
+        .order('delivery_date', { ascending: false })
+        .order('created_at', { ascending: false }),
+      // FeSi 실제 환율 (product_id + BL날짜 = delivery_date 로 매칭) — 조회 월만
       supabase
         .from('fx_rates')
-        .select('product_id, bl_date, rate_krw_per_usd'),
+        .select('product_id, bl_date, rate_krw_per_usd')
+        .gte('bl_date', `${month}-01`)
+        .lt('bl_date', `${shiftMonths(month, 1)}-01`),
     ])
 
     if (pResult.error) fetchError = `품목: ${pResult.error.message}`
@@ -66,6 +75,8 @@ export default async function DeliveriesPage() {
 
   return (
     <DeliveriesClient
+      key={month}
+      month={month}
       products={products}
       contracts={contracts}
       initialDeliveries={deliveries}

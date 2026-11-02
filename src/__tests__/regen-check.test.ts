@@ -69,3 +69,37 @@ describe('needsInvoiceRegen', () => {
     expect(needsInvoiceRegen([salesInv], [], '2026-07')).toBe(false)
   })
 })
+
+import { diffInvoices } from '@/lib/invoice-generator/regen-check'
+
+describe('diffInvoices — 입고·감가 변경 감지', () => {
+  const row = (o: Record<string, unknown> = {}) => ({
+    invoice_type: 'sales', product_id: 'p1', from_company: '한국에이원', to_company: '동국제강',
+    delivery_year_month: '2026-10', delivery_ids: ['d1', 'd2'],
+    supply_amount: 1000, vat_amount: 100, total_amount: 1100,
+    invoice_basis_date: '2026-10-31', issue_deadline: '2026-11-10', payment_due_date: '2026-11-30',
+    ...o,
+  }) as Parameters<typeof diffInvoices>[0][number]
+  const label = () => 'L'
+
+  it('같으면 빈 배열 — DB의 numeric 문자열·delivery_ids 순서는 무시', () => {
+    const stored = row({ supply_amount: '1000', vat_amount: '100', total_amount: '1100', delivery_ids: ['d2', 'd1'] })
+    expect(diffInvoices([row()], [stored as never], label)).toEqual([])
+  })
+
+  it('물량 수정으로 금액이 바뀌면 감지', () => {
+    const d = diffInvoices([row({ total_amount: 2200 })], [row() as never], label)
+    expect(d).toEqual([{ label: 'L', product_id: 'p1', before: 1100, after: 2200 }])
+  })
+
+  it('입고 추가로 계산서가 새로 생기거나, 삭제로 사라지면 감지', () => {
+    expect(diffInvoices([row(), row({ invoice_type: 'cost' })], [row() as never], label)).toHaveLength(1)
+    expect(diffInvoices([], [row() as never], label)).toEqual([{ label: 'L', product_id: 'p1', before: 1100, after: null }])
+  })
+
+  it('AL30처럼 같은 거래 단위 여러 장은 순서와 무관하게 묶어서 비교', () => {
+    const a = row({ invoice_basis_date: '2026-10-10', total_amount: 1 })
+    const b = row({ invoice_basis_date: '2026-10-20', total_amount: 2 })
+    expect(diffInvoices([a, b], [b as never, a as never], label)).toEqual([])
+  })
+})

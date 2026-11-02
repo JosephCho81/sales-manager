@@ -1,24 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { getCurrentYearMonth } from '@/lib/date'
+import { useRouter } from 'next/navigation'
 import { useCanEdit } from '@/components/RoleProvider'
 import DeliveryForm from './DeliveryForm'
 import DeliveryTable from './DeliveryTable'
 import type { ProductRow, ContractRow, DeliveryRow } from './types'
 
 export default function DeliveriesClient({
+  month,
   products,
   contracts,
   initialDeliveries,
 }: {
+  /** 조회 월 — 서버가 이 달 입고만 내려준다 */
+  month: string
   products: ProductRow[]
   contracts: ContractRow[]
   initialDeliveries: DeliveryRow[]
 }) {
+  const router = useRouter()
   const canEdit = useCanEdit()
   const [deliveries, setDeliveries]   = useState<DeliveryRow[]>(initialDeliveries)
-  const [filterMonth, setFilterMonth] = useState(getCurrentYearMonth())
   // undefined = 폼 숨김 | null = 새 입고 | DeliveryRow = 수정 중
   const [editDelivery, setEditDelivery] = useState<DeliveryRow | null | undefined>(undefined)
 
@@ -36,16 +39,19 @@ export default function DeliveriesClient({
 
       {canEdit && editDelivery !== undefined && (
         <DeliveryForm
+          key={editDelivery?.id ?? 'new'}
           products={products}
           contracts={contracts}
           editDelivery={editDelivery}
-          defaultYearMonth={filterMonth}
+          defaultYearMonth={month}
           onClose={() => setEditDelivery(undefined)}
           onSaved={saved => {
+            // 다른 달로 저장·이동한 건은 이 달 목록에서 뺀다
+            const inMonth = saved.filter(d => d.year_month === month)
             setDeliveries(prev =>
               editDelivery?.id
-                ? prev.map(d => d.id === editDelivery.id ? saved : d)
-                : [saved, ...prev]
+                ? prev.flatMap(d => d.id === editDelivery.id ? inMonth : [d])
+                : [...inMonth, ...prev]
             )
             setEditDelivery(undefined)
           }}
@@ -54,8 +60,8 @@ export default function DeliveriesClient({
 
       <DeliveryTable
         deliveries={deliveries}
-        filterMonth={filterMonth}
-        onFilterChange={setFilterMonth}
+        filterMonth={month}
+        onFilterChange={m => { if (m) router.push(`/deliveries?month=${m}`) }}
         onEdit={d => setEditDelivery(d)}
         onDeleted={id => setDeliveries(prev => prev.filter(d => d.id !== id))}
       />

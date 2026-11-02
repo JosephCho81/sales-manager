@@ -5,6 +5,7 @@ import { fmtKrw, fmtNum } from '@/lib/margin'
 import { toYearMonth } from '@/lib/date'
 import type { ProductRow, ContractRow, DeliveryRow } from './types'
 import MarginPreview from './MarginPreview'
+import type { PreviewLine } from './useDeliveryForm'
 
 // 휠 스크롤·화살표 키로 type=number 값이 미세 증감(step)되는 오입력 차단
 const blockWheel = (e: React.WheelEvent<HTMLInputElement>) => e.currentTarget.blur()
@@ -25,13 +26,16 @@ export default function DeliveryForm({
   editDelivery: DeliveryRow | null
   defaultYearMonth: string
   onClose: () => void
-  onSaved: (saved: DeliveryRow) => void
+  onSaved: (saved: DeliveryRow[]) => void
 }) {
   const {
     form, setForm,
+    quantities, setQuantities,
     saving, error,
+    duplicates, clearDuplicates,
+    isEdit,
     selectedProduct, isFeSi, isCoal, formYearMonth,
-    availableContracts, selectedContract, contractForPreview, mainMargin,
+    availableContracts, selectedContract, contractForPreview, mainMargin, previewLines,
     handleSave,
   } = useDeliveryForm({ products, contracts, editDelivery, defaultYearMonth, onSaved })
 
@@ -54,7 +58,7 @@ export default function DeliveryForm({
             </label>
             <input
               type="date" className="input" value={form.delivery_date}
-              onChange={e => setForm(f => ({ ...f, delivery_date: e.target.value, contract_id: '' }))}
+              onChange={e => { setForm(f => ({ ...f, delivery_date: e.target.value, contract_id: '' })); setQuantities({}); clearDuplicates() }}
             />
             {form.delivery_date && (
               <p className="mt-1 text-xs text-gray-400">
@@ -69,7 +73,7 @@ export default function DeliveryForm({
             <label className="label">품목 *</label>
             <select
               className="input" value={form.product_id}
-              onChange={e => setForm(f => ({ ...f, product_id: e.target.value, contract_id: '' }))}
+              onChange={e => { setForm(f => ({ ...f, product_id: e.target.value, contract_id: '' })); setQuantities({}); clearDuplicates() }}
             >
               <option value="">품목 선택</option>
               {products.map(p => (
@@ -86,8 +90,13 @@ export default function DeliveryForm({
       {form.product_id && (
         <div className="mb-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Step 2 — 낙찰 단가 선택
+            {isEdit ? 'Step 2 — 낙찰 단가 선택' : 'Step 2 — 낙찰 단가별 물량 입력'}
           </p>
+          {!isEdit && availableContracts.length > 1 && (
+            <p className="mb-2 text-xs text-gray-500">
+              단가가 {availableContracts.length}개입니다. 단가별 물량을 모두 넣고 한 번에 저장하세요 — 비워 둔 단가는 저장하지 않습니다.
+            </p>
+          )}
           {availableContracts.length === 0 ? (
             <div className="flex items-center gap-2 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-4 py-3">
               <span>⚠</span>
@@ -107,15 +116,19 @@ export default function DeliveryForm({
                 return (
                   <label
                     key={c.id}
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isSelected ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
+                    className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                      isEdit ? 'cursor-pointer' : ''
+                    } ${
+                      (isEdit ? isSelected : !!quantities[c.id]) ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-200 hover:bg-gray-50'
                     }`}
                   >
-                    <input
-                      type="radio" name="contract" value={c.id} checked={isSelected}
-                      onChange={() => setForm(f => ({ ...f, contract_id: c.id }))}
-                      className="mt-0.5"
-                    />
+                    {isEdit && (
+                      <input
+                        type="radio" name="contract" value={c.id} checked={isSelected}
+                        onChange={() => setForm(f => ({ ...f, contract_id: c.id }))}
+                        className="mt-0.5"
+                      />
+                    )}
                     <div className="flex-1 text-sm">
                       <div className="flex items-center flex-wrap gap-2">
                         <span className="font-medium text-gray-800">
@@ -140,22 +153,39 @@ export default function DeliveryForm({
                         </span>
                       </div>
                     </div>
+                    {!isEdit && (
+                      <div className="relative w-36 shrink-0">
+                        <input
+                          type="number" className="input pr-8 no-spinner text-right" value={quantities[c.id] ?? ''}
+                          onChange={e => { const v = e.target.value; setQuantities(q => ({ ...q, [c.id]: v })); clearDuplicates() }}
+                          onWheel={blockWheel} onKeyDown={blockArrowKeys}
+                          placeholder="톤" step="0.001" min="0"
+                          aria-label="물량(톤)"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">톤</span>
+                      </div>
+                    )}
                   </label>
                 )
               })}
+              {!isEdit && previewLines.length > 1 && (
+                <p className="text-right text-xs text-gray-500 tabular-nums">
+                  합계 <b className="text-gray-800">{fmtNum(previewLines.reduce((s, l) => s + l.margin.quantity_ton, 0), 3)} 톤</b>
+                </p>
+              )}
             </div>
           )}
         </div>
       )}
 
-      {/* STEP 3 — 물량 */}
-      {form.contract_id && (
+      {/* STEP 3 — 물량(수정만) · 메모 · FeSi 환율 */}
+      {(isEdit ? !!form.contract_id : availableContracts.length > 0) && (
         <div className="mb-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-            Step 3 — 물량 입력
+            {isEdit ? 'Step 3 — 물량 입력' : 'Step 3 — 메모'}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            {isEdit && <div>
               <label className="label">기본 물량 (톤) *<span className="text-gray-400 font-normal ml-1">— 소수점 3자리</span></label>
               <div className="relative">
                 <input
@@ -169,7 +199,7 @@ export default function DeliveryForm({
               {form.quantity_kg && parseFloat(form.quantity_kg) > 0 && (
                 <p className="mt-1 text-xs text-gray-400">= {fmtNum(parseFloat(form.quantity_kg) * 1000)} kg</p>
               )}
-            </div>
+            </div>}
             <div>
               <label className="label">메모</label>
               <input className="input" value={form.memo}
@@ -208,7 +238,7 @@ export default function DeliveryForm({
                       </p>
                     )}
                   </div>
-                  {form.fesi_fx_rate && form.quantity_kg && selectedContract && (
+                  {isEdit && form.fesi_fx_rate && form.quantity_kg && selectedContract && (
                     <div className="text-sm">
                       <p className="text-xs text-gray-500 mb-1">환율 기준 원화 환산</p>
                       <p className="text-gray-700">
@@ -268,22 +298,86 @@ export default function DeliveryForm({
         </p>
       )}
 
-      {/* 마진 미리보기 */}
-      <MarginPreview
-        mainMargin={mainMargin}
-        isFeSi={isFeSi}
-        fesiRateInput={form.fesi_fx_rate}
-        contractForPreview={contractForPreview}
-      />
+      {/* 마진 미리보기 — 1건은 상세, 단가 여러 개는 합계표 */}
+      {previewLines.length > 1 ? (
+        <BatchPreview lines={previewLines} />
+      ) : (
+        <MarginPreview
+          mainMargin={mainMargin}
+          isFeSi={isFeSi}
+          fesiRateInput={form.fesi_fx_rate}
+          contractForPreview={contractForPreview}
+        />
+      )}
 
       {error && <p className="mb-4 text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{error}</p>}
 
+      {duplicates && duplicates.length > 0 && (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm">
+          <p className="font-bold text-amber-800">같은 단가로 {formYearMonth} 입고가 이미 있습니다</p>
+          <ul className="mt-1 text-xs text-amber-800 tabular-nums">
+            {duplicates.map(d => {
+              const c = availableContracts.find(x => x.id === d.contract_id)
+              return (
+                <li key={d.id}>
+                  {d.delivery_date ?? d.year_month} · 원가 {c ? fmtNum(c.cost_price, c.currency === 'USD' ? 2 : 0) : '?'} · {fmtNum(d.quantity_kg / 1000, 3)}톤
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-1 text-xs text-amber-700">중복 입력이면 취소하세요. 같은 달 추가분이 맞을 때만 그대로 저장합니다.</p>
+          <div className="mt-2 flex gap-2">
+            <button className="btn-secondary text-xs" onClick={() => handleSave(true)} disabled={saving}>추가분이 맞음 — 저장</button>
+            <button className="btn-secondary text-xs" onClick={clearDuplicates}>취소</button>
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <button className="btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? '저장 중...' : editDelivery ? '수정 저장' : '입고 등록'}
+        <button className="btn-primary" onClick={() => handleSave()} disabled={saving || !!duplicates}>
+          {saving ? '저장 중...' : isEdit ? '수정 저장' : previewLines.length > 1 ? `입고 ${previewLines.length}건 등록` : '입고 등록'}
         </button>
         <button className="btn-secondary" onClick={onClose}>취소</button>
       </div>
+    </div>
+  )
+}
+
+function BatchPreview({ lines }: { lines: PreviewLine[] }) {
+  const sum = (f: (l: PreviewLine) => number) => lines.reduce((s, l) => s + f(l), 0)
+  return (
+    <div className="mb-5 rounded-lg p-4 bg-blue-50 border border-blue-100">
+      <p className="text-xs font-semibold mb-2 text-blue-700">마진 미리보기 — 단가별</p>
+      <table className="w-full text-xs tabular-nums">
+        <thead>
+          <tr className="text-gray-500">
+            <th className="text-left font-normal">원가 단가</th>
+            <th className="text-right font-normal">물량</th>
+            <th className="text-right font-normal">판매액</th>
+            <th className="text-right font-normal">매입액</th>
+            <th className="text-right font-normal">마진</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map(l => (
+            <tr key={l.contract.id}>
+              <td>{fmtNum(l.margin.cost_price_krw)}원</td>
+              <td className="text-right">{fmtNum(l.margin.quantity_ton, 3)}톤</td>
+              <td className="text-right">{fmtKrw(l.margin.sell_price_krw * l.margin.quantity_ton)}</td>
+              <td className="text-right">{fmtKrw(l.margin.cost_price_krw * l.margin.quantity_ton)}</td>
+              <td className="text-right">{fmtKrw(l.margin.total_margin)}</td>
+            </tr>
+          ))}
+          <tr className="border-t border-blue-200 font-bold text-blue-700">
+            <td>합계</td>
+            <td className="text-right">{fmtNum(sum(l => l.margin.quantity_ton), 3)}톤</td>
+            <td className="text-right">{fmtKrw(sum(l => l.margin.sell_price_krw * l.margin.quantity_ton))}</td>
+            <td className="text-right">{fmtKrw(sum(l => l.margin.cost_price_krw * l.margin.quantity_ton))}</td>
+            <td className="text-right">{fmtKrw(sum(l => l.margin.total_margin))}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-gray-500">3사 배분은 계산서 기준(매출총액−매입총액을 한 번에 1/3)으로 결제 일정에서 확정됩니다.</p>
     </div>
   )
 }

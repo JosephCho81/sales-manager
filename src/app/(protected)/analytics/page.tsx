@@ -1,4 +1,3 @@
-import { unstable_cache } from 'next/cache'
 import { toMessage } from '@/lib/error'
 import { shiftMonths } from '@/lib/date'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -21,76 +20,71 @@ function currentYM() {
 }
 
 /**
- * Supabase 조회 결과를 2분간 캐싱.
- * 캐시 키: ['analytics-data', fromYM, toYM]
- * 필터(product/buyer)는 캐시 밖에서 처리 → 같은 기간은 캐시 재사용.
+ * 매 요청 fresh 조회. 예전엔 unstable_cache(2분)로 감쌌는데 입고·감가·커미션 저장 시
+ * 무효화가 없어 수정 직후 화면이 옛 값을 보여줬다 — 데이터가 작아 캐시 이득도 없다.
+ * 캐시를 다시 넣으려면 모든 mutation 액션에 revalidateTag를 같이 걸어야 한다.
  */
-const fetchAnalyticsData = unstable_cache(
-  async (fromYM: string, toYM: string) => {
-    const supabase = createAdminClient()
+async function fetchAnalyticsData(fromYM: string, toYM: string) {
+  const supabase = createAdminClient()
 
-    const [dRes, fxRes, mdRes] = await Promise.all([
-      supabase
-        .from('deliveries')
-        .select(`
-          id, year_month, invoice_month, delivery_date, product_id,
-          quantity_kg, depreciation_amount,
-          product:products(id, name, display_name, buyer),
-          contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
-        `)
-        .gte('invoice_month', fromYM)
-        .lte('invoice_month', toYM)
-        .order('invoice_month'),
-      // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
-      supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
-      // 월별 감가 — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로.
-      // 귀속월(year_month)과 매입 차감월(cost_deduct_ym)이 다를 수 있어 둘 중 하나라도
-      // 범위에 걸리면 가져온다 (5월 귀속 감가가 7월 납품분에서 차감되는 케이스)
-      supabase
-        .from('monthly_depreciations')
-        .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym')
-        .or(
-          `and(year_month.gte.${shiftMonths(fromYM, -2)},year_month.lte.${toYM}),` +
-          `and(cost_deduct_ym.gte.${shiftMonths(fromYM, -2)},cost_deduct_ym.lte.${toYM})`,
-        ),
-    ])
+  const [dRes, fxRes, mdRes] = await Promise.all([
+    supabase
+      .from('deliveries')
+      .select(`
+        id, year_month, invoice_month, delivery_date, product_id,
+        quantity_kg, depreciation_amount,
+        product:products(id, name, display_name, buyer),
+        contract:contracts(id, sell_price, cost_price, currency, reference_exchange_rate)
+      `)
+      .gte('invoice_month', fromYM)
+      .lte('invoice_month', toYM)
+      .order('invoice_month'),
+    // FeSi 실제 환율 (product_id + delivery_date 매칭). 작은 테이블이라 전체 조회
+    supabase.from('fx_rates').select('product_id, bl_date, rate_krw_per_usd'),
+    // 월별 감가 — offset 0~2 커버를 위해 납품월 하한을 fromYM−2로.
+    // 귀속월(year_month)과 매입 차감월(cost_deduct_ym)이 다를 수 있어 둘 중 하나라도
+    // 범위에 걸리면 가져온다 (5월 귀속 감가가 7월 납품분에서 차감되는 케이스)
+    supabase
+      .from('monthly_depreciations')
+      .select('product_id, year_month, amount, sales_deduct_ym, cost_deduct_ym')
+      .or(
+        `and(year_month.gte.${shiftMonths(fromYM, -2)},year_month.lte.${toYM}),` +
+        `and(cost_deduct_ym.gte.${shiftMonths(fromYM, -2)},cost_deduct_ym.lte.${toYM})`,
+      ),
+  ])
 
-    if (dRes.error)  throw new Error(dRes.error.message)
-    if (fxRes.error) throw new Error(fxRes.error.message)
-    if (mdRes.error) throw new Error(mdRes.error.message)
+  if (dRes.error)  throw new Error(dRes.error.message)
+  if (fxRes.error) throw new Error(fxRes.error.message)
+  if (mdRes.error) throw new Error(mdRes.error.message)
 
-    const fxMap = new Map<string, number>()
-    for (const r of (fxRes.data ?? []) as Array<{ product_id: string; bl_date: string; rate_krw_per_usd: number }>) {
-      fxMap.set(`${r.product_id}:${r.bl_date}`, Number(r.rate_krw_per_usd))
-    }
-    const deliveries = ((dRes.data ?? []) as unknown as DeliveryForAnalytics[]).map(d => ({
-      ...d,
-      fx_rate: d.delivery_date ? (fxMap.get(`${d.product_id}:${d.delivery_date}`) ?? null) : null,
-    }))
+  const fxMap = new Map<string, number>()
+  for (const r of (fxRes.data ?? []) as Array<{ product_id: string; bl_date: string; rate_krw_per_usd: number }>) {
+    fxMap.set(`${r.product_id}:${r.bl_date}`, Number(r.rate_krw_per_usd))
+  }
+  const deliveries = ((dRes.data ?? []) as unknown as DeliveryForAnalytics[]).map(d => ({
+    ...d,
+    fx_rate: d.delivery_date ? (fxMap.get(`${d.product_id}:${d.delivery_date}`) ?? null) : null,
+  }))
 
-    // 현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
-    const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
-    const commFromYM = yms.length ? yms[0]                              : fromYM
-    const commToYM   = shiftMonths(yms.length ? yms[yms.length - 1] : toYM, +1)
+  // 현대제철 AL30 커미션은 delivery year_month+1 기준이므로 상한 1개월 확장
+  const yms = deliveries.map(d => d.year_month).filter(Boolean).sort()
+  const commFromYM = yms.length ? yms[0]                              : fromYM
+  const commToYM   = shiftMonths(yms.length ? yms[yms.length - 1] : toYM, +1)
 
-    const cRes = await supabase
-      .from('commissions')
-      .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
-      .gte('year_month', commFromYM)
-      .lte('year_month', commToYM)
+  const cRes = await supabase
+    .from('commissions')
+    .select('year_month, commission_amount, company, quantity_kg, price_per_ton')
+    .gte('year_month', commFromYM)
+    .lte('year_month', commToYM)
 
-    if (cRes.error) throw new Error(cRes.error.message)
+  if (cRes.error) throw new Error(cRes.error.message)
 
-    return {
-      deliveries,
-      commissions: (cRes.data ?? []) as CommissionEntry[],
-      monthlyDeps: ((mdRes.data ?? []) as MonthlyDepForAnalytics[]).map(md => ({ ...md, amount: Number(md.amount) })),
-    }
-  },
-  // v4: 감가를 매출 감액월·매입 회수월로 분리 반영 — 구 캐시 엔트리와 분리
-  ['analytics-data-v4'],
-  { revalidate: 120 },
-)
+  return {
+    deliveries,
+    commissions: (cRes.data ?? []) as CommissionEntry[],
+    monthlyDeps: ((mdRes.data ?? []) as MonthlyDepForAnalytics[]).map(md => ({ ...md, amount: Number(md.amount) })),
+  }
+}
 
 function applyDeliveryFilter(
   deliveries: DeliveryForAnalytics[],
